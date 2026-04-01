@@ -1,18 +1,47 @@
 {
   "name": "claude-code-hub",
   "version": "0.1.0",
-  "description": "Unified hub for Claude Code tools — Marketplace + Kanban",
+  "description": "Unified hub for Claude Code tools — Marketplace + Kanban in one PWA",
   "main": "server.js",
   "bin": {
-    "claude-code-hub": "server.js"
+    "claude-code-hub": "./server.js"
   },
   "scripts": {
     "start": "node server.js",
     "dev": "node server.js --open"
   },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/NikiforovAll/claude-code-hub.git"
+  },
+  "keywords": [
+    "claude",
+    "claude-code",
+    "anthropic",
+    "hub",
+    "dashboard",
+    "marketplace",
+    "kanban",
+    "pwa",
+    "developer-tools"
+  ],
+  "author": "NikiforovAll",
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/NikiforovAll/claude-code-hub/issues"
+  },
+  "homepage": "https://github.com/NikiforovAll/claude-code-hub#readme",
   "dependencies": {
+    "claude-code-kanban": "^2.2.0",
+    "claude-code-marketplace": "^0.5.0",
     "express": "^4.21.0",
     "open": "^10.1.0"
   },
-  "license": "MIT"
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "files": [
+    "server.js",
+    "public/**/*"
+  ]
 }

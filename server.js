@@ -59,8 +59,17 @@ function killAll() {
 process.on('SIGINT', () => { killAll(); process.exit(0); });
 process.on('SIGTERM', () => { killAll(); process.exit(0); });
 
-spawnApp('marketplace', process.execPath, [path.join('marketplace', 'server.js'), `--port=${MARKETPLACE_PORT}`], MARKETPLACE_PORT);
-spawnApp('kanban', process.execPath, [path.join('cck', 'server.js')], KANBAN_PORT);
+function resolveApp(submoduleDir, npmPackage) {
+  const local = path.join(__dirname, submoduleDir, 'server.js');
+  try { require.resolve(local); return local; } catch {}
+  return require.resolve(`${npmPackage}/server.js`);
+}
+
+const marketplacePath = resolveApp('marketplace', 'claude-code-marketplace');
+const kanbanPath = resolveApp('cck', 'claude-code-kanban');
+
+spawnApp('marketplace', process.execPath, [marketplacePath, `--port=${MARKETPLACE_PORT}`], MARKETPLACE_PORT);
+spawnApp('kanban', process.execPath, [kanbanPath], KANBAN_PORT);
 
 const app = express();
 
