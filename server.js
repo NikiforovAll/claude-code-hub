@@ -5,7 +5,7 @@ const express = require('express');
 const path = require('path');
 
 function getArg(name) {
-  const idx = process.argv.findIndex(a => a.startsWith(`--${name}`));
+  const idx = process.argv.findIndex((a) => a.startsWith(`--${name}`));
   if (idx === -1) return null;
   const arg = process.argv[idx];
   if (arg.includes('=')) return arg.split('=').slice(1).join('=');
@@ -56,12 +56,21 @@ function killAll() {
   }
 }
 
-process.on('SIGINT', () => { killAll(); process.exit(0); });
-process.on('SIGTERM', () => { killAll(); process.exit(0); });
+process.on('SIGINT', () => {
+  killAll();
+  process.exit(0);
+});
+process.on('SIGTERM', () => {
+  killAll();
+  process.exit(0);
+});
 
 function resolveApp(submoduleDir, npmPackage) {
   const local = path.join(__dirname, submoduleDir, 'server.js');
-  try { require.resolve(local); return local; } catch {}
+  try {
+    require.resolve(local);
+    return local;
+  } catch {}
   return require.resolve(`${npmPackage}/server.js`);
 }
 
@@ -88,7 +97,7 @@ const server = app.listen(HUB_PORT, () => {
   const actual = server.address().port;
   console.log(`Claude Code Hub running at http://localhost:${actual}`);
   if (process.argv.includes('--open')) {
-    import('open').then(m => m.default(`http://localhost:${actual}`));
+    import('open').then((m) => m.default(`http://localhost:${actual}`));
   }
 });
 
@@ -99,7 +108,7 @@ server.on('error', (err) => {
       const actual = fallback.address().port;
       console.log(`Claude Code Hub running at http://localhost:${actual}`);
       if (process.argv.includes('--open')) {
-        import('open').then(m => m.default(`http://localhost:${actual}`));
+        import('open').then((m) => m.default(`http://localhost:${actual}`));
       }
     });
   } else {

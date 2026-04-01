@@ -62,6 +62,10 @@ function listenMessages() {
     } else if (data.type === 'hub:keydown') {
       if (data.key === 'ArrowLeft') cycleTab(-1);
       else if (data.key === 'ArrowRight') cycleTab(1);
+      else {
+        const digit = parseInt(data.key, 10);
+        if (digit >= 1 && digit <= 9) switchByIndex(digit - 1);
+      }
     }
   });
 }
@@ -73,11 +77,32 @@ function cycleTab(delta) {
   switchTab(next);
 }
 
+function switchByIndex(idx) {
+  const ids = Object.keys(apps);
+  if (idx < ids.length) switchTab(ids[idx]);
+}
+
 function listenKeys() {
   document.addEventListener('keydown', (e) => {
+    if (e.altKey && !e.ctrlKey && !e.shiftKey && !e.metaKey) {
+      const digit = parseInt(e.key, 10);
+      if (digit >= 1 && digit <= 9) {
+        e.preventDefault();
+        switchByIndex(digit - 1);
+        return;
+      }
+    }
     if (e.ctrlKey && e.altKey && !e.shiftKey && !e.metaKey) {
-      if (e.key === 'ArrowLeft') { e.preventDefault(); cycleTab(-1); return; }
-      if (e.key === 'ArrowRight') { e.preventDefault(); cycleTab(1); return; }
+      if (e.key === 'ArrowLeft') {
+        e.preventDefault();
+        cycleTab(-1);
+        return;
+      }
+      if (e.key === 'ArrowRight') {
+        e.preventDefault();
+        cycleTab(1);
+        return;
+      }
     }
   });
 }
