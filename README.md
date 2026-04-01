@@ -5,6 +5,12 @@ Unified launcher for Claude Code tools — browse plugins in **Marketplace** and
 ## Quick Start
 
 ```bash
+npx claude-code-hub --open
+```
+
+### From Source
+
+```bash
 git clone --recurse-submodules https://github.com/NikiforovAll/claude-code-hub.git
 cd claude-code-hub
 npm install && npm install --prefix marketplace && npm install --prefix cck
