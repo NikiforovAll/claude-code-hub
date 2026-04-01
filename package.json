@@ -1,0 +1,18 @@
+{
+  "name": "claude-code-hub",
+  "version": "0.1.0",
+  "description": "Unified hub for Claude Code tools — Marketplace + Kanban",
+  "main": "server.js",
+  "bin": {
+    "claude-code-hub": "server.js"
+  },
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node server.js --open"
+  },
+  "dependencies": {
+    "express": "^4.21.0",
+    "open": "^10.1.0"
+  },
+  "license": "MIT"
+}

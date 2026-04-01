@@ -1,0 +1,6 @@
+[submodule "marketplace"]
+	path = marketplace
+	url = https://github.com/NikiforovAll/claude-code-marketplace.git
+[submodule "cck"]
+	path = cck
+	url = https://github.com/NikiforovAll/claude-task-viewer.git

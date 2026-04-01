@@ -1,0 +1,99 @@
+#!/usr/bin/env node
+
+const { spawn } = require('child_process');
+const express = require('express');
+const path = require('path');
+
+function getArg(name) {
+  const idx = process.argv.findIndex(a => a.startsWith(`--${name}`));
+  if (idx === -1) return null;
+  const arg = process.argv[idx];
+  if (arg.includes('=')) return arg.split('=').slice(1).join('=');
+  return process.argv[idx + 1] || null;
+}
+
+const HUB_PORT = parseInt(getArg('port') || process.env.PORT || '3455', 10);
+const MARKETPLACE_PORT = parseInt(getArg('marketplace-port') || '3457', 10);
+const KANBAN_PORT = parseInt(getArg('kanban-port') || '3456', 10);
+
+const children = [];
+const actualPorts = { marketplace: MARKETPLACE_PORT, kanban: KANBAN_PORT };
+
+function spawnApp(name, cmd, args, envPort) {
+  const child = spawn(cmd, args, {
+    cwd: __dirname,
+    env: {
+      ...process.env,
+      PORT: String(envPort),
+      CLAUDE_HUB: '1',
+      HUB_URL: `http://localhost:${HUB_PORT}`,
+    },
+    stdio: ['ignore', 'pipe', 'pipe'],
+  });
+
+  let stdoutBuf = '';
+  child.stdout.on('data', (d) => {
+    stdoutBuf += d.toString();
+    let nl;
+    while ((nl = stdoutBuf.indexOf('\n')) !== -1) {
+      const line = stdoutBuf.slice(0, nl + 1);
+      stdoutBuf = stdoutBuf.slice(nl + 1);
+      process.stdout.write(`[${name}] ${line}`);
+      const match = line.match(/running at http:\/\/localhost:(\d+)/i);
+      if (match) actualPorts[name] = parseInt(match[1], 10);
+    }
+  });
+  child.stderr.on('data', (d) => process.stderr.write(`[${name}] ${d}`));
+  child.on('exit', (code) => console.log(`[${name}] exited (code ${code})`));
+
+  children.push(child);
+  return child;
+}
+
+function killAll() {
+  for (const child of children) {
+    if (!child.killed) child.kill();
+  }
+}
+
+process.on('SIGINT', () => { killAll(); process.exit(0); });
+process.on('SIGTERM', () => { killAll(); process.exit(0); });
+
+spawnApp('marketplace', process.execPath, [path.join('marketplace', 'server.js'), `--port=${MARKETPLACE_PORT}`], MARKETPLACE_PORT);
+spawnApp('kanban', process.execPath, [path.join('cck', 'server.js')], KANBAN_PORT);
+
+const app = express();
+
+app.get('/api/config', (_req, res) => {
+  res.json({
+    apps: {
+      marketplace: { name: 'Marketplace', url: `http://localhost:${actualPorts.marketplace}`, icon: 'store' },
+      kanban: { name: 'Kanban', url: `http://localhost:${actualPorts.kanban}`, icon: 'columns' },
+    },
+  });
+});
+
+app.use(express.static(path.join(__dirname, 'public')));
+
+const server = app.listen(HUB_PORT, () => {
+  const actual = server.address().port;
+  console.log(`Claude Code Hub running at http://localhost:${actual}`);
+  if (process.argv.includes('--open')) {
+    import('open').then(m => m.default(`http://localhost:${actual}`));
+  }
+});
+
+server.on('error', (err) => {
+  if (err.code === 'EADDRINUSE') {
+    console.log(`Port ${HUB_PORT} in use, trying random port...`);
+    const fallback = app.listen(0, () => {
+      const actual = fallback.address().port;
+      console.log(`Claude Code Hub running at http://localhost:${actual}`);
+      if (process.argv.includes('--open')) {
+        import('open').then(m => m.default(`http://localhost:${actual}`));
+      }
+    });
+  } else {
+    throw err;
+  }
+});
