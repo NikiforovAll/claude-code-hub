@@ -15,19 +15,23 @@ npm start        # http://localhost:3455
 
 | Shortcut | Action |
 |---|---|
+| `Alt+1` | Switch to Marketplace |
+| `Alt+2` | Switch to Kanban |
 | `Ctrl+Alt+Right` | Switch to next tool |
 | `Ctrl+Alt+Left` | Switch to previous tool |
 
 ## How It Works
 
-The hub server spawns both sub-apps as child processes, each on its own port. A minimal shell page embeds them in iframes and switches visibility on tab change — zero UI chrome, just the keyboard shortcut.
+The hub server spawns both sub-apps as child processes, each on its own port. A minimal shell page embeds them in iframes and switches visibility on tab change — zero UI chrome, just keyboard shortcuts.
 
 Sub-apps communicate with the hub via `postMessage`:
 
 ```js
 // From inside a sub-app, trigger cross-app navigation:
-hubNavigate('kanban', '?session=abc');
+hubNavigate('marketplace', '?project=/path/to/project');
 ```
+
+The Kanban sidebar shows a marketplace button on session cards — click it to jump to the Marketplace pre-filtered to that project.
 
 ## Included Tools
 
