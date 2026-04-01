@@ -42,6 +42,8 @@ function switchTab(appId) {
   } else {
     overlay.classList.add('fade-out');
   }
+
+  iframes[appId]?.focus();
 }
 
 function onIframeLoad(appId) {

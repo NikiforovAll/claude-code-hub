@@ -85,8 +85,8 @@ const app = express();
 app.get('/api/config', (_req, res) => {
   res.json({
     apps: {
-      marketplace: { name: 'Marketplace', url: `http://localhost:${actualPorts.marketplace}`, icon: 'store' },
       kanban: { name: 'Kanban', url: `http://localhost:${actualPorts.kanban}`, icon: 'columns' },
+      marketplace: { name: 'Marketplace', url: `http://localhost:${actualPorts.marketplace}`, icon: 'store' },
     },
   });
 });
