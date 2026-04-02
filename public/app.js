@@ -22,6 +22,7 @@ function buildIframes() {
     iframe.id = `iframe-${id}`;
     iframe.src = cfg.url;
     iframe.className = 'hidden';
+    iframe.allow = 'clipboard-write';
     iframe.addEventListener('load', () => onIframeLoad(id));
     container.appendChild(iframe);
     iframes[id] = iframe;
