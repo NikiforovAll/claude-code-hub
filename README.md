@@ -8,13 +8,13 @@ Unified launcher for Claude Code tools — browse plugins in **Marketplace**, tr
 
 ## Kanban:
 
-![Kanban Screenshot](./cck/assets/screenshot-light-v2.png)
+![Kanban Screenshot](./assets/cck.png)
 
 ## Marketplace:
-![Marketplace Screenshot](./marketplace/assets/main-light.png)
+![Marketplace Screenshot](./assets/marketplace.png)
 
 ## Cost:
-![Cost Screenshot](./cost/assets/sesssion-light.png)
+![Cost Screenshot](./assets/cost.png)
 
 ## Quick Start
 
