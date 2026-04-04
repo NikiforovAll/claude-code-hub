@@ -31,6 +31,16 @@ npm install && npm install --prefix marketplace && npm install --prefix cck
 npm start        # http://localhost:3455
 ```
 
+## Agent Observability (one-time setup)
+
+For the full Kanban experience — agent log, live subagent tracking, waiting-for-user indicators, and context window monitoring — install the hooks:
+
+```bash
+npx claude-code-kanban --install
+```
+
+Without hooks you still get the task board, but no agent activity or live indicators. See the [Kanban README](https://github.com/NikiforovAll/claude-task-viewer#getting-started) for details.
+
 ## Keyboard Shortcuts
 
 | Shortcut         | Action                  |
