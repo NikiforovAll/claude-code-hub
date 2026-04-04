@@ -44,9 +44,6 @@ npm start        # http://localhost:3455
 ## How It Works
 
 The hub server spawns both sub-apps as child processes, each on its own port. A minimal shell page embeds them in iframes and switches visibility on tab change — zero UI chrome, just keyboard shortcuts.
-```
-
-The Kanban sidebar shows a marketplace button on session cards — click it to jump to the Marketplace pre-filtered to that project.
 
 ## Included Tools
 
