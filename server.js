@@ -62,14 +62,29 @@ function killAll() {
   }
 }
 
-process.on('SIGINT', () => {
+function shutdown() {
   killAll();
   process.exit(0);
+}
+
+process.on('SIGINT', shutdown);
+process.on('SIGTERM', shutdown);
+process.on('SIGHUP', shutdown);
+process.on('exit', killAll);
+
+// Git Bash + tmux on Windows doesn't deliver signals — read stdin directly
+process.stdin.setEncoding('utf8');
+process.stdin.resume();
+process.stdin.on('data', (data) => {
+  const d = data.trim().toLowerCase();
+  // Ctrl+C (0x03), Ctrl+D (0x04), or typed "q"/"exit"
+  if (data.includes('\x03') || data.includes('\x04') || d === 'q' || d === 'exit') {
+    console.log('\nShutting down...');
+    shutdown();
+  }
 });
-process.on('SIGTERM', () => {
-  killAll();
-  process.exit(0);
-});
+process.stdin.on('end', shutdown);
+process.stdin.on('close', shutdown);
 
 function resolveApp(submoduleDir, npmPackage) {
   const local = path.join(__dirname, submoduleDir, 'server.js');
@@ -104,18 +119,23 @@ app.use(express.static(path.join(__dirname, 'public')));
 
 const server = app.listen(HUB_PORT, () => {
   const actual = server.address().port;
-  console.log(`Claude Code Hub running at http://localhost:${actual}`);
+  printBanner(actual);
   if (process.argv.includes('--open')) {
     import('open').then((m) => m.default(`http://localhost:${actual}`));
   }
 });
+
+function printBanner(port) {
+  console.log(`Claude Code Hub running at http://localhost:${port}`);
+  console.log('Type "q" or "exit" to stop the server');
+}
 
 server.on('error', (err) => {
   if (err.code === 'EADDRINUSE' || err.code === 'EACCES') {
     console.log(`Port ${HUB_PORT} in use, trying random port...`);
     const fallback = app.listen(0, () => {
       const actual = fallback.address().port;
-      console.log(`Claude Code Hub running at http://localhost:${actual}`);
+      printBanner(actual);
       if (process.argv.includes('--open')) {
         import('open').then((m) => m.default(`http://localhost:${actual}`));
       }
