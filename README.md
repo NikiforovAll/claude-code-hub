@@ -4,7 +4,17 @@
 [![license](https://img.shields.io/npm/l/claude-code-hub)](LICENSE)
 [![npm downloads](https://img.shields.io/npm/dm/claude-code-hub)](https://www.npmjs.com/package/claude-code-hub)
 
-Unified launcher for Claude Code tools — browse plugins in **Marketplace** and track tasks in **Kanban**, all from a single chromeless PWA.
+Unified launcher for Claude Code tools — browse plugins in **Marketplace**, track tasks in **Kanban**, and monitor costs in **Cost**, all from a single chromeless PWA.
+
+## Kanban:
+
+![Kanban Screenshot](./cck/assets/screenshot-light-v2.png)
+
+## Marketplace:
+![Marketplace Screenshot](./marketplace/assets/main-light.png)
+
+## Cost:
+![Cost Screenshot](./cost/assets/sesssion-light.png)
 
 ## Quick Start
 
@@ -27,6 +37,7 @@ npm start        # http://localhost:3455
 | ---------------- | ----------------------- |
 | `Alt+1`          | Switch to Kanban        |
 | `Alt+2`          | Switch to Marketplace   |
+| `Alt+3`          | Switch to Cost          |
 | `Ctrl+Alt+Right` | Switch to next tool     |
 | `Ctrl+Alt+Left`  | Switch to previous tool |
 
@@ -43,6 +54,7 @@ The Kanban sidebar shows a marketplace button on session cards — click it to j
 | ---------------------------------------------------------------------- | -------------- | ------------ |
 | [Marketplace](https://github.com/NikiforovAll/claude-code-marketplace) | `marketplace/` | 3457         |
 | [Kanban](https://github.com/NikiforovAll/claude-task-viewer)           | `cck/`         | 3456         |
+| [Cost](https://github.com/NikiforovAll/claude-code-cost)               | `cost/`        | 3458         |
 
 ## CLI Flags
 
@@ -50,6 +62,7 @@ The Kanban sidebar shows a marketplace button on session cards — click it to j
 --port <n>              Hub port (default: 3455)
 --marketplace-port <n>  Marketplace port (default: 3457)
 --kanban-port <n>       Kanban port (default: 3456)
+--cost-port <n>         Cost port (default: 3458)
 --open                  Auto-open browser
 ```
 
