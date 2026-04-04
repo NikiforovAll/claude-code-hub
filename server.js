@@ -53,7 +53,12 @@ function spawnApp(name, cmd, args, envPort) {
 
 function killAll() {
   for (const child of children) {
-    if (!child.killed) child.kill();
+    if (child.killed) continue;
+    if (process.platform === 'win32') {
+      spawn('taskkill', ['/pid', String(child.pid), '/f', '/t'], { stdio: 'ignore' });
+    } else {
+      child.kill();
+    }
   }
 }
 
@@ -106,7 +111,7 @@ const server = app.listen(HUB_PORT, () => {
 });
 
 server.on('error', (err) => {
-  if (err.code === 'EADDRINUSE') {
+  if (err.code === 'EADDRINUSE' || err.code === 'EACCES') {
     console.log(`Port ${HUB_PORT} in use, trying random port...`);
     const fallback = app.listen(0, () => {
       const actual = fallback.address().port;
