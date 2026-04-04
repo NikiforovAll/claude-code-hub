@@ -22,33 +22,41 @@ Create a new release for this project.
 
 3. **Check working tree**: Run `git status`. If there are uncommitted changes, warn the user and stop.
 
-4. **Bump version**:
+4. **Update submodules**: Pull latest commits for all submodules and commit the updated references:
+   ```
+   git submodule update --remote
+   git add marketplace cck
+   git commit -m "chore: update marketplace and cck submodules"
+   ```
+   If there are no submodule changes, skip the commit.
+
+5. **Bump version**:
    ```
    npm version <version> --no-git-tag-version
    ```
 
-5. **Commit & push** (push to current branch, not hardcoded `main`):
+6. **Commit & push** (push to current branch, not hardcoded `main`):
    ```
    git add package.json package-lock.json
    git commit -m "🔖 chore: Bump version to <version>"
    git push origin HEAD
    ```
 
-6. **Tag & push tag**:
+7. **Tag & push tag**:
    ```
    git tag v<version>
    git push origin v<version>
    ```
 
-7. **Generate release notes**: Collect commits since the previous tag using `git log --oneline <prev-tag>..HEAD`. Write a **user-facing summary** grouped by:
+8. **Generate release notes**: Collect commits since the previous tag using `git log --oneline <prev-tag>..HEAD`. Write a **user-facing summary** grouped by:
    - Features (✨) — describe what was added, not raw commit messages
    - Fixes (🐛)
    - Other notable changes
    Include a "Full Changelog" compare link at the bottom.
 
-8. **Create GitHub release** (add `--prerelease` flag for RC/alpha/beta):
+9. **Create GitHub release** (add `--prerelease` flag for RC/alpha/beta):
    ```
    gh release create v<version> --title "v<version>" --notes "<notes>" [--prerelease]
    ```
 
-9. **Report**: Show the release URL to the user.
+10. **Report**: Show the release URL to the user.
