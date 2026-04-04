@@ -35,9 +35,9 @@
   },
   "homepage": "https://github.com/NikiforovAll/claude-code-hub#readme",
   "dependencies": {
-    "claude-code-cost": "^0.1.0",
-    "claude-code-kanban": "^2.2.0",
-    "claude-code-marketplace": "^0.5.0",
+    "claude-code-cost": "^0.2.0",
+    "claude-code-kanban": "^3.0.1",
+    "claude-code-marketplace": "^0.5.7",
     "express": "^4.21.0",
     "open": "^10.1.0"
   },
