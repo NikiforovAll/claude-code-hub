@@ -3,7 +3,7 @@
 	url = https://github.com/NikiforovAll/claude-code-marketplace.git
 [submodule "cck"]
 	path = cck
-	url = https://github.com/NikiforovAll/claude-task-viewer.git
+	url = https://github.com/NikiforovAll/claude-code-kanban.git
 [submodule "cost"]
 	path = cost
 	url = https://github.com/NikiforovAll/claude-code-cost.git
