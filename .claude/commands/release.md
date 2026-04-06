@@ -22,11 +22,13 @@ Create a new release for this project.
 
 3. **Check working tree**: Run `git status`. If there are uncommitted changes, warn the user and stop.
 
-4. **Update submodules**: Pull latest commits for all submodules and commit the updated references:
+4. **Update submodules**: Ensure all submodules are initialized and up to date, then pull latest commits:
    ```
+   git submodule sync
+   git submodule update --init
    git submodule update --remote
-   git add marketplace cck
-   git commit -m "chore: update marketplace and cck submodules"
+   git add marketplace cck cost
+   git commit -m "chore: update submodules"
    ```
    If there are no submodule changes, skip the commit.
 
