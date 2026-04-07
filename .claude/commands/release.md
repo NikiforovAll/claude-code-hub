@@ -27,22 +27,20 @@ Create a new release for this project.
    git submodule sync
    git submodule update --init
    git submodule update --remote
-   git add marketplace cck cost
-   git commit -m "chore: update submodules"
-   ```
-   If there are no submodule changes, skip the commit.
-
-5. **Bump version**:
-   ```
-   npm version <version> --no-git-tag-version
    ```
 
-6. **Commit & push** (push to current branch, not hardcoded `main`):
+5. **Bump version and commit everything in one commit**:
+   - Run `npm version <version> --no-git-tag-version`
+   - Update `package.json` dependency versions to match the submodule versions:
+     - Read each submodule's `package.json` to get its current version
+     - Update the corresponding `^x.y.z` ranges in the hub's `package.json` (fields: `claude-code-cost`, `claude-code-kanban`, `claude-code-marketplace`)
+   - Stage and commit all changes together:
    ```
-   git add package.json package-lock.json
+   git add package.json package-lock.json marketplace cck cost
    git commit -m "🔖 chore: Bump version to <version>"
    git push origin HEAD
    ```
+   If submodules have no changes, skip staging them.
 
 7. **Tag & push tag**:
    ```
