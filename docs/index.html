@@ -3,10 +3,10 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Claude Code Hub — Kanban, Marketplace, and Cost in one place</title>
-  <meta name="description" content="Unified launcher for Claude Code tools. Kanban board, plugin marketplace, and cost dashboard — one command, one window.">
+  <title>Claude Code Hub — Kanban, Marketplace, Cost, and Memory in one place</title>
+  <meta name="description" content="Unified launcher for Claude Code tools. Kanban board, plugin marketplace, cost dashboard, and memory explorer — one command, one window.">
   <meta property="og:title" content="Claude Code Hub">
-  <meta property="og:description" content="Kanban, Marketplace, and Cost in one place — one command, one window.">
+  <meta property="og:description" content="Kanban, Marketplace, Cost, and Memory in one place — one command, one window.">
   <meta property="og:type" content="website">
   <meta property="og:url" content="https://nikiforovall.blog/claude-code-hub/">
   <meta property="og:image" content="https://raw.githubusercontent.com/NikiforovAll/claude-code-hub/main/assets/cck.png">
@@ -283,6 +283,7 @@
     .tool-card-badge.kanban { background: rgba(91, 155, 213, 0.15); color: #5b9bd5; }
     .tool-card-badge.marketplace { background: rgba(77, 171, 130, 0.15); color: #3daa75; }
     .tool-card-badge.cost { background: var(--accent-dim); color: var(--accent); }
+    .tool-card-badge.memory { background: rgba(168, 130, 214, 0.15); color: #a882d6; }
     .tool-card h3 {
       font-family: var(--mono);
       font-size: 15px;
@@ -573,7 +574,7 @@
         </div>
       </div>
       <h1 class="fade-in delay-1">Hub for Claude<br>Code <em>Tools</em></h1>
-      <p class="hero-sub fade-in delay-2">Kanban board, plugin marketplace, and cost dashboard — unified in a single keyboard-driven launcher. Zero config.</p>
+      <p class="hero-sub fade-in delay-2">Kanban board, plugin marketplace, cost dashboard, and memory explorer — unified in a single keyboard-driven launcher. Zero config.</p>
       <div class="fade-in delay-3">
         <div class="install-block">
           <code><span class="prompt">$</span> npx claude-code-hub --open</code>
@@ -592,7 +593,7 @@
   <section class="tools" id="tools">
     <div class="container">
       <p class="section-label fade-in">Included Tools</p>
-      <h2 class="section-title fade-in">Three tools, one launcher</h2>
+      <h2 class="section-title fade-in">Four tools, one launcher</h2>
       <div class="tools-grid">
         <a class="tool-card fade-in" href="https://github.com/NikiforovAll/claude-task-viewer" target="_blank" rel="noopener">
           <img class="tool-card-img" src="assets/cck.png" alt="Kanban dashboard">
@@ -616,6 +617,14 @@
             <span class="tool-card-badge cost">Cost</span>
             <h3>Cost Dashboard</h3>
             <p>Usage and cost visualization. Drill down from totals to projects to individual sessions.</p>
+          </div>
+        </a>
+        <a class="tool-card fade-in delay-3" href="https://github.com/NikiforovAll/claude-code-memory" target="_blank" rel="noopener">
+          <img class="tool-card-img" src="assets/memory.png" alt="Memory explorer">
+          <div class="tool-card-body">
+            <span class="tool-card-badge memory">Memory</span>
+            <h3>Memory Explorer</h3>
+            <p>Visualize all memory sources that influence Claude Code — CLAUDE.md files, rules, auto memory, and import chains.</p>
           </div>
         </a>
       </div>
@@ -689,7 +698,7 @@
         <div class="step fade-in delay-2">
           <div class="step-num">2</div>
           <h3>Launch the Hub</h3>
-          <p>Starts all three tools on separate ports and opens a unified viewer in your browser.</p>
+          <p>Starts all four tools on separate ports and opens a unified viewer in your browser.</p>
           <div class="step-code">npx claude-code-hub --open</div>
         </div>
         <div class="step fade-in delay-4">
@@ -713,14 +722,14 @@
             What tools are included?
             <svg class="faq-chevron" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M5 8l5 5 5-5"/></svg>
           </button>
-          <div class="faq-a"><p><strong>Kanban</strong> — real-time task board. <strong>Marketplace</strong> — plugin browser and installer. <strong>Cost</strong> — usage and spend dashboard. Each tool also works standalone.</p></div>
+          <div class="faq-a"><p><strong>Kanban</strong> — real-time task board. <strong>Marketplace</strong> — plugin browser and installer. <strong>Cost</strong> — usage and spend dashboard. <strong>Memory</strong> — memory source explorer. Each tool also works standalone.</p></div>
         </div>
         <div class="faq-item fade-in delay-1">
           <button class="faq-q" onclick="toggleFaq(this)">
             Can I run individual tools without the Hub?
             <svg class="faq-chevron" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M5 8l5 5 5-5"/></svg>
           </button>
-          <div class="faq-a"><p>Yes. Each tool is its own npm package: <code>npx claude-code-kanban</code>, <code>npx claude-code-marketplace</code>, <code>npx claude-code-cost</code>. The Hub just wraps them into one window.</p></div>
+          <div class="faq-a"><p>Yes. Each tool is its own npm package: <code>npx claude-code-kanban</code>, <code>npx claude-code-marketplace</code>, <code>npx claude-code-cost</code>, <code>npx claude-code-memory-explorer</code>. The Hub just wraps them into one window.</p></div>
         </div>
         <div class="faq-item fade-in delay-2">
           <button class="faq-q" onclick="toggleFaq(this)">

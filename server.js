@@ -16,9 +16,10 @@ const HUB_PORT = parseInt(getArg('port') || process.env.PORT || '3455', 10);
 const MARKETPLACE_PORT = parseInt(getArg('marketplace-port') || '3457', 10);
 const KANBAN_PORT = parseInt(getArg('kanban-port') || '3456', 10);
 const COST_PORT = parseInt(getArg('cost-port') || '3458', 10);
+const MEMORY_PORT = parseInt(getArg('memory-port') || '3459', 10);
 
 const children = [];
-const actualPorts = { marketplace: MARKETPLACE_PORT, kanban: KANBAN_PORT, cost: COST_PORT };
+const actualPorts = { marketplace: MARKETPLACE_PORT, kanban: KANBAN_PORT, cost: COST_PORT, memory: MEMORY_PORT };
 
 function spawnApp(name, cmd, args, envPort) {
   const child = spawn(cmd, args, {
@@ -98,10 +99,12 @@ function resolveApp(submoduleDir, npmPackage) {
 const marketplacePath = resolveApp('marketplace', 'claude-code-marketplace');
 const kanbanPath = resolveApp('cck', 'claude-code-kanban');
 const costPath = resolveApp('cost', 'claude-code-cost');
+const memoryPath = resolveApp('memory', 'claude-code-memory-explorer');
 
 spawnApp('marketplace', process.execPath, [marketplacePath, `--port=${MARKETPLACE_PORT}`], MARKETPLACE_PORT);
 spawnApp('kanban', process.execPath, [kanbanPath], KANBAN_PORT);
 spawnApp('cost', process.execPath, [costPath, `--port=${COST_PORT}`], COST_PORT);
+spawnApp('memory', process.execPath, [memoryPath, `--port=${MEMORY_PORT}`], MEMORY_PORT);
 
 const app = express();
 
@@ -111,6 +114,7 @@ app.get('/api/config', (_req, res) => {
       kanban: { name: 'Kanban', url: `http://localhost:${actualPorts.kanban}`, icon: 'columns' },
       marketplace: { name: 'Marketplace', url: `http://localhost:${actualPorts.marketplace}`, icon: 'store' },
       cost: { name: 'Cost', url: `http://localhost:${actualPorts.cost}`, icon: 'dollar-sign' },
+      memory: { name: 'Memory', url: `http://localhost:${actualPorts.memory}`, icon: 'database' },
     },
   });
 });

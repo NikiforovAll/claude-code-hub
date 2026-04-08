@@ -7,3 +7,6 @@
 [submodule "cost"]
 	path = cost
 	url = https://github.com/NikiforovAll/claude-code-cost.git
+[submodule "memory"]
+	path = memory
+	url = https://github.com/NikiforovAll/claude-code-memory.git

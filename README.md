@@ -4,7 +4,7 @@
 [![license](https://img.shields.io/npm/l/claude-code-hub)](LICENSE)
 [![npm downloads](https://img.shields.io/npm/dm/claude-code-hub)](https://www.npmjs.com/package/claude-code-hub)
 
-Unified launcher for Claude Code tools — browse plugins in **Marketplace**, track tasks in **Kanban**, and monitor costs in **Cost**, all from a single chromeless PWA.
+Unified launcher for Claude Code tools — browse plugins in **Marketplace**, track tasks in **Kanban**, monitor costs in **Cost**, and explore memory in **Memory**, all from a single chromeless PWA.
 
 ## Kanban:
 
@@ -15,6 +15,9 @@ Unified launcher for Claude Code tools — browse plugins in **Marketplace**, tr
 
 ## Cost:
 ![Cost Screenshot](./assets/cost.png)
+
+## Memory:
+![Memory Screenshot](./assets/memory.png)
 
 ## Quick Start
 
@@ -27,7 +30,7 @@ npx claude-code-hub --open
 ```bash
 git clone --recurse-submodules https://github.com/NikiforovAll/claude-code-hub.git
 cd claude-code-hub
-npm install && npm install --prefix marketplace && npm install --prefix cck
+npm install && npm install --prefix marketplace && npm install --prefix cck && npm install --prefix memory
 npm start        # http://localhost:3455
 ```
 
@@ -48,6 +51,8 @@ Without hooks you still get the task board, but no agent activity or live indica
 | `Alt+1`          | Switch to Kanban        |
 | `Alt+2`          | Switch to Marketplace   |
 | `Alt+3`          | Switch to Cost          |
+| `Alt+4`          | Switch to Memory        |
+| `Ctrl+M`         | Open Memory for current session (Kanban) |
 | `Ctrl+Alt+Right` | Switch to next tool     |
 | `Ctrl+Alt+Left`  | Switch to previous tool |
 
@@ -62,6 +67,7 @@ The hub server spawns both sub-apps as child processes, each on its own port. A 
 | [Marketplace](https://github.com/NikiforovAll/claude-code-marketplace) | `marketplace/` | 3457         |
 | [Kanban](https://github.com/NikiforovAll/claude-task-viewer)           | `cck/`         | 3456         |
 | [Cost](https://github.com/NikiforovAll/claude-code-cost)               | `cost/`        | 3458         |
+| [Memory](https://github.com/NikiforovAll/claude-code-memory)           | `memory/`      | 3459         |
 
 ## CLI Flags
 
@@ -70,6 +76,7 @@ The hub server spawns both sub-apps as child processes, each on its own port. A 
 --marketplace-port <n>  Marketplace port (default: 3457)
 --kanban-port <n>       Kanban port (default: 3456)
 --cost-port <n>         Cost port (default: 3458)
+--memory-port <n>       Memory port (default: 3459)
 --open                  Auto-open browser
 ```
 
