@@ -36,6 +36,8 @@ Origin validation on the hub side restricts messages to known sub-app origins.
 
 After cloning: `git submodule update --init` then `npm install` in root, `marketplace/`, `cck/`, `cost/`, and `memory/`.
 
+**IMPORTANT**: Submodules are often in detached HEAD state. Before making any changes in a submodule, always checkout its main branch first: `git -C <submodule> checkout master`. This avoids committing on a detached HEAD and losing work.
+
 Each sub-app has its own linter (Biome) and pre-commit hooks. The hub repo itself has no linter.
 
 ## Sub-app Hub Integration
