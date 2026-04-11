@@ -28,6 +28,14 @@ Create a new release for this project.
    git submodule update --init
    git submodule update --remote
    ```
+   After updating, re-attach each submodule to its branch (submodule update leaves them in detached HEAD):
+   ```
+   git -C cck checkout main
+   git -C marketplace checkout main
+   git -C cost checkout main
+   git -C memory checkout main
+   ```
+   Skip any submodule that had no changes.
 
 5. **Bump version and commit everything in one commit**:
    - Run `npm version <version> --no-git-tag-version`
