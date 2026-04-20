@@ -2,6 +2,7 @@
 
 const { spawn } = require('child_process');
 const express = require('express');
+const http = require('http');
 const path = require('path');
 
 function getArg(name) {
@@ -101,10 +102,14 @@ const kanbanPath = resolveApp('cck', 'claude-code-kanban');
 const costPath = resolveApp('cost', 'claude-code-cost');
 const memoryPath = resolveApp('memory', 'claude-code-memory-explorer');
 
-spawnApp('marketplace', process.execPath, [marketplacePath, `--port=${MARKETPLACE_PORT}`], MARKETPLACE_PORT);
-spawnApp('kanban', process.execPath, [kanbanPath], KANBAN_PORT);
-spawnApp('cost', process.execPath, [costPath, `--port=${COST_PORT}`], COST_PORT);
-spawnApp('memory', process.execPath, [memoryPath, `--port=${MEMORY_PORT}`], MEMORY_PORT);
+// Raise header size limit to 64KB — localhost cookies from sibling apps can pile up and
+// trip Node's default 16KB limit, breaking iframes with HTTP 431.
+const NODE_HDR = '--max-http-header-size=65536';
+
+spawnApp('marketplace', process.execPath, [NODE_HDR, marketplacePath, `--port=${MARKETPLACE_PORT}`], MARKETPLACE_PORT);
+spawnApp('kanban', process.execPath, [NODE_HDR, kanbanPath], KANBAN_PORT);
+spawnApp('cost', process.execPath, [NODE_HDR, costPath, `--port=${COST_PORT}`], COST_PORT);
+spawnApp('memory', process.execPath, [NODE_HDR, memoryPath, `--port=${MEMORY_PORT}`], MEMORY_PORT);
 
 const app = express();
 
@@ -121,7 +126,8 @@ app.get('/api/config', (_req, res) => {
 
 app.use(express.static(path.join(__dirname, 'public')));
 
-const server = app.listen(HUB_PORT, () => {
+const server = http.createServer({ maxHeaderSize: 65536 }, app);
+server.listen(HUB_PORT, () => {
   const actual = server.address().port;
   printBanner(actual);
   if (process.argv.includes('--open')) {
@@ -137,7 +143,8 @@ function printBanner(port) {
 server.on('error', (err) => {
   if (err.code === 'EADDRINUSE' || err.code === 'EACCES') {
     console.log(`Port ${HUB_PORT} in use, trying random port...`);
-    const fallback = app.listen(0, () => {
+    const fallback = http.createServer({ maxHeaderSize: 65536 }, app);
+    fallback.listen(0, () => {
       const actual = fallback.address().port;
       printBanner(actual);
       if (process.argv.includes('--open')) {
