@@ -20,20 +20,20 @@ Create a new release for this project.
 
 2. **Detect prerelease**: If version contains `-rc.`, `-alpha.`, `-beta.`, treat as prerelease.
 
-3. **Check working tree**: Run `git status`. If there are uncommitted changes, warn the user and stop.
+3. **Check working tree**: Run `git status`. Warn and stop on tracked-file modifications. Ignore untracked-only state (e.g. `.vscode/`) and submodule pointer bumps (those get refreshed in step 4).
 
-4. **Update submodules**: Ensure all submodules are initialized and up to date, then pull latest commits:
+4. **Update submodules**: Ensure all submodules are initialized and fast-forwarded to their remote branch tips:
    ```
    git submodule sync
    git submodule update --init
    git submodule update --remote
    ```
-   After updating, re-attach each submodule to its branch (submodule update leaves them in detached HEAD):
+   `submodule update --remote` leaves each submodule in detached HEAD at the remote branch tip. Re-attach by checking out the submodule's own default branch — it lands on the same commit, just attached. **Branch names differ per submodule** — detect each one with `git -C <submodule> symbolic-ref refs/remotes/origin/HEAD` (strips to `main` or `master`). Current mapping:
    ```
    git -C cck checkout main
    git -C marketplace checkout main
    git -C cost checkout main
-   git -C memory checkout main
+   git -C memory checkout master
    ```
    Skip any submodule that had no changes.
 
@@ -41,10 +41,10 @@ Create a new release for this project.
    - Run `npm version <version> --no-git-tag-version`
    - Update `package.json` dependency versions to match the submodule versions:
      - Read each submodule's `package.json` to get its current version
-     - Update the corresponding `^x.y.z` ranges in the hub's `package.json` (fields: `claude-code-cost`, `claude-code-kanban`, `claude-code-marketplace`)
-   - Stage and commit all changes together:
+     - Update the corresponding `^x.y.z` ranges in the hub's `package.json` (fields: `claude-code-cost`, `claude-code-kanban`, `claude-code-marketplace`, `claude-code-memory-explorer`)
+   - Stage and commit all changes together (include every submodule that moved):
    ```
-   git add package.json package-lock.json marketplace cck cost
+   git add package.json package-lock.json marketplace cck cost memory
    git commit -m "🔖 chore: Bump version to <version>"
    git push origin HEAD
    ```
