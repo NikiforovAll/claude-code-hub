@@ -3,6 +3,7 @@ let activeApp = null;
 const iframes = {};
 const loadedApps = new Set();
 let allowedOrigins = new Set();
+let lastTheme = null;
 
 async function init() {
   const res = await fetch('/api/config');
@@ -52,6 +53,9 @@ function onIframeLoad(appId) {
   if (appId === activeApp) {
     document.getElementById('loading-overlay').classList.add('fade-out');
   }
+  if (lastTheme) {
+    iframes[appId].contentWindow?.postMessage({ type: 'hub:theme', theme: lastTheme }, new URL(apps[appId].url).origin);
+  }
 }
 
 function listenMessages() {
@@ -68,6 +72,14 @@ function listenMessages() {
       else {
         const digit = parseInt(data.key, 10);
         if (digit >= 1 && digit <= 9) switchByIndex(digit - 1);
+      }
+    } else if (data.type === 'hub:theme') {
+      if (data.theme !== 'light' && data.theme !== 'dark') return;
+      if (data.theme === lastTheme) return;
+      lastTheme = data.theme;
+      for (const [id, iframe] of Object.entries(iframes)) {
+        if (iframe.contentWindow === e.source) continue;
+        iframe.contentWindow?.postMessage({ type: 'hub:theme', theme: data.theme }, new URL(apps[id].url).origin);
       }
     }
   });
