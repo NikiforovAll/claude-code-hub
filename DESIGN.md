@@ -130,6 +130,10 @@ A cool-neutral field carrying one warm ember and a small set of functional statu
 - **Signal Warning** (`#f0b429`): Pending-permission, caution thresholds.
 - **Signal Team** (`#60a5fa`): Team / multi-agent ownership.
 - **Signal Plan** (`#86a886`): Plan / planning-mode markers.
+- **Signal Danger** (`#ef5350` dark / `#c0392b` light): Error / destructive / failed state. The only red in the system; like the other signals it appears *only* bound to the condition it describes, never as decoration.
+
+### Voice Accents
+- **Antique Gold** (`#d9b667` dark / `#a8842f` light): Marks the *human* voice — the user's own messages in the session log carry a gold leading accent, distinct from the ember that marks the assistant. A muted, aged gold, never a bright yellow; it reads as "your hand" in the transcript without competing with the ember signal.
 
 ### Neutral (dark, canonical)
 - **Field** (`#101114`): The deepest surface; the body canvas and inset wells (inputs, dropdowns).
@@ -177,7 +181,7 @@ Shadows exist, but only as a **response to state or true floating**, never as am
 - **Focus ring** (`box-shadow: 0 0 0 2px var(--accent-dim)`): The ember-tinted ring on focused inputs and interactive elements.
 - **Ember glow** (`box-shadow: 0 0 12px var(--accent-glow)`): Reserved for live/active emphasis — the connection pulse, an active control.
 - **Floating panel** (`box-shadow: -8px 0 24px rgba(0,0,0,0.15)`): The slide-in detail and session-log panels, which genuinely float above the board.
-- **Modal** (`box-shadow: 0 20px 60px rgba(0,0,0,0.5)`): Dialogs lifted clear of everything beneath the backdrop.
+- **Modal** (`box-shadow: 0 16px 44px rgba(0,0,0,0.38), 0 4px 12px rgba(0,0,0,0.2)`): Dialogs lifted clear of everything beneath the backdrop, using a two-layer shadow (broad ambient + tight contact) for believable lift. The modal surface itself stays on `surface` — **not** `elevated`. A full-size dialog on the warm `elevated` off-white (`#fbfaf9`) glares; separation comes from the shadow and the dimmed backdrop, not from a brighter fill. (Elevated remains reserved for *small* nested elements per §2.)
 
 ### Named Rules
 **The Flat-At-Rest Rule.** A resting card, row, or panel has no drop shadow. Shadows appear only for focus (ring), liveness (glow), or genuine float (panels, modals). If a static card has an ambient shadow, delete it and let the tonal step do the work.
@@ -198,13 +202,18 @@ Components are **refined and restrained**: quiet at rest, state shown through su
 ### Cards / Containers
 - **Corner Style:** 6px (`rounded.md`); session and task cards.
 - **Background:** `surface`, one tonal step above the board field. Never `#ffffff` in light theme.
-- **Shadow Strategy:** None at rest (see The Flat-At-Rest Rule). Selection is shown by an ember focus ring, not a shadow.
+- **Shadow Strategy:** None at rest (see The Flat-At-Rest Rule). Selection is shown by an **ember ring** (`border-color: accent` + `box-shadow: 0 0 0 1px accent-dim, 0 0 12px accent-dim`) lifted to `elevated`, not a shadow. The same ember ring marks a selected session-log message — selection is one consistent ember treatment across the app. When a detail view closes, the item stays logically selected for keyboard nav but the ember ring is dimmed off; an explicit nav gesture (arrow keys, refocusing the board) restores it.
 - **Border:** Hairline `border` at rest. In the light theme this is the soft `paper-border` (`#cfcbc4`), and panel-dividing borders are softened further to ~35% opacity via `color-mix` so they read as whispers, not lines.
 - **Internal Padding:** 12px (`spacing.md`).
 
 ### Inputs / Fields
 - **Style:** Inset `field` background (darker than the surface around them), hairline `border`, 6px radius. They read as wells cut into the surface.
 - **Focus:** Ember focus ring (`0 0 0 2px accent-dim`); border does not jump to full accent.
+
+### Code Surfaces
+- **Style:** Code blocks, diff blocks, and inline code chips share one recessed recipe: a translucent neutral fill `color-mix(in srgb, var(--text-muted) N%, transparent)` over a hairline `color-mix(... border ...)` border (blocks ~8%, inline chips ~12%). The block is defined by its *outline*, not by being dark or stark white.
+- **Never** a flat opaque gray (`rgba(127,127,127,0.15)` reads muddy on warm paper) and **never** the near-white `elevated` fill (glares; see The No-Pure-White Rule).
+- **Syntax highlighting:** This neutral fill explicitly overrides the highlight.js theme background (`code.hljs`), so highlighted blocks match unhighlighted ones rather than imposing the library's own white panel. Token colors sit on the shared recessed surface.
 
 ### Navigation
 - **Style:** Left sidebar, collapsible and drag-resizable. Section labels are tracked uppercase mono (Label role); session rows are dense Data-size mono. Active session is marked by ember, not by a filled background block. Cross-app navigation between the four sub-apps is keyboard-driven (`Ctrl+Alt+Arrow`) — the chrome stays invisible.
