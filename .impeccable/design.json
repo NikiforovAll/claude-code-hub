@@ -1,0 +1,110 @@
+{
+  "schemaVersion": 2,
+  "generatedAt": "2026-06-06T00:00:00Z",
+  "title": "Design System: Claude Code Hub",
+  "extensions": {
+    "colorMeta": {
+      "ember": { "role": "primary", "displayName": "Ember Terracotta", "canonical": "#e86f33", "tonalRamp": ["#3a1c0d", "#5c2c14", "#83401d", "#a85427", "#cc6730", "#e86f33", "#f0a070", "#f6c6a3", "#fbe3d3", "#fdf3ec"] },
+      "ember-glow": { "role": "primary", "displayName": "Ember Glow", "canonical": "#f0a070", "tonalRamp": ["#3a1c0d", "#5c2c14", "#83401d", "#b85a20", "#d6803f", "#e89058", "#f0a070", "#f6c6a3", "#fbe3d3", "#fdf3ec"] },
+      "signal-success": { "role": "tertiary", "displayName": "Signal Success", "canonical": "#3ecf8e", "tonalRamp": ["#0c3525", "#114a33", "#176647", "#1e8a5f", "#2bad77", "#3ecf8e", "#6bdca8", "#97e7c2", "#c4f2dd", "#e6faf0"] },
+      "signal-warning": { "role": "tertiary", "displayName": "Signal Warning", "canonical": "#f0b429", "tonalRamp": ["#3d2c06", "#5c420a", "#83600f", "#a87b14", "#cc961e", "#f0b429", "#f4c659", "#f8d98a", "#fbeabb", "#fef8e6"] },
+      "signal-team": { "role": "tertiary", "displayName": "Signal Team", "canonical": "#60a5fa", "tonalRamp": ["#0f2540", "#16365c", "#1e4a83", "#2a63ad", "#3d82d6", "#60a5fa", "#88bdfb", "#aed3fc", "#d3e7fe", "#eef5ff"] },
+      "signal-plan": { "role": "tertiary", "displayName": "Signal Plan", "canonical": "#86a886", "tonalRamp": ["#1f291f", "#2e3d2e", "#3f543f", "#536f53", "#6a8b6a", "#86a886", "#a3c0a3", "#c0d6c0", "#dcebdc", "#f1f7f1"] },
+      "bg-deep": { "role": "neutral", "displayName": "Field", "canonical": "#101114", "tonalRamp": ["#101114", "#16181c", "#1e2025", "#282a30", "#363840", "#4a4d57", "#7d808a", "#9a9da5", "#c2c4c9", "#f0f1f3"] },
+      "paper-deep": { "role": "neutral", "displayName": "Paper Field", "canonical": "#e8e6e3", "tonalRamp": ["#0a0a0a", "#444444", "#666666", "#888888", "#a09b94", "#cfcbc4", "#dddbd8", "#e8e6e3", "#efede9", "#fbfaf9"] }
+    },
+    "typographyMeta": {
+      "display": { "displayName": "Display", "purpose": "View headers and the largest panel titles. Playfair Display, the editorial voice." },
+      "title": { "displayName": "Title", "purpose": "Panel and modal headings (e.g. 'Session Log'). Playfair at small size." },
+      "body": { "displayName": "Body", "purpose": "Default reading text and descriptions. IBM Plex Mono, capped at 65-75ch in prose." },
+      "data": { "displayName": "Data", "purpose": "The dense workhorse: session rows, metadata, message bodies, timestamps." },
+      "label": { "displayName": "Label", "purpose": "Tracked uppercase section eyebrows and column headers. <=4 words." }
+    },
+    "shadows": [
+      { "name": "focus-ring", "value": "0 0 0 2px var(--accent-dim)", "purpose": "Ember-tinted focus ring on inputs and interactive elements. The standard focus treatment." },
+      { "name": "ember-glow", "value": "0 0 12px var(--accent-glow)", "purpose": "Liveness emphasis: connection pulse, active control. Never decorative." },
+      { "name": "floating-panel", "value": "-8px 0 24px rgba(0,0,0,0.15)", "purpose": "Slide-in detail and session-log panels that genuinely float above the board." },
+      { "name": "modal", "value": "0 20px 60px rgba(0,0,0,0.5)", "purpose": "Dialogs lifted clear of the backdrop." }
+    ],
+    "motion": [
+      { "name": "ease-standard", "value": "all 0.15s ease", "purpose": "Default state transition for hovers and color shifts." },
+      { "name": "ease-deliberate", "value": "all 0.2s cubic-bezier(0.4, 0, 0.2, 1)", "purpose": "Deliberate state changes (drag, expand) wanting a touch more presence." },
+      { "name": "progress", "value": "width 0.5s ease-out", "purpose": "Progress-bar fills." }
+    ],
+    "breakpoints": []
+  },
+  "components": [
+    {
+      "name": "Icon Button",
+      "kind": "button",
+      "refersTo": "button-icon",
+      "description": "The primary action affordance in the app shell. Quiet at rest, lifts on hover. No filled CTA buttons.",
+      "html": "<button class=\"ds-icon-btn\" aria-label=\"History\"><svg viewBox=\"0 0 24 24\" width=\"16\" height=\"16\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><circle cx=\"12\" cy=\"12\" r=\"9\"/><path d=\"M12 7v5l3 2\"/></svg></button>",
+      "css": ".ds-icon-btn { display: inline-flex; align-items: center; justify-content: center; padding: 6px 8px; background: var(--bg-deep, #101114); color: var(--text-muted, #7d808a); border: 1px solid transparent; border-radius: 6px; cursor: pointer; transition: all 0.15s ease; } .ds-icon-btn:hover { background: var(--bg-hover, #282a30); color: var(--text-primary, #f0f1f3); border-color: var(--border, #363840); } .ds-icon-btn:focus-visible { outline: none; box-shadow: 0 0 0 2px var(--accent-dim, rgba(232,111,51,0.22)); }"
+    },
+    {
+      "name": "Filter Chip",
+      "kind": "chip",
+      "refersTo": "chip",
+      "description": "Filter / count pill. Neutral at rest; active state tints toward the ember as a whisper, never a flood.",
+      "html": "<span class=\"ds-chip ds-chip--active\">1 waiting</span>",
+      "css": ".ds-chip { display: inline-flex; align-items: center; gap: 4px; padding: 2px 8px; font-family: 'IBM Plex Mono', ui-monospace, monospace; font-size: 11px; color: var(--text-secondary, #c2c4c9); background: var(--bg-deep, #101114); border: 1px solid var(--border, #363840); border-radius: 4px; transition: all 0.15s ease; } .ds-chip:hover { border-color: color-mix(in srgb, var(--text-secondary, #c2c4c9) 30%, var(--border, #363840)); } .ds-chip--active { color: color-mix(in srgb, #e86f33 80%, var(--text-secondary, #c2c4c9)); border-color: color-mix(in srgb, #e86f33 50%, var(--border, #363840)); background: color-mix(in srgb, #e86f33 9%, var(--bg-deep, #101114)); }"
+    },
+    {
+      "name": "Task Card",
+      "kind": "card",
+      "refersTo": "card",
+      "description": "Session/task card. Flat at rest on the surface tone; selection shown by the ember focus ring, not a shadow.",
+      "html": "<article class=\"ds-card\"><h3 class=\"ds-card__title\">Improve CCK sidebar visual design and UI/UX</h3><span class=\"ds-card__meta\">main</span></article>",
+      "css": ".ds-card { padding: 12px; background: var(--bg-surface, #16181c); border: 1px solid var(--border, #363840); border-radius: 6px; transition: all 0.15s ease; } .ds-card:hover { border-color: color-mix(in srgb, var(--text-secondary, #c2c4c9) 30%, var(--border, #363840)); } .ds-card[aria-selected=\"true\"] { box-shadow: 0 0 0 2px var(--accent-dim, rgba(232,111,51,0.22)); } .ds-card__title { font-family: 'Playfair Display', Georgia, serif; font-size: 14px; font-weight: 500; color: var(--text-primary, #f0f1f3); margin: 0; } .ds-card__meta { font-family: 'IBM Plex Mono', ui-monospace, monospace; font-size: 11px; color: var(--text-muted, #7d808a); }"
+    },
+    {
+      "name": "Search Input",
+      "kind": "input",
+      "refersTo": "input",
+      "description": "Inset well cut into the surface. Ember focus ring; border does not jump to full accent.",
+      "html": "<input class=\"ds-input\" type=\"search\" placeholder=\"Filter sessions\" />",
+      "css": ".ds-input { width: 100%; padding: 8px 12px; font-family: 'IBM Plex Mono', ui-monospace, monospace; font-size: 12px; color: var(--text-primary, #f0f1f3); background: var(--bg-deep, #101114); border: 1px solid var(--border, #363840); border-radius: 6px; transition: all 0.15s ease; } .ds-input::placeholder { color: var(--text-muted, #7d808a); } .ds-input:focus-visible { outline: none; box-shadow: 0 0 0 2px var(--accent-dim, rgba(232,111,51,0.22)); }"
+    },
+    {
+      "name": "Section Label",
+      "kind": "custom",
+      "refersTo": "label",
+      "description": "Tracked uppercase mono eyebrow used for sidebar sections and kanban column headers.",
+      "html": "<span class=\"ds-label\">Sessions</span>",
+      "css": ".ds-label { font-family: 'IBM Plex Mono', ui-monospace, monospace; font-size: 11px; font-weight: 500; letter-spacing: 0.08em; text-transform: uppercase; color: var(--text-muted, #7d808a); }"
+    }
+  ],
+  "narrative": {
+    "northStar": "The Lab Notebook",
+    "overview": "Claude Code Hub is the instrument a developer keeps open while many Claude Code sessions, agents, and tasks run at once. It reads like a working notebook, not an app: editorial serif section-heads (Playfair Display) sit directly above dense monospace data (IBM Plex Mono), a print-style contrast axis that signals 'this is a record, kept precisely.' The field is quiet and cool-neutral; a single terracotta ember marks what is live. The system ships in two sibling skins: a near-black instrument (default) and a warm-paper notebook (light), sharing one ember accent, one type pairing, and one tonal-first depth model. It rejects the bright SaaS-dashboard look, glaring white surfaces, and anything childish.",
+    "keyCharacteristics": [
+      "Editorial serif headings over monospace data; no third typeface.",
+      "Dark-first, with a warm-paper light theme as an equal sibling.",
+      "One terracotta ember as the only non-functional saturated color.",
+      "Tonal-first depth: surfaces lift by lightness step, not by shadow.",
+      "Dense by design; whitespace spent for clarity, not decoration."
+    ],
+    "rules": [
+      { "name": "The One Ember Rule", "body": "The terracotta accent is the only saturated color allowed for non-functional use, and it stays under 10% of any screen. Status hues appear only bound to the data they describe, never as decoration.", "section": "colors" },
+      { "name": "The No-Pure-White Rule", "body": "In the light theme, no surface is #ffffff. The brightest allowed value is the warm elevated off-white #fbfaf9.", "section": "colors" },
+      { "name": "The Two-Voice Rule", "body": "Serif speaks for structure (headings, titles); mono speaks for content and data. A heading in mono or a number in serif is a bug. Never introduce a third typeface.", "section": "typography" },
+      { "name": "The Flat-At-Rest Rule", "body": "A resting card, row, or panel has no drop shadow. Shadows appear only for focus (ring), liveness (glow), or genuine float (panels, modals).", "section": "elevation" }
+    ],
+    "dos": [
+      "Do convey depth with the tonal ramp first (field -> surface -> elevated -> hover); reach for a border only when tone is not enough.",
+      "Do keep the ember under 10% of any screen, and bind every status hue to the data it describes.",
+      "Do keep headings in Playfair and all data in IBM Plex Mono; weight and the serif/mono axis carry hierarchy.",
+      "Do soften light-theme dividers (color-mix(... var(--border) 35%, transparent)) so panels separate without hard lines.",
+      "Do show focus with the ember ring (0 0 0 2px accent-dim) and reserve glow/shadow for liveness and true floating."
+    ],
+    "donts": [
+      "Don't use any #ffffff surface in the light theme; the warm elevated off-white #fbfaf9 is the ceiling.",
+      "Don't box every region in a high-contrast border or drop an ambient shadow on a resting card.",
+      "Don't ship the bright SaaS-dashboard look: hero-metric tiles, identical icon-heading-text card grids, gradient accents.",
+      "Don't go childish: bubbly radii, bright primary palettes, emoji-as-UI, gamified flourishes.",
+      "Don't add a third typeface, set body copy in ALL CAPS, or put a number in the serif.",
+      "Don't use a colored border-left/border-right greater than 1px as an accent stripe on new components."
+    ]
+  }
+}
