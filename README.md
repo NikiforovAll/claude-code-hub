@@ -31,7 +31,7 @@ npx claude-code-hub --open
 git clone --recurse-submodules https://github.com/NikiforovAll/claude-code-hub.git
 cd claude-code-hub
 npm install && npm install --prefix marketplace && npm install --prefix cck && npm install --prefix memory
-npm start        # http://localhost:3455
+npm start        # http://localhost:3540
 ```
 
 ## Agent Observability (one-time setup)
@@ -64,19 +64,19 @@ The hub server spawns both sub-apps as child processes, each on its own port. A 
 
 | Tool                                                                   | Submodule      | Default Port |
 | ---------------------------------------------------------------------- | -------------- | ------------ |
-| [Marketplace](https://github.com/NikiforovAll/claude-code-marketplace) | `marketplace/` | 3457         |
-| [Kanban](https://github.com/NikiforovAll/claude-task-viewer)           | `cck/`         | 3456         |
-| [Cost](https://github.com/NikiforovAll/claude-code-cost)               | `cost/`        | 3458         |
-| [Memory](https://github.com/NikiforovAll/claude-code-memory)           | `memory/`      | 3459         |
+| [Marketplace](https://github.com/NikiforovAll/claude-code-marketplace) | `marketplace/` | 3542         |
+| [Kanban](https://github.com/NikiforovAll/claude-task-viewer)           | `cck/`         | 3541         |
+| [Cost](https://github.com/NikiforovAll/claude-code-cost)               | `cost/`        | 3543         |
+| [Memory](https://github.com/NikiforovAll/claude-code-memory)           | `memory/`      | 3544         |
 
 ## CLI Flags
 
 ```
---port <n>              Hub port (default: 3455)
---marketplace-port <n>  Marketplace port (default: 3457)
---kanban-port <n>       Kanban port (default: 3456)
---cost-port <n>         Cost port (default: 3458)
---memory-port <n>       Memory port (default: 3459)
+--port <n>              Hub port (default: 3540)
+--marketplace-port <n>  Marketplace port (default: 3542)
+--kanban-port <n>       Kanban port (default: 3541)
+--cost-port <n>         Cost port (default: 3543)
+--memory-port <n>       Memory port (default: 3544)
 --open                  Auto-open browser
 ```
 

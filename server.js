@@ -13,11 +13,11 @@ function getArg(name) {
   return process.argv[idx + 1] || null;
 }
 
-const HUB_PORT = parseInt(getArg('port') || process.env.PORT || '3455', 10);
-const MARKETPLACE_PORT = parseInt(getArg('marketplace-port') || '3457', 10);
-const KANBAN_PORT = parseInt(getArg('kanban-port') || '3456', 10);
-const COST_PORT = parseInt(getArg('cost-port') || '3458', 10);
-const MEMORY_PORT = parseInt(getArg('memory-port') || '3459', 10);
+const HUB_PORT = parseInt(getArg('port') || process.env.PORT || '3540', 10);
+const MARKETPLACE_PORT = parseInt(getArg('marketplace-port') || '3542', 10);
+const KANBAN_PORT = parseInt(getArg('kanban-port') || '3541', 10);
+const COST_PORT = parseInt(getArg('cost-port') || '3543', 10);
+const MEMORY_PORT = parseInt(getArg('memory-port') || '3544', 10);
 
 const children = [];
 const actualPorts = { marketplace: MARKETPLACE_PORT, kanban: KANBAN_PORT, cost: COST_PORT, memory: MEMORY_PORT };

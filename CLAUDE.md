@@ -9,7 +9,7 @@ Claude Code Hub — a unified launcher that combines multiple Claude Code tools 
 ## Commands
 
 ```bash
-npm start                # Start hub + all sub-apps (http://localhost:3455)
+npm start                # Start hub + all sub-apps (http://localhost:3540)
 npm run dev              # Start with auto-open browser
 ```
 
@@ -29,14 +29,14 @@ Origin validation on the hub side restricts messages to known sub-app origins.
 
 ## Git Submodules
 
-- `marketplace/` → [claude-code-marketplace](https://github.com/NikiforovAll/claude-code-marketplace) (port 3457)
-- `cck/` → [claude-task-viewer](https://github.com/NikiforovAll/claude-task-viewer) (port 3456)
-- `cost/` → [claude-code-cost](https://github.com/NikiforovAll/claude-code-cost) (port 3458)
-- `memory/` → [claude-code-memory](https://github.com/NikiforovAll/claude-code-memory) (port 3459)
+- `marketplace/` → [claude-code-marketplace](https://github.com/NikiforovAll/claude-code-marketplace) (port 3542)
+- `cck/` → [claude-task-viewer](https://github.com/NikiforovAll/claude-task-viewer) (port 3541)
+- `cost/` → [claude-code-cost](https://github.com/NikiforovAll/claude-code-cost) (port 3543)
+- `memory/` → [claude-code-memory](https://github.com/NikiforovAll/claude-code-memory) (port 3544)
 
 After cloning: `git submodule update --init` then `npm install` in root, `marketplace/`, `cck/`, `cost/`, and `memory/`.
 
-**IMPORTANT**: Submodules are often in detached HEAD state. Before making any changes in a submodule, always checkout its main branch first: `git -C <submodule> checkout master`. This avoids committing on a detached HEAD and losing work.
+**IMPORTANT**: Submodules are often in detached HEAD state. Before making any changes in a submodule, always checkout its main branch first: `git -C <submodule> checkout main`. This avoids committing on a detached HEAD and losing work.
 
 Each sub-app has its own linter (Biome) and pre-commit hooks. The hub repo itself has no linter.
 
