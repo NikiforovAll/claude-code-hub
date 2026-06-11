@@ -3,7 +3,21 @@ let activeApp = null;
 const iframes = {};
 const loadedApps = new Set();
 let allowedOrigins = new Set();
-let lastTheme = null;
+// {theme: 'dark'|'light', colorTheme: '<id>'} — survives hub reloads so
+// late-loading iframes and fresh sessions get the last chosen theme.
+const themeState = loadThemeState();
+
+function loadThemeState() {
+  try {
+    return JSON.parse(localStorage.getItem('hub-theme')) ?? {};
+  } catch {
+    return {};
+  }
+}
+
+function themeMessage() {
+  return { type: 'hub:theme', theme: themeState.theme, colorTheme: themeState.colorTheme };
+}
 
 async function init() {
   const res = await fetch('/api/config');
@@ -53,8 +67,8 @@ function onIframeLoad(appId) {
   if (appId === activeApp) {
     document.getElementById('loading-overlay').classList.add('fade-out');
   }
-  if (lastTheme) {
-    iframes[appId].contentWindow?.postMessage({ type: 'hub:theme', theme: lastTheme }, new URL(apps[appId].url).origin);
+  if (themeState.theme || themeState.colorTheme) {
+    iframes[appId].contentWindow?.postMessage(themeMessage(), new URL(apps[appId].url).origin);
   }
 }
 
@@ -74,12 +88,17 @@ function listenMessages() {
         if (digit >= 1 && digit <= 9) switchByIndex(digit - 1);
       }
     } else if (data.type === 'hub:theme') {
+      // Legacy senders pass only {theme}; colorTheme is optional and sticky.
       if (data.theme !== 'light' && data.theme !== 'dark') return;
-      if (data.theme === lastTheme) return;
-      lastTheme = data.theme;
+      const hasColor = typeof data.colorTheme === 'string' && /^[a-z0-9-]{0,32}$/.test(data.colorTheme);
+      const changed = data.theme !== themeState.theme || (hasColor && data.colorTheme !== themeState.colorTheme);
+      if (!changed) return;
+      themeState.theme = data.theme;
+      if (hasColor) themeState.colorTheme = data.colorTheme;
+      localStorage.setItem('hub-theme', JSON.stringify(themeState));
       for (const [id, iframe] of Object.entries(iframes)) {
         if (iframe.contentWindow === e.source) continue;
-        iframe.contentWindow?.postMessage({ type: 'hub:theme', theme: data.theme }, new URL(apps[id].url).origin);
+        iframe.contentWindow?.postMessage(themeMessage(), new URL(apps[id].url).origin);
       }
     }
   });
