@@ -33,9 +33,11 @@ Create a new release for this project.
    git -C cck checkout main
    git -C marketplace checkout main
    git -C cost checkout main
-   git -C memory checkout master
+   git -C memory checkout main
    ```
    Skip any submodule that had no changes.
+
+   **If a submodule is _ahead_ of its remote** (local unpushed commits — `git -C <sub> log origin/<branch>..HEAD` is non-empty), `submodule update --remote` will NOT rewind it. Stop and surface those commits to the user before bundling them into the hub release: an unpushed submodule commit means the hub would reference a SHA that doesn't exist on the remote (broken for anyone cloning). Decide with the user whether to (a) push + release that submodule properly first, or (b) reset the pointer to `origin/<branch>` and exclude it. If a submodule has a real feature commit, give it its own version bump + tag + release before pointing the hub at it.
 
 5. **Bump version and commit everything in one commit**:
    - Run `npm version <version> --no-git-tag-version`
@@ -56,8 +58,8 @@ Create a new release for this project.
    git push origin v<version>
    ```
 
-8. **Generate release notes**: Collect commits since the previous tag using `git log --oneline <prev-tag>..HEAD`. Write a **user-facing summary** grouped by:
-   - Features (✨) — describe what was added, not raw commit messages
+8. **Generate release notes**: The hub's own commits since the previous tag are usually just the version bump — the meaningful changes live in the bumped submodules. Group the **submodule-level** changes the user cares about:
+   - Features (✨) — per sub-app (e.g. "Kanban (→ vX.Y.Z): …"), describe what was added, not raw commit messages
    - Fixes (🐛)
    - Other notable changes
    Include a "Full Changelog" compare link at the bottom.
@@ -67,4 +69,4 @@ Create a new release for this project.
    gh release create v<version> --title "v<version>" --notes "<notes>" [--prerelease]
    ```
 
-10. **Report**: Show the release URL to the user.
+10. **Report**: Show the release URL. Then present the manual `npm publish` commands for the hub and any submodules that got their own release — do **not** run `npm publish` automatically; let the user decide.
