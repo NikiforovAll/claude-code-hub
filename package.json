@@ -4,7 +4,7 @@
   "description": "Unified hub for Claude Code tools — Marketplace + Kanban in one PWA",
   "main": "server.js",
   "bin": {
-    "claude-code-hub": "./server.js"
+    "claude-code-hub": "server.js"
   },
   "scripts": {
     "start": "node server.js",
