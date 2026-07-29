@@ -11,12 +11,22 @@
       --bg: #1a1a2e;
       --border: #0f3460;
       --accent: #e94560;
+      --surface: #16213e;
+      --surface-hover: #1f2a4a;
+      --text: #e8e8ef;
+      --text-dim: #8a8fa3;
+      --shadow: rgba(0, 0, 0, 0.55);
     }
 
     @media (prefers-color-scheme: light) {
       :root {
         --bg: #f4f4f5;
         --border: #e4e4e7;
+        --surface: #ffffff;
+        --surface-hover: #f1f1f4;
+        --text: #18181b;
+        --text-dim: #71717a;
+        --shadow: rgba(0, 0, 0, 0.18);
       }
     }
 
@@ -75,12 +85,103 @@
     }
 
     @keyframes spin { to { transform: rotate(360deg); } }
+
+    /* Project switcher palette — the hub's only chrome, summoned with Ctrl+Alt+P. */
+    .palette {
+      position: fixed;
+      inset: 0;
+      z-index: 20;
+      display: flex;
+      justify-content: center;
+      align-items: flex-start;
+      padding-top: 12vh;
+      background: color-mix(in srgb, var(--bg) 70%, transparent);
+    }
+
+    .palette[hidden] { display: none; }
+
+    .palette-box {
+      width: min(680px, 92vw);
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      box-shadow: 0 18px 48px var(--shadow);
+      overflow: hidden;
+      font: 14px/1.4 ui-monospace, SFMono-Regular, Menlo, monospace;
+    }
+
+    .palette-input {
+      width: 100%;
+      padding: 12px 14px;
+      border: none;
+      border-bottom: 1px solid var(--border);
+      background: transparent;
+      color: var(--text);
+      font: inherit;
+      outline: none;
+    }
+
+    .palette-input::placeholder { color: var(--text-dim); }
+
+    .palette-list {
+      list-style: none;
+      max-height: 46vh;
+      overflow-y: auto;
+    }
+
+    .palette-row {
+      display: flex;
+      align-items: baseline;
+      gap: 10px;
+      padding: 7px 14px;
+      cursor: pointer;
+      color: var(--text);
+      white-space: nowrap;
+    }
+
+    .palette-row.selected {
+      background: var(--surface-hover);
+      box-shadow: inset 2px 0 0 var(--accent);
+    }
+
+    .palette-row .name { font-weight: 600; }
+
+    .palette-row .parent {
+      color: var(--text-dim);
+      overflow: hidden;
+      text-overflow: ellipsis;
+      flex: 1;
+    }
+
+    .palette-row .age {
+      color: var(--text-dim);
+      margin-left: auto;
+      padding-left: 10px;
+    }
+
+    .palette-row.literal {
+      border-top: 1px solid var(--border);
+      color: var(--accent);
+    }
+
+    .palette-empty {
+      padding: 10px 14px;
+      color: var(--text-dim);
+    }
   </style>
 </head>
 <body>
   <div class="iframe-container" id="iframe-container">
     <div class="loading-overlay" id="loading-overlay">
       <div class="spinner"></div>
+    </div>
+  </div>
+
+  <div class="palette" id="palette" hidden>
+    <div class="palette-box" role="dialog" aria-modal="true" aria-label="Switch project">
+      <input class="palette-input" id="palette-input" type="text" spellcheck="false"
+             autocomplete="off" placeholder="Search projects or type a path...">
+      <ul class="palette-list" id="palette-list" role="listbox"></ul>
     </div>
   </div>
 

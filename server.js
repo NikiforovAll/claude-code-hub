@@ -2,6 +2,7 @@
 
 const { spawn } = require('child_process');
 const express = require('express');
+const fs = require('fs');
 const http = require('http');
 const path = require('path');
 
@@ -122,6 +123,51 @@ app.get('/api/config', (_req, res) => {
       memory: { name: 'Memory', url: `http://localhost:${actualPorts.memory}`, icon: 'database' },
     },
   });
+});
+
+// Project list for the switcher palette, proxied from kanban — it is the only sub-app that
+// enumerates projects. actualPorts is read per request because kanban's real port is only
+// known once its banner has been scraped (see spawnApp).
+app.get('/api/projects', async (_req, res) => {
+  res.setHeader('Cache-Control', 'no-store');
+  try {
+    // 127.0.0.1, not localhost — Node's verbatim DNS ordering tries ::1 first on Windows.
+    const upstream = await fetch(`http://127.0.0.1:${actualPorts.kanban}/api/projects`, {
+      signal: AbortSignal.timeout(4000),
+    });
+    if (!upstream.ok) {
+      res.status(502).json({ error: `kanban responded ${upstream.status}` });
+      return;
+    }
+    res.json(await upstream.json());
+  } catch (err) {
+    // Soft-fail so the palette still opens and offers literal-path entry.
+    res.status(502).json({ error: `kanban unavailable: ${err.message}` });
+  }
+});
+
+// Normalizes a typed path to its real on-disk form (true casing, native separators) so cck's
+// strict === project match and cost's abs->encoded transform both hit. List-picked paths skip
+// this: they are byte-exact copies of what kanban reported.
+app.get('/api/resolve-path', (req, res) => {
+  res.setHeader('Cache-Control', 'no-store');
+  const input = typeof req.query.path === 'string' ? req.query.path.trim() : '';
+  if (!input) {
+    res.status(400).json({ error: 'path is required' });
+    return;
+  }
+  let resolved;
+  try {
+    resolved = fs.realpathSync.native(path.resolve(input));
+  } catch {
+    res.status(404).json({ error: 'Path not found' });
+    return;
+  }
+  if (!fs.statSync(resolved).isDirectory()) {
+    res.status(400).json({ error: 'Not a directory' });
+    return;
+  }
+  res.json({ path: resolved });
 });
 
 app.use(express.static(path.join(__dirname, 'public')));
