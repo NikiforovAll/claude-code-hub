@@ -29,14 +29,14 @@ function themeMessage() {
 // registry is unreadable; either way the palette keeps the --accent from index.html.
 let themeAccents = {};
 
-// Paints the palette in the active theme's accent — its only themed surface.
-function applyHubAccent() {
-  const pair = themeAccents[themeState.colorTheme];
-  if (!pair) return;
-  // themeState.theme is unset until a sub-app pushes one; the palette's own colours come from
-  // prefers-color-scheme, so match that in the meantime.
+// Paints the palette — the hub's only themed surface — in the active theme. The hub relays
+// hub:theme to the sub-apps; this is what makes it apply to the hub's own chrome too.
+function applyHubTheme() {
+  // themeState.theme is unset until a sub-app pushes one, so fall back to the OS preference.
   const mode = themeState.theme ?? (window.matchMedia('(prefers-color-scheme: light)').matches ? 'light' : 'dark');
-  document.documentElement.style.setProperty('--accent', pair[mode]);
+  document.documentElement.classList.toggle('light', mode === 'light');
+  const pair = themeAccents[themeState.colorTheme];
+  if (pair) document.documentElement.style.setProperty('--accent', pair[mode]);
 }
 
 // Claude's on-disk project-directory name. Matches memory/server.js encodeProjectPath. The hub
@@ -96,11 +96,14 @@ function postActiveTo(appId) {
 }
 
 async function init() {
+  // Twice: light/dark comes from localStorage and shouldn't wait on the fetch, the accent can't be
+  // resolved until the registry arrives with it.
+  applyHubTheme();
   const res = await fetch('/api/config');
   const config = await res.json();
   apps = config.apps;
   themeAccents = config.themeAccents ?? {};
-  applyHubAccent();
+  applyHubTheme();
   allowedOrigins = new Set(Object.values(apps).map((a) => new URL(a.url).origin));
   buildIframes();
   switchTab(Object.keys(apps)[0]);
@@ -181,7 +184,7 @@ function listenMessages() {
       themeState.theme = data.theme;
       if (hasColor) themeState.colorTheme = data.colorTheme;
       localStorage.setItem('hub-theme', JSON.stringify(themeState));
-      applyHubAccent();
+      applyHubTheme();
       broadcast(themeMessage(), e.source);
     }
   });

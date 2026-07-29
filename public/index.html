@@ -20,16 +20,18 @@
       --shadow: rgba(0, 0, 0, 0.55);
     }
 
-    @media (prefers-color-scheme: light) {
-      :root {
-        --bg: #f4f4f5;
-        --border: #e4e4e7;
-        --surface: #ffffff;
-        --surface-hover: #f1f1f4;
-        --text: #18181b;
-        --text-dim: #71717a;
-        --shadow: rgba(0, 0, 0, 0.18);
-      }
+    /* applyHubTheme() owns light/dark and stamps this class, resolving the pushed hub:theme first
+       and prefers-color-scheme only as its fallback. Deliberately not a @media block: the theme a
+       sub-app pushed has to win over the OS preference, and the only surface painted before JS runs
+       is a background the iframes immediately cover. */
+    :root.light {
+      --bg: #f4f4f5;
+      --border: #e4e4e7;
+      --surface: #ffffff;
+      --surface-hover: #f1f1f4;
+      --text: #18181b;
+      --text-dim: #71717a;
+      --shadow: rgba(0, 0, 0, 0.18);
     }
 
     * { margin: 0; padding: 0; box-sizing: border-box; }
