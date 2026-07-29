@@ -114,8 +114,23 @@ spawnApp('memory', process.execPath, [NODE_HDR, memoryPath, `--port=${MEMORY_POR
 
 const app = express();
 
+// The accent hex per color theme, read from the same registry generate-themes.mjs compiles into each
+// sub-app's themes.css. Served rather than hand-copied into public/app.js so there is one source of
+// truth; the palette is the hub's only themed surface, so only ember (the accent role) is needed.
+// Read once — themes.json only changes when the generator is re-run, which restarts the hub anyway.
+const themeAccents = (() => {
+  try {
+    const themes = JSON.parse(fs.readFileSync(path.join(__dirname, 'scripts/themes.json'), 'utf8'));
+    return Object.fromEntries(themes.map((t) => [t.id, { dark: t.dark.ember, light: t.light.ember }]));
+  } catch {
+    // Palette falls back to the --accent in index.html; not worth failing startup over.
+    return {};
+  }
+})();
+
 app.get('/api/config', (_req, res) => {
   res.json({
+    themeAccents,
     apps: {
       kanban: { name: 'Kanban', url: `http://localhost:${actualPorts.kanban}`, icon: 'columns' },
       marketplace: { name: 'Marketplace', url: `http://localhost:${actualPorts.marketplace}`, icon: 'store' },

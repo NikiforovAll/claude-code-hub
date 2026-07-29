@@ -24,6 +24,21 @@ function themeMessage() {
   return { type: 'hub:theme', theme: themeState.theme, colorTheme: themeState.colorTheme };
 }
 
+// {<themeId>: {dark, light}} from /api/config, which derives it from scripts/themes.json — the same
+// registry that generates each sub-app's themes.css. Empty until config arrives, and empty if the
+// registry is unreadable; either way the palette keeps the --accent from index.html.
+let themeAccents = {};
+
+// Paints the palette in the active theme's accent — its only themed surface.
+function applyHubAccent() {
+  const pair = themeAccents[themeState.colorTheme];
+  if (!pair) return;
+  // themeState.theme is unset until a sub-app pushes one; the palette's own colours come from
+  // prefers-color-scheme, so match that in the meantime.
+  const mode = themeState.theme ?? (window.matchMedia('(prefers-color-scheme: light)').matches ? 'light' : 'dark');
+  document.documentElement.style.setProperty('--accent', pair[mode]);
+}
+
 // Claude's on-disk project-directory name. Matches memory/server.js encodeProjectPath. The hub
 // owns this transform so cost never has to convert anything; the inverse is lossy and not needed.
 function encodeProjectPath(p) {
@@ -74,9 +89,18 @@ function postProjectTo(appId) {
   postTo(appId, projectMessage());
 }
 
+// Sub-apps can't detect this themselves: inactive iframes are display:none, and a nested
+// document's visibilityState still follows the top-level tab. Used for polling/auto-refresh.
+function postActiveTo(appId) {
+  postTo(appId, { type: 'hub:active', active: appId === activeApp });
+}
+
 async function init() {
   const res = await fetch('/api/config');
-  apps = (await res.json()).apps;
+  const config = await res.json();
+  apps = config.apps;
+  themeAccents = config.themeAccents ?? {};
+  applyHubAccent();
   allowedOrigins = new Set(Object.values(apps).map((a) => new URL(a.url).origin));
   buildIframes();
   switchTab(Object.keys(apps)[0]);
@@ -106,6 +130,7 @@ function switchTab(appId) {
 
   for (const [id, iframe] of Object.entries(iframes)) {
     iframe.classList.toggle('hidden', id !== appId);
+    postActiveTo(id);
   }
 
   const overlay = document.getElementById('loading-overlay');
@@ -127,10 +152,14 @@ function onIframeLoad(appId) {
     postTo(appId, themeMessage());
   }
   postProjectTo(appId);
+  postActiveTo(appId);
   // Posted twice: the shims gate their origin check on window.__HUB__, which they populate from
   // an async /hub-config fetch that resolves after this load event, so the first post can be
   // dropped. Safe to repeat — every shim's apply is idempotent.
-  setTimeout(() => postProjectTo(appId), 400);
+  setTimeout(() => {
+    postProjectTo(appId);
+    postActiveTo(appId);
+  }, 400);
 }
 
 function listenMessages() {
@@ -152,6 +181,7 @@ function listenMessages() {
       themeState.theme = data.theme;
       if (hasColor) themeState.colorTheme = data.colorTheme;
       localStorage.setItem('hub-theme', JSON.stringify(themeState));
+      applyHubAccent();
       broadcast(themeMessage(), e.source);
     }
   });
@@ -248,9 +278,11 @@ function subseq(text, q) {
 
 // Matches the full path so worktrees with opaque basenames stay reachable, but ranks basename
 // hits above parent-path hits. Tier ties fall back to the recency order set in loadProjects.
+// Returns {p, tier} so the renderer can mark the field that actually explains the match instead of
+// re-deriving it.
 function projectRows(projects, query) {
   const q = query.trim().toLowerCase();
-  if (!q) return projects.slice(0, 100);
+  if (!q) return projects.slice(0, 100).map((p) => ({ p, tier: 0 }));
   const tierOf = (p) => {
     if (p.name.toLowerCase().includes(q)) return 0;
     if (p.path.toLowerCase().includes(q)) return 1;
@@ -267,7 +299,47 @@ function projectRows(projects, query) {
       .filter((x) => x.tier >= 0);
   }
   out.sort((a, b) => a.tier - b.tier || b.p.ts - a.p.ts);
-  return out.map((x) => x.p).slice(0, 100);
+  return out.slice(0, 100);
+}
+
+// The [start, end) slices of `lower` that q matched, mirroring the tiers in projectRows: one
+// contiguous range for a substring hit, otherwise the subsequence positions, coalesced so adjacent
+// letters share a range. Null when q is absent altogether.
+function matchRanges(lower, q) {
+  const at = lower.indexOf(q);
+  if (at >= 0) return [[at, at + q.length]];
+  const ranges = [];
+  let qi = 0;
+  for (let i = 0; i < lower.length && qi < q.length; i++) {
+    if (lower[i] !== q[qi]) continue;
+    const last = ranges[ranges.length - 1];
+    if (last && last[1] === i) last[1] = i + 1;
+    else ranges.push([i, i + 1]);
+    qi++;
+  }
+  return qi === q.length ? ranges : null;
+}
+
+// Marks the letters that made this row match, so a hit on an opaque basename explains itself.
+// Returns nodes, never HTML — a project path must never be interpolated.
+function markMatch(text, q) {
+  const ranges = q ? matchRanges(text.toLowerCase(), q) : null;
+  if (!ranges) return [document.createTextNode(text)];
+  const nodes = [];
+  let at = 0;
+  for (const [from, to] of ranges) {
+    if (from > at) nodes.push(document.createTextNode(text.slice(at, from)));
+    nodes.push(el('mark', '', text.slice(from, to)));
+    at = to;
+  }
+  if (at < text.length) nodes.push(document.createTextNode(text.slice(at)));
+  return nodes;
+}
+
+function markedSpan(className, text, q) {
+  const node = el('span', className);
+  node.append(...markMatch(text, q));
+  return node;
 }
 
 function looksLikePath(q) {
@@ -284,7 +356,13 @@ function relAge(ts) {
 
 function renderPalette() {
   const list = document.getElementById('palette-list');
-  const rows = projectRows(palette.projects, palette.query).map((p) => ({ kind: 'project', path: p.path, p }));
+  const q = palette.query.trim().toLowerCase();
+  const rows = projectRows(palette.projects, palette.query).map((x) => ({
+    kind: 'project',
+    path: x.p.path,
+    p: x.p,
+    tier: x.tier,
+  }));
   if (looksLikePath(palette.query)) rows.push({ kind: 'literal', path: palette.query.trim() });
   palette.rows = rows;
   palette.sel = Math.min(palette.sel, Math.max(0, rows.length - 1));
@@ -302,9 +380,11 @@ function renderPalette() {
       if (row.kind === 'literal') {
         li.textContent = `Use literal path -- ${row.path}`;
       } else {
+        // Only the field that ranked the row is marked — otherwise a one-letter query like "c"
+        // would light up the "C:" drive letter on every row. Tier 0 is a basename hit.
         li.append(
-          el('span', 'name', row.p.name),
-          el('span', 'parent', row.p.parent),
+          markedSpan('name', row.p.name, row.tier === 0 ? q : ''),
+          markedSpan('parent', row.p.parent, row.tier === 0 ? '' : q),
           el('span', 'age', relAge(row.p.ts)),
         );
       }

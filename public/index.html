@@ -10,7 +10,9 @@
     :root {
       --bg: #1a1a2e;
       --border: #0f3460;
-      --accent: #e94560;
+      /* Fallback until applyHubAccent() overrides it with the active theme's accent, and the value
+         that stands if /api/config carries no accents. Ember, every sub-app's :root default. */
+      --accent: #e86f33;
       --surface: #16213e;
       --surface-hover: #1f2a4a;
       --text: #e8e8ef;
@@ -95,7 +97,7 @@
       justify-content: center;
       align-items: flex-start;
       padding-top: 12vh;
-      background: color-mix(in srgb, var(--bg) 70%, transparent);
+      background: color-mix(in srgb, var(--bg) 78%, transparent);
     }
 
     .palette[hidden] { display: none; }
@@ -133,18 +135,29 @@
       display: flex;
       align-items: baseline;
       gap: 10px;
-      padding: 7px 14px;
+      padding: 8px 14px;
       cursor: pointer;
       color: var(--text);
       white-space: nowrap;
     }
 
+    /* Bar over the neutral hover background, no accent tint: the faintest theme accents
+       (monokai light #c08a00, vitesse light #1c6b48) barely register as a tint, but read
+       clearly as a 2px bar. */
     .palette-row.selected {
       background: var(--surface-hover);
       box-shadow: inset 2px 0 0 var(--accent);
     }
 
     .palette-row .name { font-weight: 600; }
+
+    /* The letters that made this row match. Accent-coloured rather than block-highlighted so it
+       reads inside a bold name without fighting the selected row's bar. */
+    .palette-row mark {
+      background: transparent;
+      color: var(--accent);
+      font-weight: 700;
+    }
 
     .palette-row .parent {
       color: var(--text-dim);
