@@ -227,8 +227,15 @@ function listenKeys() {
       return;
     }
     // While the palette is open the input owns the keyboard — don't let tab shortcuts fire
-    // mid-path (Alt+digit especially, since Windows paths contain digits).
-    if (palette.open) return;
+    // mid-path (Alt+digit especially, since Windows paths contain digits). Escape still closes:
+    // bound here as well as on the input so it works wherever focus landed in the hub document.
+    if (palette.open) {
+      if (e.key === 'Escape') {
+        e.preventDefault();
+        closePalette();
+      }
+      return;
+    }
     if (e.altKey && !e.ctrlKey && !e.shiftKey && !e.metaKey) {
       const digit = parseInt(e.key, 10);
       if (digit >= 1 && digit <= 9) {
@@ -417,6 +424,10 @@ function openPalette() {
   palette.sel = 0;
   input.value = '';
   document.getElementById('palette').hidden = false;
+  // Ctrl+Alt+P usually arrives forwarded from a focused iframe. Without inert the sub-app can keep
+  // or take focus back, and then Escape is handled inside it — the palette stays open and only the
+  // sub-app's own focus visibly changes.
+  setIframesInert(true);
   renderPalette();
   input.focus();
   // Stale-while-revalidate: the cached list renders instantly, recency refreshes when this lands.
@@ -430,7 +441,12 @@ function openPalette() {
 function closePalette() {
   palette.open = false;
   document.getElementById('palette').hidden = true;
+  setIframesInert(false);
   iframes[activeApp]?.focus();
+}
+
+function setIframesInert(on) {
+  for (const iframe of Object.values(iframes)) iframe.inert = on;
 }
 
 function movePaletteSel(delta) {
