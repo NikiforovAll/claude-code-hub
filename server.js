@@ -3,8 +3,8 @@
 const { spawn } = require('child_process');
 const express = require('express');
 const fs = require('fs');
-const http = require('http');
 const path = require('path');
+const { createNetGuard } = require('./lib/net-guard');
 
 function getArg(name) {
   const idx = process.argv.findIndex((a) => a.startsWith(`--${name}`));
@@ -23,6 +23,11 @@ const MEMORY_PORT = parseInt(getArg('memory-port') || '3544', 10);
 const children = [];
 const actualPorts = { marketplace: MARKETPLACE_PORT, kanban: KANBAN_PORT, cost: COST_PORT, memory: MEMORY_PORT };
 
+// Created before spawnApp so the same host/allowed-hosts decision reaches the
+// children. Without that propagation, `--host 0.0.0.0` would expose the hub shell
+// while every iframe 403'd on its own Host check.
+const net = createNetGuard({ appName: 'Claude Code Hub' });
+
 function spawnApp(name, cmd, args, envPort) {
   const child = spawn(cmd, args, {
     cwd: __dirname,
@@ -31,6 +36,8 @@ function spawnApp(name, cmd, args, envPort) {
       PORT: String(envPort),
       CLAUDE_HUB: '1',
       HUB_URL: `http://localhost:${HUB_PORT}`,
+      HOST: net.BIND_HOST,
+      ALLOWED_HOSTS: net.ALLOWED_HOSTS,
     },
     stdio: ['ignore', 'pipe', 'pipe'],
   });
@@ -105,7 +112,8 @@ const memoryPath = resolveApp('memory', 'claude-code-memory-explorer');
 
 // Raise header size limit to 64KB — localhost cookies from sibling apps can pile up and
 // trip Node's default 16KB limit, breaking iframes with HTTP 431.
-const NODE_HDR = '--max-http-header-size=65536';
+const HDR_BYTES = 65536;
+const NODE_HDR = `--max-http-header-size=${HDR_BYTES}`;
 
 spawnApp('marketplace', process.execPath, [NODE_HDR, marketplacePath, `--port=${MARKETPLACE_PORT}`], MARKETPLACE_PORT);
 spawnApp('kanban', process.execPath, [NODE_HDR, kanbanPath], KANBAN_PORT);
@@ -113,6 +121,12 @@ spawnApp('cost', process.execPath, [NODE_HDR, costPath, `--port=${COST_PORT}`], 
 spawnApp('memory', process.execPath, [NODE_HDR, memoryPath, `--port=${MEMORY_PORT}`], MEMORY_PORT);
 
 const app = express();
+
+// Mounted before the routes below, which are registered ahead of the first
+// app.use() and would otherwise bypass the guards entirely.
+app.use(net.hostGuard);
+app.use(net.frameGuard);
+app.use(net.originGuard);
 
 // The accent hex per color theme, read from the same registry generate-themes.mjs compiles into each
 // sub-app's themes.css. Served rather than hand-copied into public/app.js so there is one source of
@@ -187,31 +201,26 @@ app.get('/api/resolve-path', (req, res) => {
 
 app.use(express.static(path.join(__dirname, 'public')));
 
-const server = http.createServer({ maxHeaderSize: 65536 }, app);
-server.listen(HUB_PORT, () => {
-  const actual = server.address().port;
+const onReady = (actual) => {
   printBanner(actual);
   if (process.argv.includes('--open')) {
     import('open').then((m) => m.default(`http://localhost:${actual}`));
   }
-});
+};
+
+const server = net.listenLoopback(app, HUB_PORT, onReady, { maxHeaderSize: HDR_BYTES });
 
 function printBanner(port) {
   console.log(`Claude Code Hub running at http://localhost:${port}`);
+  const warning = net.exposureWarning();
+  if (warning) console.log(warning);
   console.log('Type "q" or "exit" to stop the server');
 }
 
 server.on('error', (err) => {
   if (err.code === 'EADDRINUSE' || err.code === 'EACCES') {
     console.log(`Port ${HUB_PORT} in use, trying random port...`);
-    const fallback = http.createServer({ maxHeaderSize: 65536 }, app);
-    fallback.listen(0, () => {
-      const actual = fallback.address().port;
-      printBanner(actual);
-      if (process.argv.includes('--open')) {
-        import('open').then((m) => m.default(`http://localhost:${actual}`));
-      }
-    });
+    net.listenLoopback(app, 0, onReady, { maxHeaderSize: HDR_BYTES });
   } else {
     throw err;
   }

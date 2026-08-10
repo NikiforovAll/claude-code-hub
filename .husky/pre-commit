@@ -1,2 +1,2 @@
 #!/usr/bin/env sh
-npx @biomejs/biome check public/app.js server.js
+npm run lint

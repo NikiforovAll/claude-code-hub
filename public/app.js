@@ -68,6 +68,10 @@ function originOf(appId) {
 }
 
 function postTo(appId, message) {
+  // Before the iframe commits its src its contentWindow is still on the hub's own
+  // origin, so a send addressed to the sub-app origin is refused and logged. The
+  // load handler posts the current state anyway, so skipping here loses nothing.
+  if (!loadedApps.has(appId)) return;
   iframes[appId]?.contentWindow?.postMessage(message, originOf(appId));
 }
 

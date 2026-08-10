@@ -9,9 +9,11 @@
   "scripts": {
     "start": "node server.js",
     "dev": "node server.js --open",
-    "lint": "npx @biomejs/biome check public/app.js server.js",
+    "lint": "npx @biomejs/biome check public/app.js server.js && npm run check:escaping && npm run check:security-lib",
     "lint:fix": "npx @biomejs/biome check --fix public/app.js server.js",
-    "prepare": "husky"
+    "prepare": "husky",
+    "check:escaping": "node scripts/check-escaping.mjs",
+    "check:security-lib": "bash scripts/sync-security-lib.sh --check"
   },
   "repository": {
     "type": "git",
