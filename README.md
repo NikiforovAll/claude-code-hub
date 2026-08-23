@@ -4,7 +4,7 @@
 [![license](https://img.shields.io/npm/l/claude-code-hub)](LICENSE)
 [![npm downloads](https://img.shields.io/npm/dm/claude-code-hub)](https://www.npmjs.com/package/claude-code-hub)
 
-Unified launcher for Claude Code tools — browse plugins in **Marketplace**, track tasks in **Kanban**, monitor costs in **Cost**, and explore memory in **Memory**, all from a single chromeless PWA.
+Unified launcher for Claude Code tools — browse plugins in **Marketplace**, track tasks in **Kanban**, monitor costs in **Cost**, and explore memory in **Memory Diagnoser**, all from a single chromeless PWA.
 
 ## Kanban:
 
@@ -16,8 +16,8 @@ Unified launcher for Claude Code tools — browse plugins in **Marketplace**, tr
 ## Cost:
 ![Cost Screenshot](./assets/cost.png)
 
-## Memory:
-![Memory Screenshot](./assets/memory.png)
+## Memory Diagnoser:
+![Memory Diagnoser Screenshot](./assets/memory.png)
 
 ## Quick Start
 
@@ -51,8 +51,8 @@ Without hooks you still get the task board, but no agent activity or live indica
 | `Alt+1`          | Switch to Kanban        |
 | `Alt+2`          | Switch to Marketplace   |
 | `Alt+3`          | Switch to Cost          |
-| `Alt+4`          | Switch to Memory        |
-| `Ctrl+M`         | Open Memory for current session (Kanban) |
+| `Alt+4`          | Switch to Memory Diagnoser |
+| `Ctrl+M`         | Open Memory Diagnoser for current session (Kanban) |
 | `Ctrl+Alt+Right` | Switch to next tool     |
 | `Ctrl+Alt+Left`  | Switch to previous tool |
 
@@ -67,7 +67,7 @@ The hub server spawns both sub-apps as child processes, each on its own port. A 
 | [Marketplace](https://github.com/NikiforovAll/claude-code-marketplace) | `marketplace/` | 3542         |
 | [Kanban](https://github.com/NikiforovAll/claude-task-viewer)           | `cck/`         | 3541         |
 | [Cost](https://github.com/NikiforovAll/claude-code-cost)               | `cost/`        | 3543         |
-| [Memory](https://github.com/NikiforovAll/claude-code-memory)           | `memory/`      | 3544         |
+| [Memory Diagnoser](https://github.com/NikiforovAll/claude-code-memory) | `memory/`      | 3544         |
 
 ## CLI Flags
 
@@ -76,7 +76,7 @@ The hub server spawns both sub-apps as child processes, each on its own port. A 
 --marketplace-port <n>  Marketplace port (default: 3542)
 --kanban-port <n>       Kanban port (default: 3541)
 --cost-port <n>         Cost port (default: 3543)
---memory-port <n>       Memory port (default: 3544)
+--memory-port <n>       Memory Diagnoser port (default: 3544)
 --open                  Auto-open browser
 ```
 

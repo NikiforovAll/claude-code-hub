@@ -149,7 +149,7 @@ app.get('/api/config', (_req, res) => {
       kanban: { name: 'Kanban', url: `http://localhost:${actualPorts.kanban}`, icon: 'columns' },
       marketplace: { name: 'Marketplace', url: `http://localhost:${actualPorts.marketplace}`, icon: 'store' },
       cost: { name: 'Cost', url: `http://localhost:${actualPorts.cost}`, icon: 'dollar-sign' },
-      memory: { name: 'Memory', url: `http://localhost:${actualPorts.memory}`, icon: 'database' },
+      memory: { name: 'Memory Diagnoser', url: `http://localhost:${actualPorts.memory}`, icon: 'database' },
     },
   });
 });
