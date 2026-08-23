@@ -41,7 +41,7 @@ After cloning: `git submodule update --init` then `npm install` in root, `market
 
 **IMPORTANT**: Submodules are often in detached HEAD state. Before making any changes in a submodule, always checkout its main branch first: `git -C <submodule> checkout main`. This avoids committing on a detached HEAD and losing work.
 
-Each sub-app has its own linter (Biome) and pre-commit hooks. The hub repo itself has no linter.
+Each sub-app has its own linter (Biome) and pre-commit hooks. The hub root does too: `npm run lint` (Biome over `public/app.js` and `server.js`, plus the escaping and security-lib checks) and husky-managed pre-commit hooks.
 
 ## Sub-app Hub Integration
 
