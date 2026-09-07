@@ -234,9 +234,11 @@ function handleForwardedKey(d) {
   }
   if (d.key === 'ArrowLeft') cycleTab(-1);
   else if (d.key === 'ArrowRight') cycleTab(1);
-  else if (d.key.toLowerCase() === 'p') togglePalette('project');
-  else if (d.key.toLowerCase() === 'w') togglePalette('configDir');
+  else if (PALETTE_KEYS[d.key.toLowerCase()]) togglePalette(PALETTE_KEYS[d.key.toLowerCase()]);
 }
+
+// Ctrl+Alt+<letter> bindings. Sub-app shims forward every letter, so this is the one keymap.
+const PALETTE_KEYS = { p: 'project', w: 'configDir' };
 
 function cycleTab(delta) {
   const ids = Object.keys(apps);
@@ -253,9 +255,9 @@ function switchByIndex(idx) {
 function listenKeys() {
   document.addEventListener('keydown', (e) => {
     // Matches both cases: with Ctrl+Alt held, some layouts report AltGr-shifted characters.
-    if (e.ctrlKey && e.altKey && !e.shiftKey && !e.metaKey && /^[pw]$/i.test(e.key)) {
+    if (e.ctrlKey && e.altKey && !e.shiftKey && !e.metaKey && PALETTE_KEYS[e.key.toLowerCase()]) {
       e.preventDefault();
-      togglePalette(e.key.toLowerCase() === 'p' ? 'project' : 'configDir');
+      togglePalette(PALETTE_KEYS[e.key.toLowerCase()]);
       return;
     }
     // While the palette is open the input owns the keyboard — don't let tab shortcuts fire
