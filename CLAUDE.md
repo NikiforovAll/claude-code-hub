@@ -17,9 +17,11 @@ CLI flags: `--port <n>`, `--marketplace-port <n>`, `--kanban-port <n>`, `--cost-
 
 ## Architecture
 
-**Hub server** (`server.js`) spawns four child processes — marketplace, kanban, cost, and memory — passing `CLAUDE_HUB=1` and `HUB_URL` env vars. It parses their stdout to detect actual ports (handles fallback when default ports are busy) and exposes `GET /api/config` returning the live app URLs.
+**Hub server** (`server.js`) spawns four child processes — marketplace, kanban, cost, and memory — passing `CLAUDE_HUB=1`, `HUB_URL`, and `CLAUDE_CONFIG_DIR` env vars. It parses their stdout to detect actual ports (handles fallback when default ports are busy) and exposes `GET /api/config` returning the live app URLs.
 
-**Hub client** (`public/app.js`) fetches config, creates one iframe per app, and switches visibility on tab change. No visible chrome — switching is keyboard-only via `Ctrl+Alt+Left/Right`.
+**Config dirs.** The hub keeps a list of Claude config dirs and the active one in `~/.claude-hub/config.json` (`GET/POST/DELETE /api/config-dirs`, `POST /api/config-dirs/activate`). Every sub-app resolves `CLAUDE_CONFIG_DIR` once at startup, so activating a dir kills and respawns all four children; the response carries the fresh app URLs and the client reloads every iframe. cck's hooks and statusLine are installed per dir, so a dir without them shows tasks and sessions but no live agent activity.
+
+**Hub client** (`public/app.js`) fetches config, creates one iframe per app, and switches visibility on tab change. No visible chrome — switching is keyboard-only via `Ctrl+Alt+Left/Right`. `Ctrl+Alt+P` opens the project palette, `Ctrl+Alt+W` the config-dir palette (same widget, typing a path adds a new dir).
 
 **postMessage protocol** enables cross-app communication:
 - `hub:navigate` — sub-app requests the hub to switch to another app (with optional deep link URL)
@@ -47,7 +49,7 @@ Each sub-app has its own linter (Biome) and pre-commit hooks. The hub root does 
 
 All sub-apps expose `GET /hub-config` (returns `{enabled, url}` from env vars) and append a `HUB_INTEGRATION` region to their `public/app.js` with:
 - `initHub()` — fetches config, stores in `window.__HUB__`
-- Keyboard forwarding (`Ctrl+Alt+Arrow` → `postMessage` to parent)
+- Keyboard forwarding (`Ctrl+Alt+Arrow`, `Ctrl+Alt+P`, `Ctrl+Alt+W`, `Alt+digit` → `postMessage` to parent, modifiers included)
 - `hubNavigate(app, url)` — callable API for cross-app deep links (no-op when standalone)
 
 ## Landing Page

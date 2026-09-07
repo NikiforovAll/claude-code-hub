@@ -55,6 +55,8 @@ Without hooks you still get the task board, but no agent activity or live indica
 | `Ctrl+M`         | Open Memory Diagnoser for current session (Kanban) |
 | `Ctrl+Alt+Right` | Switch to next tool     |
 | `Ctrl+Alt+Left`  | Switch to previous tool |
+| `Ctrl+Alt+P`     | Switch project          |
+| `Ctrl+Alt+W`     | Switch Claude config dir (`CLAUDE_CONFIG_DIR`); restarts the sub-apps |
 
 ## How It Works
 

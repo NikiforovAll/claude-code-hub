@@ -67,6 +67,8 @@
       position: absolute;
       top: 0; left: 0; right: 0; bottom: 0;
       display: flex;
+      flex-direction: column;
+      gap: 14px;
       align-items: center;
       justify-content: center;
       background: var(--bg);
@@ -90,7 +92,15 @@
 
     @keyframes spin { to { transform: rotate(360deg); } }
 
-    /* Project switcher palette — the hub's only chrome, summoned with Ctrl+Alt+P. */
+    .loading-text {
+      color: var(--text-dim);
+      font: 13px/1.4 ui-monospace, SFMono-Regular, Menlo, monospace;
+    }
+
+    .loading-text:empty { display: none; }
+
+    /* Switcher palette — the hub's only chrome. Ctrl+Alt+P for projects, Ctrl+Alt+W for Claude
+       config dirs. */
     .palette {
       position: fixed;
       inset: 0;
@@ -183,12 +193,41 @@
       padding: 10px 14px;
       color: var(--text-dim);
     }
+
+    /* Mirrors memory's picker: the remove control is hidden until the row is hovered or selected. */
+    .palette-row .palette-remove {
+      margin-left: auto;
+      padding: 0 6px;
+      border: none;
+      background: transparent;
+      color: var(--text-dim);
+      font: inherit;
+      font-size: 16px;
+      line-height: 1;
+      cursor: pointer;
+      opacity: 0;
+    }
+
+    .palette-row:hover .palette-remove,
+    .palette-row.selected .palette-remove { opacity: 1; }
+
+    .palette-row .palette-remove:hover { color: #e5484d; }
+
+    .palette-hint {
+      padding: 8px 14px;
+      border-top: 1px solid var(--border);
+      color: var(--text-dim);
+      font-size: 12px;
+    }
+
+    .palette-hint:empty { display: none; }
   </style>
 </head>
 <body>
   <div class="iframe-container" id="iframe-container">
     <div class="loading-overlay" id="loading-overlay">
       <div class="spinner"></div>
+      <div class="loading-text" id="loading-text"></div>
     </div>
   </div>
 
@@ -197,6 +236,7 @@
       <input class="palette-input" id="palette-input" type="text" spellcheck="false"
              autocomplete="off" placeholder="Search projects or type a path...">
       <ul class="palette-list" id="palette-list" role="listbox"></ul>
+      <div class="palette-hint" id="palette-hint"></div>
     </div>
   </div>
 
