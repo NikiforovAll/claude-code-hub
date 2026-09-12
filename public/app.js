@@ -29,8 +29,14 @@ function loadThemeState() {
   }
 }
 
+function osTheme() {
+  return window.matchMedia('(prefers-color-scheme: light)').matches ? 'light' : 'dark';
+}
+
+// Sub-apps disagree on their first-run default (marketplace follows the OS, the rest start dark),
+// so an unset theme resolves to the OS preference here and reaches every iframe on load.
 function themeMessage() {
-  return { type: 'hub:theme', theme: themeState.theme, colorTheme: themeState.colorTheme };
+  return { type: 'hub:theme', theme: themeState.theme ?? osTheme(), colorTheme: themeState.colorTheme };
 }
 
 // {<themeId>: {dark, light}} from /api/config, which derives it from scripts/themes.json — the same
@@ -41,8 +47,7 @@ let themeAccents = {};
 // Paints the palette — the hub's only themed surface — in the active theme. The hub relays
 // hub:theme to the sub-apps; this is what makes it apply to the hub's own chrome too.
 function applyHubTheme() {
-  // themeState.theme is unset until a sub-app pushes one, so fall back to the OS preference.
-  const mode = themeState.theme ?? (window.matchMedia('(prefers-color-scheme: light)').matches ? 'light' : 'dark');
+  const mode = themeState.theme ?? osTheme();
   document.documentElement.classList.toggle('light', mode === 'light');
   const pair = themeAccents[themeState.colorTheme];
   if (pair) document.documentElement.style.setProperty('--accent', pair[mode]);
@@ -182,15 +187,14 @@ function switchTab(appId) {
 function onIframeLoad(appId) {
   loadedApps.add(appId);
   if (appId === activeApp) hideLoading();
-  if (themeState.theme || themeState.colorTheme) {
-    postTo(appId, themeMessage());
-  }
+  postTo(appId, themeMessage());
   postProjectTo(appId);
   postActiveTo(appId);
   // Posted twice: the shims gate their origin check on window.__HUB__, which they populate from
   // an async /hub-config fetch that resolves after this load event, so the first post can be
   // dropped. Safe to repeat — every shim's apply is idempotent.
   setTimeout(() => {
+    postTo(appId, themeMessage());
     postProjectTo(appId);
     postActiveTo(appId);
   }, 400);
@@ -452,6 +456,13 @@ const PALETTE_MODES = {
       if (looksLikePath(typed) && !dirs.some((d) => d.toLowerCase() === q)) rows.push({ kind: 'literal', path: typed });
       return rows;
     },
+    // Enter on the default row must switch, so the cursor lands on the dir before the active one,
+    // wrapping. With two dirs the palette then behaves like a toggle.
+    initialSel(rows) {
+      const active = rows.findIndex((r) => r.active);
+      if (active < 0 || rows.length < 2) return 0;
+      return (active - 1 + rows.length) % rows.length;
+    },
     fillRow(li, row, q) {
       li.append(markedSpan('name', row.path, q));
       if (row.active) {
@@ -475,6 +486,8 @@ function renderPalette() {
   const q = typed.toLowerCase();
   const rows = spec.rows(typed, q);
   palette.rows = rows;
+  // sel is null until the first render that has rows: the cached list may be empty until load() lands.
+  if (palette.sel === null && rows.length > 0) palette.sel = spec.initialSel?.(rows) ?? 0;
   palette.sel = Math.min(palette.sel, Math.max(0, rows.length - 1));
   if (rows.length === 0) {
     list.replaceChildren(el('li', 'palette-empty', spec.empty));
@@ -515,7 +528,7 @@ function openPalette(mode) {
   palette.open = true;
   palette.mode = mode;
   palette.query = '';
-  palette.sel = 0;
+  palette.sel = null;
   input.value = '';
   input.placeholder = spec.placeholder;
   document.querySelector('#palette .palette-box').setAttribute('aria-label', spec.label);
