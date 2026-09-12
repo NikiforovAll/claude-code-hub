@@ -620,6 +620,8 @@ async function commitConfigDir(row) {
   showLoading(`Switching to ${target}...`);
   try {
     setApps((await sendJson('POST', '/api/config-dirs/activate', { path: target })).apps);
+    // The palette renders from this cache before its refetch lands, and initialSel keys off it.
+    palette.configDirs.active = target;
     reloadIframes();
   } catch (err) {
     console.warn('config dir switch failed:', err.message);
