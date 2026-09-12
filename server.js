@@ -3,6 +3,7 @@
 const { spawn } = require('child_process');
 const express = require('express');
 const fs = require('fs');
+const http = require('http');
 const os = require('os');
 const path = require('path');
 const { createNetGuard } = require('./lib/net-guard');
@@ -21,9 +22,16 @@ const KANBAN_PORT = parseInt(getArg('kanban-port') || '3541', 10);
 const COST_PORT = parseInt(getArg('cost-port') || '3543', 10);
 const MEMORY_PORT = parseInt(getArg('memory-port') || '3544', 10);
 
-let children = [];
+const POOL_SIZE = Math.max(1, parseInt(getArg('pool-size') || '3', 10));
 const DEFAULT_PORTS = { marketplace: MARKETPLACE_PORT, kanban: KANBAN_PORT, cost: COST_PORT, memory: MEMORY_PORT };
-const actualPorts = { ...DEFAULT_PORTS };
+
+// One child set per config dir, kept alive after a switch so switching back is instant. Map
+// insertion order doubles as LRU: activating a dir re-inserts it at the end.
+const pools = new Map();
+
+function activePool() {
+  return pools.get(hubConfig.activeConfigDir);
+}
 
 // Every sub-app resolves CLAUDE_CONFIG_DIR once at startup into a module constant, so switching
 // the dir means restarting the children. Kept on the server, not in the browser: the dir has to
@@ -34,23 +42,51 @@ function expandHome(p) {
   return p.startsWith('~') ? p.replace('~', os.homedir()) : p;
 }
 
+// Real on-disk spelling (true casing, native separators). One dir is one list entry and one child
+// pool whichever way it was typed. Throws when the path does not exist.
+function canonicalDir(p) {
+  return fs.realpathSync.native(path.resolve(expandHome(p)));
+}
+
 function loadHubConfig() {
-  const fallback = expandHome(
+  const canonical = (p) => {
+    try {
+      return canonicalDir(p);
+    } catch {
+      return expandHome(p);
+    }
+  };
+  const fallback = canonical(
     process.env.CLAUDE_CONFIG_DIR || process.env.CLAUDE_DIR || path.join(os.homedir(), '.claude'),
   );
+  let raw = '';
   let saved = {};
   try {
-    saved = JSON.parse(fs.readFileSync(HUB_CONFIG_FILE, 'utf8'));
+    raw = fs.readFileSync(HUB_CONFIG_FILE, 'utf8');
+    saved = JSON.parse(raw);
   } catch {}
-  const dirs = Array.isArray(saved.configDirs) ? saved.configDirs.filter((d) => typeof d === 'string') : [];
+  const savedDirs = Array.isArray(saved.configDirs) ? saved.configDirs.filter((d) => typeof d === 'string') : [];
+  const dirs = [...new Set(savedDirs.map(canonical))];
   if (!dirs.includes(fallback)) dirs.unshift(fallback);
-  const active = dirs.includes(saved.activeConfigDir) ? saved.activeConfigDir : fallback;
-  return { configDirs: dirs, activeConfigDir: active };
+  const savedActive = typeof saved.activeConfigDir === 'string' ? canonical(saved.activeConfigDir) : null;
+  const active = dirs.includes(savedActive) ? savedActive : fallback;
+  const config = { configDirs: dirs, activeConfigDir: active };
+  // Configs saved before canonicalization can hold one dir under two spellings; persist the merge.
+  if (serializeConfig(config) !== raw) writeHubConfig(config);
+  return config;
+}
+
+function serializeConfig(config) {
+  return `${JSON.stringify(config, null, 2)}\n`;
+}
+
+function writeHubConfig(config) {
+  fs.mkdirSync(path.dirname(HUB_CONFIG_FILE), { recursive: true });
+  fs.writeFileSync(HUB_CONFIG_FILE, serializeConfig(config));
 }
 
 function saveHubConfig() {
-  fs.mkdirSync(path.dirname(HUB_CONFIG_FILE), { recursive: true });
-  fs.writeFileSync(HUB_CONFIG_FILE, `${JSON.stringify(hubConfig, null, 2)}\n`);
+  writeHubConfig(hubConfig);
 }
 
 const hubConfig = loadHubConfig();
@@ -60,13 +96,13 @@ const hubConfig = loadHubConfig();
 // while every iframe 403'd on its own Host check.
 const net = createNetGuard({ appName: 'Claude Code Hub' });
 
-function spawnApp(name, cmd, args, envPort) {
+function spawnApp(pool, name, cmd, args) {
   const child = spawn(cmd, args, {
     cwd: __dirname,
     env: {
       ...process.env,
-      PORT: String(envPort),
-      CLAUDE_CONFIG_DIR: hubConfig.activeConfigDir,
+      PORT: '0',
+      CLAUDE_CONFIG_DIR: pool.dir,
       CLAUDE_HUB: '1',
       HUB_URL: `http://localhost:${HUB_PORT}`,
       HOST: net.BIND_HOST,
@@ -80,7 +116,6 @@ function spawnApp(name, cmd, args, envPort) {
   child.ready = new Promise((resolve) => {
     markReady = resolve;
   });
-  child.exited = new Promise((resolve) => child.on('exit', resolve));
   child.stdout.on('data', (d) => {
     stdoutBuf += d.toString();
     let nl;
@@ -90,7 +125,7 @@ function spawnApp(name, cmd, args, envPort) {
       process.stdout.write(`[${name}] ${line}`);
       const match = line.match(/running at http:\/\/localhost:(\d+)/i);
       if (match) {
-        actualPorts[name] = parseInt(match[1], 10);
+        pool.ports[name] = parseInt(match[1], 10);
         markReady();
       }
     }
@@ -101,12 +136,12 @@ function spawnApp(name, cmd, args, envPort) {
     markReady();
   });
 
-  children.push(child);
+  pool.children.push(child);
   return child;
 }
 
-function killAll() {
-  for (const child of children) {
+function killPool(pool) {
+  for (const child of pool.children) {
     if (child.exitCode !== null || child.killed) continue;
     if (process.platform === 'win32') {
       spawn('taskkill', ['/pid', String(child.pid), '/f', '/t'], { stdio: 'ignore' });
@@ -114,6 +149,10 @@ function killAll() {
       child.kill();
     }
   }
+}
+
+function killAll() {
+  for (const pool of pools.values()) killPool(pool);
 }
 
 function withTimeout(promise, ms) {
@@ -124,24 +163,33 @@ function withTimeout(promise, ms) {
   return Promise.race([promise, gate]).finally(() => clearTimeout(timer));
 }
 
-// Kills the current children and spawns a fresh set against hubConfig.activeConfigDir. Resolves
-// once every child has printed its port banner (or given up), so the caller can hand the client
-// URLs that are actually live.
-let restarting = null;
-function restartChildren() {
-  if (restarting) return restarting;
-  restarting = (async () => {
-    const old = children;
-    killAll();
-    await withTimeout(Promise.all(old.map((c) => c.exited)), 8000);
-    children = [];
-    Object.assign(actualPorts, DEFAULT_PORTS);
-    spawnChildren();
-    await withTimeout(Promise.all(children.map((c) => c.ready)), 20000);
-  })().finally(() => {
-    restarting = null;
-  });
-  return restarting;
+// Returns the live pool for a dir, spawning one when absent and evicting the least recently used
+// pool past POOL_SIZE. Resolves once every child has printed its port banner (or given up), so
+// the caller can hand the client URLs that are actually live.
+async function ensurePool(dir) {
+  let pool = pools.get(dir);
+  if (pool) {
+    pools.delete(dir);
+    pools.set(dir, pool);
+    return pool.ready;
+  }
+  while (pools.size >= POOL_SIZE) {
+    const oldestDir = pools.keys().next().value;
+    console.log(`Evicting children for ${oldestDir}`);
+    dropPool(oldestDir);
+  }
+  pool = { dir, children: [], ports: {} };
+  pools.set(dir, pool);
+  spawnChildren(pool);
+  pool.ready = withTimeout(Promise.all(pool.children.map((c) => c.ready)), 20000).then(() => pool);
+  return pool.ready;
+}
+
+function dropPool(dir) {
+  const pool = pools.get(dir);
+  if (!pool) return;
+  pools.delete(dir);
+  killPool(pool);
 }
 
 function shutdown() {
@@ -187,19 +235,83 @@ const memoryPath = resolveApp('memory', 'claude-code-memory-explorer');
 const HDR_BYTES = 65536;
 const NODE_HDR = `--max-http-header-size=${HDR_BYTES}`;
 
-function spawnChildren() {
-  spawnApp(
-    'marketplace',
-    process.execPath,
-    [NODE_HDR, marketplacePath, `--port=${MARKETPLACE_PORT}`],
-    MARKETPLACE_PORT,
-  );
-  spawnApp('kanban', process.execPath, [NODE_HDR, kanbanPath], KANBAN_PORT);
-  spawnApp('cost', process.execPath, [NODE_HDR, costPath, `--port=${COST_PORT}`], COST_PORT);
-  spawnApp('memory', process.execPath, [NODE_HDR, memoryPath, `--port=${MEMORY_PORT}`], MEMORY_PORT);
+// Children bind ephemeral ports; the public ports below belong to the hub's proxies. Browser
+// localStorage is keyed by origin, so the sub-app origin has to stay put across switches or the
+// user loses pins and filters every time the active set changes.
+function spawnChildren(pool) {
+  spawnApp(pool, 'marketplace', process.execPath, [NODE_HDR, marketplacePath]);
+  spawnApp(pool, 'kanban', process.execPath, [NODE_HDR, kanbanPath]);
+  spawnApp(pool, 'cost', process.execPath, [NODE_HDR, costPath]);
+  spawnApp(pool, 'memory', process.execPath, [NODE_HDR, memoryPath]);
 }
 
-spawnChildren();
+const publicPorts = { ...DEFAULT_PORTS };
+
+function rewriteOrigin(origin, publicPort, childPort) {
+  try {
+    const u = new URL(origin);
+    if (Number(u.port) !== publicPort) return origin;
+    u.port = String(childPort);
+    return u.origin;
+  } catch {
+    return origin;
+  }
+}
+
+const proxyAgent = new http.Agent({ keepAlive: true, maxSockets: 64 });
+
+// Host is forwarded untouched so the child's hostGuard still sees what the browser sent. Origin is
+// the one header the child cannot judge on its own: its guard compares the port to its own
+// ephemeral one, so the public-port spelling is mapped to the child's; anything else passes
+// through as-is and the child rejects it.
+function proxyHandler(name) {
+  return (req, res) => {
+    const childPort = activePool()?.ports[name];
+    if (!childPort) {
+      res.writeHead(503, { 'Retry-After': '1' });
+      res.end(`${name} is starting`);
+      return;
+    }
+    const headers = { ...req.headers };
+    if (headers.origin) headers.origin = rewriteOrigin(headers.origin, publicPorts[name], childPort);
+    const upstream = http.request(
+      { host: '127.0.0.1', port: childPort, method: req.method, path: req.url, headers, agent: proxyAgent },
+      (u) => {
+        res.writeHead(u.statusCode, u.headers);
+        u.pipe(res);
+      },
+    );
+    upstream.on('error', (err) => {
+      if (!res.headersSent) res.writeHead(502);
+      res.end(err.message);
+    });
+    res.on('close', () => upstream.destroy());
+    req.pipe(upstream);
+  };
+}
+
+function listenWithFallback(handler, port, onReady, label) {
+  const server = net.listenLoopback(handler, port, onReady, { maxHeaderSize: HDR_BYTES });
+  server.on('error', (err) => {
+    if (err.code !== 'EADDRINUSE' && err.code !== 'EACCES') throw err;
+    console.log(`${label}port ${port} in use, trying random port...`);
+    net.listenLoopback(handler, 0, onReady, { maxHeaderSize: HDR_BYTES });
+  });
+  return server;
+}
+
+for (const [name, port] of Object.entries(DEFAULT_PORTS)) {
+  listenWithFallback(
+    proxyHandler(name),
+    port,
+    (actual) => {
+      publicPorts[name] = actual;
+    },
+    `[${name}] `,
+  );
+}
+
+ensurePool(hubConfig.activeConfigDir);
 
 const app = express();
 app.use(express.json());
@@ -226,10 +338,10 @@ const themeAccents = (() => {
 
 function appsConfig() {
   return {
-    kanban: { name: 'Kanban', url: `http://localhost:${actualPorts.kanban}`, icon: 'columns' },
-    marketplace: { name: 'Marketplace', url: `http://localhost:${actualPorts.marketplace}`, icon: 'store' },
-    cost: { name: 'Cost', url: `http://localhost:${actualPorts.cost}`, icon: 'dollar-sign' },
-    memory: { name: 'Memory Diagnoser', url: `http://localhost:${actualPorts.memory}`, icon: 'database' },
+    kanban: { name: 'Kanban', url: `http://localhost:${publicPorts.kanban}`, icon: 'columns' },
+    marketplace: { name: 'Marketplace', url: `http://localhost:${publicPorts.marketplace}`, icon: 'store' },
+    cost: { name: 'Cost', url: `http://localhost:${publicPorts.cost}`, icon: 'dollar-sign' },
+    memory: { name: 'Memory Diagnoser', url: `http://localhost:${publicPorts.memory}`, icon: 'database' },
   };
 }
 
@@ -249,7 +361,7 @@ function resolveDir(input) {
   if (typeof input !== 'string' || !input.trim()) return { error: 'path is required', status: 400 };
   let resolved;
   try {
-    resolved = fs.realpathSync.native(path.resolve(expandHome(input.trim())));
+    resolved = canonicalDir(input.trim());
   } catch {
     return { error: 'Path not found', status: 404 };
   }
@@ -279,35 +391,39 @@ app.delete('/api/config-dirs', (req, res) => {
   }
   hubConfig.configDirs = hubConfig.configDirs.filter((d) => d !== target);
   saveHubConfig();
+  dropPool(target);
   res.json({ dirs: hubConfig.configDirs, active: hubConfig.activeConfigDir });
 });
 
-// Switching restarts every child, so the response carries the fresh app URLs — a child whose
-// default port was still held by its predecessor may have fallen back to another one.
+// The response carries the app URLs so the client reloads every iframe against the new set.
 app.post('/api/config-dirs/activate', async (req, res) => {
   const target = typeof req.body?.path === 'string' ? req.body.path : '';
   if (!hubConfig.configDirs.includes(target)) {
     res.status(404).json({ error: 'Unknown config dir; add it first' });
     return;
   }
-  const changed = target !== hubConfig.activeConfigDir;
-  if (changed) {
+  if (target !== hubConfig.activeConfigDir) {
+    console.log(`Switching CLAUDE_CONFIG_DIR -> ${target}`);
+    await ensurePool(target);
     hubConfig.activeConfigDir = target;
     saveHubConfig();
-    console.log(`Switching CLAUDE_CONFIG_DIR -> ${target}`);
-    await restartChildren();
   }
   res.json({ apps: appsConfig() });
 });
 
 // Project list for the switcher palette, proxied from kanban — it is the only sub-app that
-// enumerates projects. actualPorts is read per request because kanban's real port is only
-// known once its banner has been scraped (see spawnApp).
+// enumerates projects. The port is read per request because kanban's real port is only known
+// once its banner has been scraped (see spawnApp).
 app.get('/api/projects', async (_req, res) => {
   res.setHeader('Cache-Control', 'no-store');
+  const kanbanPort = activePool()?.ports.kanban;
+  if (!kanbanPort) {
+    res.status(503).json({ error: 'kanban is starting' });
+    return;
+  }
   try {
     // 127.0.0.1, not localhost — Node's verbatim DNS ordering tries ::1 first on Windows.
-    const upstream = await fetch(`http://127.0.0.1:${actualPorts.kanban}/api/projects`, {
+    const upstream = await fetch(`http://127.0.0.1:${kanbanPort}/api/projects`, {
       signal: AbortSignal.timeout(4000),
     });
     if (!upstream.ok) {
@@ -338,7 +454,7 @@ const onReady = (actual) => {
   }
 };
 
-const server = net.listenLoopback(app, HUB_PORT, onReady, { maxHeaderSize: HDR_BYTES });
+listenWithFallback(app, HUB_PORT, onReady, '');
 
 function printBanner(port) {
   console.log(`Claude Code Hub running at http://localhost:${port}`);
@@ -346,12 +462,3 @@ function printBanner(port) {
   if (warning) console.log(warning);
   console.log('Type "q" or "exit" to stop the server');
 }
-
-server.on('error', (err) => {
-  if (err.code === 'EADDRINUSE' || err.code === 'EACCES') {
-    console.log(`Port ${HUB_PORT} in use, trying random port...`);
-    net.listenLoopback(app, 0, onReady, { maxHeaderSize: HDR_BYTES });
-  } else {
-    throw err;
-  }
-});

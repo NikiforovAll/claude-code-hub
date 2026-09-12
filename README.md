@@ -79,6 +79,7 @@ The hub server spawns both sub-apps as child processes, each on its own port. A 
 --kanban-port <n>       Kanban port (default: 3541)
 --cost-port <n>         Cost port (default: 3543)
 --memory-port <n>       Memory Diagnoser port (default: 3544)
+--pool-size <n>         Config dirs kept running after a switch (default: 3)
 --open                  Auto-open browser
 ```
 
