@@ -10,6 +10,8 @@ const themeState = loadThemeState();
 // hub-theme: starting unset means there is nothing to race against each sub-app's own
 // project self-restore on boot. Once set it never returns to null.
 let projectState = null;
+// The config dir the hub falls back to (~/.claude). Stays out of the window title.
+let defaultConfigDir = null;
 // mode: 'project' (Ctrl+Alt+P) or 'configDir' (Ctrl+Alt+W). One widget, two row sources.
 const palette = {
   open: false,
@@ -120,6 +122,8 @@ async function init() {
   const res = await fetch('/api/config');
   const config = await res.json();
   setApps(config.apps);
+  defaultConfigDir = config.defaultConfigDir ?? null;
+  applyTitle(config.activeConfigDir);
   themeAccents = config.themeAccents ?? {};
   applyHubTheme();
   buildIframes();
@@ -128,6 +132,13 @@ async function init() {
   listenKeys();
   bindPalette();
   registerSW();
+}
+
+// The hub has no visible chrome, so the window/tab title is the only place the active config dir
+// shows. Only a non-default dir is named, and by basename alone — the PWA window prepends the
+// manifest name, so a product name here would read as "Claude Code Hub - .claude-eom · Hub".
+function applyTitle(dir) {
+  document.title = dir && dir !== defaultConfigDir ? basename(dir) : 'Claude Code Hub';
 }
 
 function setApps(next) {
@@ -622,6 +633,7 @@ async function commitConfigDir(row) {
     setApps((await sendJson('POST', '/api/config-dirs/activate', { path: target })).apps);
     // The palette renders from this cache before its refetch lands, and initialSel keys off it.
     palette.configDirs.active = target;
+    applyTitle(target);
     reloadIframes();
   } catch (err) {
     console.warn('config dir switch failed:', err.message);

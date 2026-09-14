@@ -38,6 +38,10 @@ function activePool() {
 // be known before the first spawn, and the hub already has one localStorage key to reason about.
 const HUB_CONFIG_FILE = path.join(os.homedir(), '.claude-hub', 'config.json');
 
+// The dir the hub would use with no saved config. Set by loadHubConfig; the client uses it to keep
+// the default dir out of the window title.
+let defaultConfigDir = null;
+
 function expandHome(p) {
   return p.startsWith('~') ? p.replace('~', os.homedir()) : p;
 }
@@ -59,6 +63,7 @@ function loadHubConfig() {
   const fallback = canonical(
     process.env.CLAUDE_CONFIG_DIR || process.env.CLAUDE_DIR || path.join(os.homedir(), '.claude'),
   );
+  defaultConfigDir = fallback;
   let raw = '';
   let saved = {};
   try {
@@ -346,7 +351,7 @@ function appsConfig() {
 }
 
 app.get('/api/config', (_req, res) => {
-  res.json({ themeAccents, apps: appsConfig() });
+  res.json({ themeAccents, apps: appsConfig(), activeConfigDir: hubConfig.activeConfigDir, defaultConfigDir });
 });
 
 app.get('/api/config-dirs', (_req, res) => {
