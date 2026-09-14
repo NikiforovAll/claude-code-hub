@@ -221,6 +221,17 @@ function listenMessages() {
       if (data.url) iframes[data.app].src = apps[data.app].url + data.url;
     } else if (data.type === 'hub:keydown') {
       handleForwardedKey(data);
+    } else if (data.type === 'hub:openExternal') {
+      // In the installed PWA window a framed sub-app's own target=_blank opens
+      // nothing, so the shims hand external links up to the top frame instead.
+      let url;
+      try {
+        url = new URL(String(data.url));
+      } catch (_) {
+        return;
+      }
+      if (url.protocol !== 'http:' && url.protocol !== 'https:') return;
+      window.open(url.href, '_blank', 'noopener');
     } else if (data.type === 'hub:theme') {
       // Legacy senders pass only {theme}; colorTheme is optional and sticky.
       if (data.theme !== 'light' && data.theme !== 'dark') return;
