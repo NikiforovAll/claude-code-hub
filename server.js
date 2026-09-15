@@ -272,9 +272,11 @@ const proxyAgent = new http.Agent({ keepAlive: true, maxSockets: 64 });
 function proxyHandler(name) {
   return (req, res) => {
     const childPort = activePool()?.ports[name];
+    // Proxied traffic is a sub-app's own API, so the caller hands the body to .json():
+    // a plain-text error surfaces as a SyntaxError instead of the reason.
     if (!childPort) {
-      res.writeHead(503, { 'Retry-After': '1' });
-      res.end(`${name} is starting`);
+      res.writeHead(503, { 'Retry-After': '1', 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ error: `${name} is starting` }));
       return;
     }
     const headers = { ...req.headers };
@@ -287,8 +289,12 @@ function proxyHandler(name) {
       },
     );
     upstream.on('error', (err) => {
-      if (!res.headersSent) res.writeHead(502);
-      res.end(err.message);
+      if (res.headersSent) {
+        res.end();
+        return;
+      }
+      res.writeHead(502, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ error: err.message }));
     });
     res.on('close', () => upstream.destroy());
     req.pipe(upstream);
