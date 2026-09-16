@@ -138,6 +138,9 @@ function spawnApp(pool, name, cmd, args) {
   child.stderr.on('data', (d) => process.stderr.write(`[${name}] ${d}`));
   child.on('exit', (code) => {
     console.log(`[${name}] exited (code ${code})`);
+    // Without this the proxy dials a dead ephemeral port the OS may have recycled, instead of
+    // answering 503. A dead child is never respawned, so that app stays 503 until the dir switches.
+    delete pool.ports[name];
     markReady();
   });
 
@@ -265,6 +268,10 @@ function rewriteOrigin(origin, publicPort, childPort) {
 
 const proxyAgent = new http.Agent({ keepAlive: true, maxSockets: 64 });
 
+// What a peer closing a pooled socket looks like. Connect-time codes are absent on purpose: the
+// retry below fires only on a socket that was already established.
+const RETRYABLE = new Set(['ECONNRESET', 'EPIPE', 'ECONNABORTED']);
+
 // Host is forwarded untouched so the child's hostGuard still sees what the browser sent. Origin is
 // the one header the child cannot judge on its own: its guard compares the port to its own
 // ephemeral one, so the public-port spelling is mapped to the child's; anything else passes
@@ -281,23 +288,40 @@ function proxyHandler(name) {
     }
     const headers = { ...req.headers };
     if (headers.origin) headers.origin = rewriteOrigin(headers.origin, publicPorts[name], childPort);
-    const upstream = http.request(
-      { host: '127.0.0.1', port: childPort, method: req.method, path: req.url, headers, agent: proxyAgent },
-      (u) => {
-        res.writeHead(u.statusCode, u.headers);
-        u.pipe(res);
-      },
-    );
-    upstream.on('error', (err) => {
-      if (res.headersSent) {
-        res.end();
-        return;
-      }
-      res.writeHead(502, { 'Content-Type': 'application/json' });
-      res.end(JSON.stringify({ error: err.message }));
-    });
-    res.on('close', () => upstream.destroy());
-    req.pipe(upstream);
+    // req is consumed by the first attempt, so only a request with no body can be re-sent.
+    const replayable = req.method === 'GET' || req.method === 'HEAD' || req.method === 'OPTIONS';
+    let retried = false;
+
+    const send = () => {
+      const upstream = http.request(
+        { host: '127.0.0.1', port: childPort, method: req.method, path: req.url, headers, agent: proxyAgent },
+        (u) => {
+          res.writeHead(u.statusCode, u.headers);
+          u.pipe(res);
+        },
+      );
+      upstream.on('error', (err) => {
+        if (res.headersSent) {
+          res.end();
+          return;
+        }
+        // The agent hands back an idle pooled socket unprobed, so a child that just hit its own
+        // keepAliveTimeout can close one in the same tick the hub reuses it. reusedSocket is what
+        // makes the replay safe — a fresh connection that fails failed for a reason of its own.
+        if (replayable && !retried && upstream.reusedSocket && RETRYABLE.has(err.code)) {
+          retried = true;
+          send();
+          return;
+        }
+        res.writeHead(502, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ error: err.message }));
+      });
+      res.on('close', () => upstream.destroy());
+      if (replayable) upstream.end();
+      else req.pipe(upstream);
+    };
+
+    send();
   };
 }
 
