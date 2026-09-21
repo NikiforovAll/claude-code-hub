@@ -9,6 +9,8 @@
   "scripts": {
     "start": "node server.js",
     "dev": "node server.js --open",
+    "update": "bash scripts/update-submodules.sh",
+    "update:check": "bash scripts/update-submodules.sh --check",
     "lint": "npx @biomejs/biome check public/app.js server.js && npm run check:escaping && npm run check:security-lib",
     "lint:fix": "npx @biomejs/biome check --fix public/app.js server.js",
     "prepare": "husky",
