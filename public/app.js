@@ -3,9 +3,13 @@ let activeApp = null;
 const iframes = {};
 const loadedApps = new Set();
 let allowedOrigins = new Set();
-// {theme: 'dark'|'light', colorTheme: '<id>'} — survives hub reloads so
-// late-loading iframes and fresh sessions get the last chosen theme.
+// {theme: 'dark'|'light', colorTheme: '<id>', colorThemes: {<configDir>: '<id>'}} — survives hub
+// reloads so late-loading iframes and fresh sessions get the last chosen theme. Light/dark is
+// global; the color theme is per config dir, and colorTheme is the last one picked anywhere, which
+// a dir that has never been themed inherits.
 const themeState = loadThemeState();
+// Keys themeState.colorThemes. Null until /api/config lands, so the first paint uses the fallback.
+let activeConfigDir = null;
 // {project, encoded, name} — the current project scope. Deliberately NOT persisted, unlike
 // hub-theme: starting unset means there is nothing to race against each sub-app's own
 // project self-restore on boot. Once set it never returns to null.
@@ -24,11 +28,19 @@ const palette = {
 };
 
 function loadThemeState() {
+  let state;
   try {
-    return JSON.parse(localStorage.getItem('hub-theme')) ?? {};
+    state = JSON.parse(localStorage.getItem('hub-theme')) ?? {};
   } catch {
-    return {};
+    state = {};
   }
+  if (!state.colorThemes || typeof state.colorThemes !== 'object') state.colorThemes = {};
+  return state;
+}
+
+// The color theme of the active config dir, falling back to the last one picked anywhere.
+function activeColorTheme() {
+  return themeState.colorThemes[activeConfigDir] ?? themeState.colorTheme;
 }
 
 function osTheme() {
@@ -38,7 +50,7 @@ function osTheme() {
 // Sub-apps disagree on their first-run default (marketplace follows the OS, the rest start dark),
 // so an unset theme resolves to the OS preference here and reaches every iframe on load.
 function themeMessage() {
-  return { type: 'hub:theme', theme: themeState.theme ?? osTheme(), colorTheme: themeState.colorTheme };
+  return { type: 'hub:theme', theme: themeState.theme ?? osTheme(), colorTheme: activeColorTheme() };
 }
 
 // {<themeId>: {dark, light}} from /api/config, which derives it from scripts/themes.json — the same
@@ -51,7 +63,7 @@ let themeAccents = {};
 function applyHubTheme() {
   const mode = themeState.theme ?? osTheme();
   document.documentElement.classList.toggle('light', mode === 'light');
-  const pair = themeAccents[themeState.colorTheme];
+  const pair = themeAccents[activeColorTheme()];
   if (pair) document.documentElement.style.setProperty('--accent', pair[mode]);
 }
 
@@ -123,6 +135,7 @@ async function init() {
   const config = await res.json();
   setApps(config.apps);
   defaultConfigDir = config.defaultConfigDir ?? null;
+  activeConfigDir = config.activeConfigDir ?? null;
   applyTitle(config.activeConfigDir);
   themeAccents = config.themeAccents ?? {};
   applyHubTheme();
@@ -236,10 +249,13 @@ function listenMessages() {
       // Legacy senders pass only {theme}; colorTheme is optional and sticky.
       if (data.theme !== 'light' && data.theme !== 'dark') return;
       const hasColor = typeof data.colorTheme === 'string' && /^[a-z0-9-]{0,32}$/.test(data.colorTheme);
-      const changed = data.theme !== themeState.theme || (hasColor && data.colorTheme !== themeState.colorTheme);
+      const changed = data.theme !== themeState.theme || (hasColor && data.colorTheme !== activeColorTheme());
       if (!changed) return;
       themeState.theme = data.theme;
-      if (hasColor) themeState.colorTheme = data.colorTheme;
+      if (hasColor) {
+        themeState.colorTheme = data.colorTheme;
+        if (activeConfigDir) themeState.colorThemes[activeConfigDir] = data.colorTheme;
+      }
       localStorage.setItem('hub-theme', JSON.stringify(themeState));
       applyHubTheme();
       broadcast(themeMessage(), e.source);
@@ -430,6 +446,10 @@ async function removeConfigDir(dirPath) {
   } catch (err) {
     console.warn('remove config dir failed:', err.message);
     return;
+  }
+  if (dirPath in themeState.colorThemes) {
+    delete themeState.colorThemes[dirPath];
+    localStorage.setItem('hub-theme', JSON.stringify(themeState));
   }
   if (palette.open && palette.mode === 'configDir') renderPalette();
 }
@@ -644,7 +664,10 @@ async function commitConfigDir(row) {
     setApps((await sendJson('POST', '/api/config-dirs/activate', { path: target })).apps);
     // The palette renders from this cache before its refetch lands, and initialSel keys off it.
     palette.configDirs.active = target;
+    activeConfigDir = target;
     applyTitle(target);
+    // Each iframe gets the new dir's color theme from its load handler; this repaints the palette.
+    applyHubTheme();
     reloadIframes();
   } catch (err) {
     console.warn('config dir switch failed:', err.message);
