@@ -270,17 +270,29 @@ function handleForwardedKey(d) {
   const alt = typeof d.alt === 'boolean' ? d.alt : true;
   const ctrl = typeof d.alt === 'boolean' ? d.ctrl : d.key.startsWith('Arrow');
   if (!alt || d.shift === true) return;
+  const k = bindingKey(d);
   if (!ctrl) {
-    if (/^[1-9]$/.test(d.key)) switchByIndex(Number(d.key) - 1);
+    if (/^[1-9]$/.test(k)) switchByIndex(Number(k) - 1);
     return;
   }
-  if (d.key === 'ArrowLeft') cycleTab(-1);
-  else if (d.key === 'ArrowRight') cycleTab(1);
-  else if (PALETTE_KEYS[d.key.toLowerCase()]) togglePalette(PALETTE_KEYS[d.key.toLowerCase()]);
+  if (k === 'ArrowLeft') cycleTab(-1);
+  else if (k === 'ArrowRight') cycleTab(1);
+  else if (PALETTE_KEYS[k]) togglePalette(PALETTE_KEYS[k]);
 }
 
 // Ctrl+Alt+<letter> bindings. Sub-app shims forward every letter, so this is the one keymap.
 const PALETTE_KEYS = { p: 'project', w: 'configDir' };
+
+// macOS composes Option+<key> into a character — Option+1 is '¡', Option+P is 'π' — and holding
+// Control does not undo it, so e.key alone cannot carry these bindings there. e.code is the
+// physical key, which is wrong for non-US layouts, hence only as a fallback. Takes a real
+// KeyboardEvent or a forwarded {key, code} payload; a payload without code degrades to key.
+function bindingKey(e) {
+  const lower = typeof e.key === 'string' ? e.key.toLowerCase() : '';
+  if (/^[a-z1-9]$/.test(lower)) return lower;
+  const m = /^(?:Key|Digit)([A-Z1-9])$/.exec(e.code || '');
+  return m ? m[1].toLowerCase() : e.key;
+}
 
 function cycleTab(delta) {
   const ids = Object.keys(apps);
@@ -296,11 +308,13 @@ function switchByIndex(idx) {
 
 function listenKeys() {
   document.addEventListener('keydown', (e) => {
-    // Matches both cases: with Ctrl+Alt held, some layouts report AltGr-shifted characters.
-    if (e.ctrlKey && e.altKey && !e.shiftKey && !e.metaKey && PALETTE_KEYS[e.key.toLowerCase()]) {
-      e.preventDefault();
-      togglePalette(PALETTE_KEYS[e.key.toLowerCase()]);
-      return;
+    if (e.ctrlKey && e.altKey && !e.shiftKey && !e.metaKey) {
+      const mode = PALETTE_KEYS[bindingKey(e)];
+      if (mode) {
+        e.preventDefault();
+        togglePalette(mode);
+        return;
+      }
     }
     // While the palette is open the input owns the keyboard — don't let tab shortcuts fire
     // mid-path (Alt+digit especially, since Windows paths contain digits). Escape still closes:
@@ -313,10 +327,10 @@ function listenKeys() {
       return;
     }
     if (e.altKey && !e.ctrlKey && !e.shiftKey && !e.metaKey) {
-      const digit = parseInt(e.key, 10);
-      if (digit >= 1 && digit <= 9) {
+      const k = bindingKey(e);
+      if (/^[1-9]$/.test(k)) {
         e.preventDefault();
-        switchByIndex(digit - 1);
+        switchByIndex(Number(k) - 1);
         return;
       }
     }
