@@ -13,6 +13,8 @@ npm start                # Start hub + all sub-apps (http://localhost:3540)
 npm run dev              # Start with auto-open browser
 ```
 
+The hub is usually already running on :3540. Check it with `curl -s -o /dev/null -w '%{http_code}' http://localhost:3540/api/config`. Use it only for read-only checks. To test a fix, start a second hub on other ports (`--port`, `--marketplace-port`, `--kanban-port`, `--cost-port`, `--memory-port`) so the running one is not disturbed.
+
 CLI flags: `--port <n>`, `--marketplace-port <n>`, `--kanban-port <n>`, `--cost-port <n>`, `--memory-port <n>`, `--pool-size <n>`, `--open`
 
 ## Architecture
