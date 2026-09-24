@@ -39,10 +39,10 @@
   },
   "homepage": "https://github.com/NikiforovAll/claude-code-hub#readme",
   "dependencies": {
-    "claude-code-cost": "^0.23.0",
-    "claude-code-kanban": "^4.26.0",
-    "claude-code-marketplace": "^0.18.0",
-    "claude-code-memory-explorer": "^0.14.0",
+    "claude-code-cost": "^0.23.1",
+    "claude-code-kanban": "^4.27.0",
+    "claude-code-marketplace": "^0.19.0",
+    "claude-code-memory-explorer": "^0.14.1",
     "express": "^4.21.0",
     "open": "^10.1.0"
   },
