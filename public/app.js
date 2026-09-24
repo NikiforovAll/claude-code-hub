@@ -742,8 +742,15 @@ function bindPalette() {
     palette.sel = Number(li.dataset.idx);
     commitPalette();
   });
+  // Vimium eats Escape inside a text input and only blurs it, so the page never sees the key —
+  // losing focus is the one signal left. Busy disables the input and Alt+Tab blurs the window;
+  // neither is a dismissal.
+  input.addEventListener('blur', () => {
+    if (palette.open && !input.disabled && document.hasFocus()) closePalette();
+  });
   document.getElementById('palette').addEventListener('mousedown', (e) => {
     if (e.target.id === 'palette') closePalette();
+    else if (e.target !== input) e.preventDefault();
   });
 }
 
