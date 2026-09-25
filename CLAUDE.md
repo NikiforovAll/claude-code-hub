@@ -52,7 +52,7 @@ Each sub-app has its own linter (Biome) and pre-commit hooks. The hub root does 
 
 All sub-apps expose `GET /hub-config` (returns `{enabled, url}` from env vars) and append a `HUB_INTEGRATION` region to their `public/app.js` with:
 - `initHub()` — fetches config, stores in `window.__HUB__`
-- Keyboard forwarding (`Ctrl+Alt+Arrow`, any `Ctrl+Alt+<letter>`, `Alt+digit` → `postMessage` to parent, modifiers included). The hub owns the letter keymap and ignores letters it has no binding for, so a new hub shortcut needs no submodule change. The payload carries `code` beside `key` because macOS composes Option+&lt;key&gt; into a character; the hub normalizes the pair in `bindingKey()`, so a shim never needs to know a binding.
+- Keyboard forwarding (`Ctrl+Alt+Arrow`, any `Ctrl+Alt+<letter>`, `Alt+digit` → `postMessage` to parent, modifiers included). The hub owns the letter keymap and ignores letters it has no binding for, so a new hub shortcut needs no submodule change. The one exception is cck's `Ctrl+Alt+N` (New session), which cck keeps and never forwards, so the hub cannot bind N. The payload carries `code` beside `key` because macOS composes Option+&lt;key&gt; into a character; the hub normalizes the pair in `bindingKey()`, so a shim never needs to know a binding.
 - `hubNavigate(app, url)` — callable API for cross-app deep links (no-op when standalone)
 
 ## Landing Page
