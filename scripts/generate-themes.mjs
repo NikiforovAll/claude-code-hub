@@ -43,7 +43,6 @@ const coreVars = (p, mode) => ({
 const APP_EXTRAS = {
   cost: (p) => ({
     '--chart-fill': `rgba(${hexToRgb(p.ember)}, 0.32)`,
-    '--chart-1': p.ember,
   }),
   cck: () => ({}),
   memory: () => ({}),
