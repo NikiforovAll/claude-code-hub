@@ -1,9 +1,11 @@
 #!/usr/bin/env node
 
 const { spawn } = require('child_process');
+const crypto = require('crypto');
 const express = require('express');
 const fs = require('fs');
 const http = require('http');
+const tcp = require('net');
 const os = require('os');
 const path = require('path');
 const { createNetGuard } = require('./lib/net-guard');
@@ -82,6 +84,8 @@ function loadHubConfig() {
   const savedActive = typeof saved.activeConfigDir === 'string' ? canonical(saved.activeConfigDir) : null;
   const active = dirs.includes(savedActive) ? savedActive : fallback;
   const config = { configDirs: dirs, activeConfigDir: active };
+  // Hand-edited only; kept verbatim so a rewrite of the file does not drop it.
+  if (saved.terminal && typeof saved.terminal === 'object') config.terminal = saved.terminal;
   // Configs saved before canonicalization can hold one dir under two spellings; persist the merge.
   if (serializeConfig(config) !== raw) writeHubConfig(config);
   return config;
@@ -107,18 +111,36 @@ const hubConfig = loadHubConfig();
 // while every iframe 403'd on its own Host check.
 const net = createNetGuard({ appName: 'Claude Code Hub' });
 
+// cck's embedded terminal. One token per hub launch, shared by every pool: the hub puts it in the
+// kanban iframe's URL fragment and cck checks it on the WebSocket. cck applies the rest of its
+// policy (exposure refusal, Origin, session cap) itself.
+const TERMINAL = {
+  ...(hubConfig.terminal || {}),
+  enabled: process.argv.includes('--enable-terminal') || hubConfig.terminal?.enabled === true,
+};
+const TERMINAL_TOKEN = TERMINAL.enabled ? crypto.randomBytes(32).toString('hex') : null;
+
+function childEnv(pool, name) {
+  const env = {
+    ...process.env,
+    PORT: '0',
+    CLAUDE_CONFIG_DIR: pool.dir,
+    CLAUDE_HUB: '1',
+    HUB_URL: `http://localhost:${HUB_PORT}`,
+    HOST: net.BIND_HOST,
+    ALLOWED_HOSTS: net.ALLOWED_HOSTS,
+  };
+  if (name === 'kanban' && TERMINAL.enabled) {
+    env.CCK_TERMINAL = JSON.stringify(TERMINAL);
+    env.CCK_TERMINAL_TOKEN = TERMINAL_TOKEN;
+  }
+  return env;
+}
+
 function spawnApp(pool, name, cmd, args) {
   const child = spawn(cmd, args, {
     cwd: __dirname,
-    env: {
-      ...process.env,
-      PORT: '0',
-      CLAUDE_CONFIG_DIR: pool.dir,
-      CLAUDE_HUB: '1',
-      HUB_URL: `http://localhost:${HUB_PORT}`,
-      HOST: net.BIND_HOST,
-      ALLOWED_HOSTS: net.ALLOWED_HOSTS,
-    },
+    env: childEnv(pool, name),
     stdio: ['ignore', 'pipe', 'pipe'],
   });
 
@@ -204,17 +226,46 @@ async function ensurePool(dir) {
     pools.set(dir, pool);
     return pool.ready;
   }
-  while (pools.size >= POOL_SIZE) {
-    const oldestDir = pools.keys().next().value;
-    console.log(`Evicting children for ${oldestDir}`);
-    dropPool(oldestDir);
-  }
+  if (pools.size >= POOL_SIZE) await evictPools(dir);
+  pool = pools.get(dir);
+  if (pool) return pool.ready;
   pool = { dir, children: new Map(), ports: {}, restarts: {}, retired: false };
   pools.set(dir, pool);
   spawnChildren(pool);
   const ready = [...pool.children.values()].map((c) => c.ready);
   pool.ready = withTimeout(Promise.all(ready), 20000).then(() => pool);
   return pool.ready;
+}
+
+async function terminalCount(pool) {
+  const port = pool.ports.kanban;
+  if (!port) return 0;
+  try {
+    const r = await fetch(`http://127.0.0.1:${port}/api/terminals`, { signal: AbortSignal.timeout(1500) });
+    return r.ok ? (await r.json()).sessions?.length || 0 : 0;
+  } catch {
+    return 0;
+  }
+}
+
+// A pool whose cck holds live terminals is pinned: killing it would kill running claude sessions.
+// When every candidate is pinned the pool size is exceeded rather than losing work.
+async function evictPools(keepDir) {
+  let pinned = new Set();
+  if (TERMINAL.enabled) {
+    const candidates = [...pools.values()].filter((p) => p.dir !== keepDir);
+    const counts = await Promise.all(candidates.map(terminalCount));
+    pinned = new Set(candidates.filter((_, i) => counts[i]).map((p) => p.dir));
+  }
+  while (pools.size >= POOL_SIZE) {
+    const victim = [...pools.keys()].find((d) => d !== keepDir && !pinned.has(d));
+    if (!victim) {
+      console.log(`Pool size ${POOL_SIZE} exceeded: every other pool has live terminals`);
+      return;
+    }
+    console.log(`Evicting children for ${victim}`);
+    dropPool(victim);
+  }
 }
 
 function dropPool(dir) {
@@ -454,12 +505,44 @@ function proxyHandler(name) {
   };
 }
 
-function listenWithFallback(handler, port, onReady, label) {
-  const server = net.listenLoopback(handler, port, onReady, { maxHeaderSize: HDR_BYTES });
+// WebSocket upgrades (cck's terminal) are tunnelled as raw bytes for every app. Host and Origin get
+// the same treatment as proxyHandler; the child runs its own upgrade checks, and a child with no
+// upgrade listener closes the socket.
+function proxyUpgrade(name) {
+  return async (req, socket, head) => {
+    socket.on('error', () => socket.destroy());
+    const childPort = await waitForPort(name, Date.now() + API_PORT_WAIT_MS);
+    if (!childPort || socket.destroyed) {
+      socket.destroy();
+      return;
+    }
+    const lines = [`${req.method} ${req.url} HTTP/${req.httpVersion}`];
+    for (let i = 0; i < req.rawHeaders.length; i += 2) {
+      let value = req.rawHeaders[i + 1];
+      if (req.rawHeaders[i].toLowerCase() === 'origin') value = rewriteOrigin(value, publicPorts[name], childPort);
+      lines.push(`${req.rawHeaders[i]}: ${value}`);
+    }
+    const upstream = tcp.connect(childPort, '127.0.0.1', () => {
+      clearTimeout(connectTimer);
+      upstream.write(`${lines.join('\r\n')}\r\n\r\n`);
+      if (head?.length) upstream.write(head);
+      upstream.pipe(socket);
+      socket.pipe(upstream);
+    });
+    const connectTimer = setTimeout(() => upstream.destroy(), CONNECT_TIMEOUT_MS);
+    upstream.on('error', () => socket.destroy());
+    socket.on('close', () => upstream.destroy());
+    upstream.on('close', () => socket.destroy());
+  };
+}
+
+function listenWithFallback(handler, port, onReady, label, onUpgrade) {
+  const opts = { maxHeaderSize: HDR_BYTES, onUpgrade };
+  const server = net.listenLoopback(handler, port, onReady, opts);
   server.on('error', (err) => {
     if (err.code !== 'EADDRINUSE' && err.code !== 'EACCES') throw err;
     console.log(`${label}port ${port} in use, trying random port...`);
-    net.listenLoopback(handler, 0, onReady, { maxHeaderSize: HDR_BYTES });
+    net.listenLoopback(handler, 0, onReady, opts);
   });
   return server;
 }
@@ -472,6 +555,7 @@ for (const [name, port] of Object.entries(DEFAULT_PORTS)) {
       publicPorts[name] = actual;
     },
     `[${name}] `,
+    proxyUpgrade(name),
   );
 }
 
@@ -501,8 +585,10 @@ const themeAccents = (() => {
 })();
 
 function appsConfig() {
+  const kanban = { name: 'Kanban', url: `http://localhost:${publicPorts.kanban}`, icon: 'columns' };
+  if (TERMINAL_TOKEN) kanban.terminalToken = TERMINAL_TOKEN;
   return {
-    kanban: { name: 'Kanban', url: `http://localhost:${publicPorts.kanban}`, icon: 'columns' },
+    kanban,
     marketplace: { name: 'Marketplace', url: `http://localhost:${publicPorts.marketplace}`, icon: 'store' },
     cost: { name: 'Cost', url: `http://localhost:${publicPorts.cost}`, icon: 'dollar-sign' },
     memory: { name: 'Memory Diagnoser', url: `http://localhost:${publicPorts.memory}`, icon: 'database' },

@@ -166,7 +166,13 @@ function reloadIframes() {
   loadedApps.clear();
   projectState = null;
   // Assigning src navigates even when the URL is unchanged.
-  for (const [id, iframe] of Object.entries(iframes)) iframe.src = apps[id].url;
+  for (const [id, iframe] of Object.entries(iframes)) iframe.src = appSrc(id);
+}
+
+// The terminal token rides in the fragment so it never reaches a server log or a Referer.
+function appSrc(id, path = '') {
+  const token = apps[id].terminalToken;
+  return apps[id].url + path + (token ? `#t=${token}` : '');
 }
 
 function showLoading(text = '') {
@@ -181,10 +187,10 @@ function hideLoading() {
 
 function buildIframes() {
   const container = document.getElementById('iframe-container');
-  for (const [id, cfg] of Object.entries(apps)) {
+  for (const id of Object.keys(apps)) {
     const iframe = document.createElement('iframe');
     iframe.id = `iframe-${id}`;
-    iframe.src = cfg.url;
+    iframe.src = appSrc(id);
     iframe.className = 'hidden';
     iframe.allow = 'clipboard-write';
     iframe.addEventListener('load', () => onIframeLoad(id));
@@ -231,7 +237,7 @@ function listenMessages() {
     if (data.type === 'hub:navigate') {
       if (!apps[data.app]) return;
       switchTab(data.app);
-      if (data.url) iframes[data.app].src = apps[data.app].url + data.url;
+      if (data.url) iframes[data.app].src = appSrc(data.app, data.url);
     } else if (data.type === 'hub:keydown') {
       handleForwardedKey(data);
     } else if (data.type === 'hub:openExternal') {
