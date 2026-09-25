@@ -18,7 +18,7 @@
   },
   "light": {
    "ember": "#e86f33",
-   "emberGlow": "#b85a20",
+   "emberGlow": "#a0501c",
    "emberDim": "rgba(184,90,32,0.18)",
    "field": "#e8e6e3",
    "surface": "#efede9",
@@ -145,18 +145,20 @@
    "inkMuted": "#839496"
   },
   "light": {
-   "ember": "#cb4b16",
-   "emberGlow": "#b34a12",
-   "emberDim": "rgba(203,75,22,0.18)",
+   "ember": "#2280c2",
+   "emberGlow": "#1b6aa3",
+   "emberDim": "rgba(34,128,194,0.18)",
    "field": "#eee8d5",
-   "surface": "#f5efdc",
-   "elevated": "#fdf6e3",
-   "hover": "#e4ddc8",
-   "border": "#d3cbb7",
+   "sidebar": "#e6dfc7",
+   "sidebarItem": "#f3ecd6",
+   "surface": "#fdf6e3",
+   "elevated": "#fffbef",
+   "hover": "#efe8d3",
+   "border": "#cdc4ab",
    "ink1": "#073642",
-   "ink2": "#586e75",
-   "ink3": "#657b83",
-   "inkMuted": "#839496"
+   "ink2": "#4f6369",
+   "ink3": "#586e75",
+   "inkMuted": "#728589"
   }
  },
  {
@@ -248,11 +250,11 @@
    "surface": "#faf4ed",
    "elevated": "#fffaf3",
    "hover": "#ebdfd4",
-   "border": "#dfdad9",
+   "border": "#cecacd",
    "ink1": "#575279",
    "ink2": "#635e87",
-   "ink3": "#797593",
-   "inkMuted": "#9893a5"
+   "ink3": "#6e6a88",
+   "inkMuted": "#857f96"
   }
  },
  {
@@ -276,15 +278,15 @@
    "ember": "#6f8352",
    "emberGlow": "#56683f",
    "emberDim": "rgba(111,131,82,0.18)",
-   "field": "#f4f0d9",
-   "surface": "#fdf6e3",
-   "elevated": "#fffbef",
-   "hover": "#efebd4",
-   "border": "#d8d3ba",
-   "ink1": "#4d5960",
-   "ink2": "#5c6a72",
-   "ink3": "#7a8478",
-   "inkMuted": "#939f91"
+   "field": "#ebeadb",
+   "surface": "#f5f4e8",
+   "elevated": "#fbfbf4",
+   "hover": "#e5e4d3",
+   "border": "#d3d2bf",
+   "ink1": "#3d484e",
+   "ink2": "#55636b",
+   "ink3": "#66705f",
+   "inkMuted": "#7a8577"
   }
  },
  {
@@ -402,7 +404,7 @@
   },
   "light": {
    "ember": "#c08a00",
-   "emberGlow": "#9a6e00",
+   "emberGlow": "#856000",
    "emberDim": "rgba(192,138,0,0.18)",
    "field": "#e9e6e4",
    "surface": "#f1efed",
@@ -465,9 +467,9 @@
    "inkMuted": "#6c7380"
   },
   "light": {
-   "ember": "#f2ae49",
-   "emberGlow": "#b87514",
-   "emberDim": "rgba(242,174,73,0.18)",
+   "ember": "#c97612",
+   "emberGlow": "#a65e0c",
+   "emberDim": "rgba(201,118,18,0.18)",
    "field": "#eff1f3",
    "surface": "#f8f9fa",
    "elevated": "#fcfcfc",

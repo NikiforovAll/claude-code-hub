@@ -36,6 +36,8 @@ const coreVars = (p, mode) => ({
   '--text-secondary': p.ink2,
   '--text-tertiary': p.ink3,
   '--text-muted': p.inkMuted,
+  ...(p.sidebar && { '--sidebar-bg': p.sidebar }),
+  ...(p.sidebarItem && { '--sidebar-item-bg': p.sidebarItem }),
 });
 
 const APP_EXTRAS = {
