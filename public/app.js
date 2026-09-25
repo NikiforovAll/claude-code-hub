@@ -104,6 +104,10 @@ function postTo(appId, message) {
   iframes[appId]?.contentWindow?.postMessage(message, originOf(appId));
 }
 
+function appIdOf(source) {
+  return Object.keys(iframes).find((id) => iframes[id].contentWindow === source);
+}
+
 // exceptWindow lets an echo of a sub-app's own message skip that sub-app.
 function broadcast(message, exceptWindow) {
   for (const [id, iframe] of Object.entries(iframes)) {
@@ -246,10 +250,22 @@ function listenMessages() {
     } else if (data.type === 'hub:keydown') {
       handleForwardedKey(data);
     } else if (data.type === 'hub:closeGuard') {
-      const appId = Object.keys(iframes).find((id) => iframes[id].contentWindow === e.source);
+      const appId = appIdOf(e.source);
       if (!appId) return;
       if (data.on === true) guardedApps.add(appId);
       else guardedApps.delete(appId);
+    } else if (data.type === 'hub:terminalToken') {
+      // This hub page may have outlived the restart too, so the cached token is not trusted.
+      const appId = appIdOf(e.source);
+      if (!appId) return;
+      sendJson('GET', '/api/config')
+        .then((cfg) => {
+          const token = cfg.apps?.[appId]?.terminalToken;
+          if (!token) return;
+          apps[appId].terminalToken = token;
+          postTo(appId, { type: 'hub:terminalToken', token });
+        })
+        .catch(() => {});
     } else if (data.type === 'hub:openExternal') {
       // In the installed PWA window a framed sub-app's own target=_blank opens
       // nothing, so the shims hand external links up to the top frame instead.
@@ -388,28 +404,38 @@ function subseq(text, q) {
 }
 
 // Matches the full path so worktrees with opaque basenames stay reachable, but ranks basename
-// hits above parent-path hits. Tier ties fall back to the recency order set in loadProjects.
+// hits above parent-path hits, and within those an exact name, then a prefix, then a word start.
+// Rank ties fall back to the recency order set in loadProjects.
 // Returns {p, tier} so the renderer can mark the field that actually explains the match instead of
 // re-deriving it.
+const PATH_RANK = 4;
+
 function projectRows(projects, q) {
   if (!q) return projects.slice(0, 100).map((p) => ({ p, tier: 0 }));
-  const tierOf = (p) => {
-    if (p.name.toLowerCase().includes(q)) return 0;
-    if (p.path.toLowerCase().includes(q)) return 1;
+  const rankOf = (p) => {
+    const name = p.name.toLowerCase();
+    const at = name.indexOf(q);
+    if (name === q) return 0;
+    if (at === 0) return 1;
+    if (at > 0 && /[^a-z0-9]/.test(name[at - 1])) return 2;
+    if (at > 0) return 3;
+    const path = p.path.toLowerCase();
+    if (path.split(/[/\\]/).includes(q)) return PATH_RANK;
+    if (path.includes(q)) return PATH_RANK + 1;
     return -1;
   };
-  let out = projects.map((p) => ({ p, tier: tierOf(p) })).filter((x) => x.tier >= 0);
+  let out = projects.map((p) => ({ p, rank: rankOf(p) })).filter((x) => x.rank >= 0);
   if (out.length === 0) {
     // Subsequence only as a fallback — it would otherwise swamp real substring matches.
     out = projects
       .map((p) => {
-        const tier = subseq(p.name.toLowerCase(), q) ? 0 : subseq(p.path.toLowerCase(), q) ? 1 : -1;
-        return { p, tier };
+        const rank = subseq(p.name.toLowerCase(), q) ? 0 : subseq(p.path.toLowerCase(), q) ? PATH_RANK : -1;
+        return { p, rank };
       })
-      .filter((x) => x.tier >= 0);
+      .filter((x) => x.rank >= 0);
   }
-  out.sort((a, b) => a.tier - b.tier || b.p.ts - a.p.ts);
-  return out.slice(0, 100);
+  out.sort((a, b) => a.rank - b.rank || b.p.ts - a.p.ts);
+  return out.slice(0, 100).map(({ p, rank }) => ({ p, tier: rank < PATH_RANK ? 0 : 1 }));
 }
 
 // The [start, end) slices of `lower` that q matched, mirroring the tiers in projectRows: one

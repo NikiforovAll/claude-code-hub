@@ -23,6 +23,7 @@ self.addEventListener('fetch', (e) => {
     return;
   }
   e.respondWith(
-    fetch(e.request).catch(() => caches.match(e.request))
+    // respondWith(undefined) throws, so a miss while the server is down must still be a Response.
+    fetch(e.request).catch(() => caches.match(e.request).then((cached) => cached || Response.error()))
   );
 });

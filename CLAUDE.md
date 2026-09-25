@@ -32,6 +32,7 @@ CLI flags: `--port <n>`, `--marketplace-port <n>`, `--kanban-port <n>`, `--cost-
 - `hub:project` — hub → sub-apps, the current project scope (the hub owns the abs-path → encoded transform)
 - `hub:active` — hub → sub-apps, whether that app is the one on screen. Sub-apps can't detect this themselves: inactive iframes are `display:none`, and a nested document's `visibilityState` follows the top-level tab regardless. Cost uses it to gate auto-refresh.
 - `hub:closeGuard` — sub-app → hub, `{on}`. While any app has it on, the hub asks before the window closes. cck turns it on while its embedded terminal is attached, because Ctrl+W meant for the terminal closes the window. Cleared on iframe load.
+- `hub:terminalToken` — cck → hub asks, hub → cck answers `{token}`. The hub mints the terminal token per run and hands it over in the iframe's `#t=` fragment, so a page that outlived a hub restart holds a dead one. On a 401 or a token refusal cck asks once; the hub re-reads `/api/config`, because its own page may have outlived the restart too.
 
 Origin validation on the hub side restricts messages to known sub-app origins; each sub-app shim checks `e.source === window.parent` and the hub's origin. `hub:project`/`hub:active` are re-posted 400 ms after an iframe load because the shims gate on `window.__HUB__`, which arrives from an async `/hub-config` fetch — every apply is idempotent.
 
@@ -52,7 +53,7 @@ Each sub-app has its own linter (Biome) and pre-commit hooks. The hub root does 
 
 All sub-apps expose `GET /hub-config` (returns `{enabled, url}` from env vars) and append a `HUB_INTEGRATION` region to their `public/app.js` with:
 - `initHub()` — fetches config, stores in `window.__HUB__`
-- Keyboard forwarding (`Ctrl+Alt+Arrow`, any `Ctrl+Alt+<letter>`, `Alt+digit` → `postMessage` to parent, modifiers included). The hub owns the letter keymap and ignores letters it has no binding for, so a new hub shortcut needs no submodule change. The one exception is cck's `Ctrl+Alt+N` (New session), which cck keeps and never forwards, so the hub cannot bind N. The payload carries `code` beside `key` because macOS composes Option+&lt;key&gt; into a character; the hub normalizes the pair in `bindingKey()`, so a shim never needs to know a binding.
+- Keyboard forwarding (`Ctrl+Alt+Arrow`, any `Ctrl+Alt+<letter>`, `Alt+digit` → `postMessage` to parent, modifiers included). The hub owns the letter keymap and ignores letters it has no binding for, so a new hub shortcut needs no submodule change. The exceptions are cck's `Ctrl+Alt+N` (New session) and `Ctrl+Alt+R` (Resume session), which cck keeps and never forwards, so the hub cannot bind N or R. The payload carries `code` beside `key` because macOS composes Option+&lt;key&gt; into a character; the hub normalizes the pair in `bindingKey()`, so a shim never needs to know a binding.
 - `hubNavigate(app, url)` — callable API for cross-app deep links (no-op when standalone)
 
 ## Landing Page
