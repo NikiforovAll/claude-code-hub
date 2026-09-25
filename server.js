@@ -111,12 +111,13 @@ const hubConfig = loadHubConfig();
 // while every iframe 403'd on its own Host check.
 const net = createNetGuard({ appName: 'Claude Code Hub' });
 
-// cck's embedded terminal. One token per hub launch, shared by every pool: the hub puts it in the
-// kanban iframe's URL fragment and cck checks it on the WebSocket. cck applies the rest of its
-// policy (exposure refusal, Origin, session cap) itself.
+// cck's embedded terminal, on by default under the hub (standalone cck keeps it opt-in).
+// `"terminal": {"enabled": false}` or --disable-terminal turns it off. One token per hub launch,
+// shared by every pool: the hub puts it in the kanban iframe's URL fragment and cck checks it on
+// the WebSocket. cck applies the rest of its policy (exposure refusal, Origin, session cap) itself.
 const TERMINAL = {
   ...(hubConfig.terminal || {}),
-  enabled: process.argv.includes('--enable-terminal') || hubConfig.terminal?.enabled === true,
+  enabled: !process.argv.includes('--disable-terminal') && hubConfig.terminal?.enabled !== false,
 };
 const TERMINAL_TOKEN = TERMINAL.enabled ? crypto.randomBytes(32).toString('hex') : null;
 
