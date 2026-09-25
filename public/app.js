@@ -417,8 +417,7 @@ function projectRows(projects, q) {
     const at = name.indexOf(q);
     if (name === q) return 0;
     if (at === 0) return 1;
-    if (at > 0 && /[^a-z0-9]/.test(name[at - 1])) return 2;
-    if (at > 0) return 3;
+    if (at > 0) return /[^a-z0-9]/.test(name[at - 1]) ? 2 : 3;
     const path = p.path.toLowerCase();
     if (path.split(/[/\\]/).includes(q)) return PATH_RANK;
     if (path.includes(q)) return PATH_RANK + 1;
