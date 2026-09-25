@@ -31,6 +31,7 @@ CLI flags: `--port <n>`, `--marketplace-port <n>`, `--kanban-port <n>`, `--cost-
 - `hub:theme` — light/dark + color theme, echoed both ways so a change in one app reaches all
 - `hub:project` — hub → sub-apps, the current project scope (the hub owns the abs-path → encoded transform)
 - `hub:active` — hub → sub-apps, whether that app is the one on screen. Sub-apps can't detect this themselves: inactive iframes are `display:none`, and a nested document's `visibilityState` follows the top-level tab regardless. Cost uses it to gate auto-refresh.
+- `hub:closeGuard` — sub-app → hub, `{on}`. While any app has it on, the hub asks before the window closes. cck turns it on while its embedded terminal is attached, because Ctrl+W meant for the terminal closes the window. Cleared on iframe load.
 
 Origin validation on the hub side restricts messages to known sub-app origins; each sub-app shim checks `e.source === window.parent` and the hub's origin. `hub:project`/`hub:active` are re-posted 400 ms after an iframe load because the shims gate on `window.__HUB__`, which arrives from an async `/hub-config` fetch — every apply is idempotent.
 

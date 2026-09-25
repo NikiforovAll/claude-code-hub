@@ -2,6 +2,7 @@ let apps = {};
 let activeApp = null;
 const iframes = {};
 const loadedApps = new Set();
+const guardedApps = new Set();
 let allowedOrigins = new Set();
 // {theme: 'dark'|'light', colorTheme: '<id>', colorThemes: {<configDir>: '<id>'}} — survives hub
 // reloads so late-loading iframes and fresh sessions get the last chosen theme. Light/dark is
@@ -216,6 +217,7 @@ function switchTab(appId) {
 
 function onIframeLoad(appId) {
   loadedApps.add(appId);
+  guardedApps.delete(appId);
   if (appId === activeApp) hideLoading();
   postTo(appId, themeMessage());
   postProjectTo(appId);
@@ -231,6 +233,9 @@ function onIframeLoad(appId) {
 }
 
 function listenMessages() {
+  window.addEventListener('beforeunload', (e) => {
+    if (guardedApps.size) e.preventDefault();
+  });
   window.addEventListener('message', (e) => {
     if (!allowedOrigins.has(e.origin)) return;
     const data = e.data ?? {};
@@ -240,6 +245,11 @@ function listenMessages() {
       if (data.url) iframes[data.app].src = appSrc(data.app, data.url);
     } else if (data.type === 'hub:keydown') {
       handleForwardedKey(data);
+    } else if (data.type === 'hub:closeGuard') {
+      const appId = Object.keys(iframes).find((id) => iframes[id].contentWindow === e.source);
+      if (!appId) return;
+      if (data.on === true) guardedApps.add(appId);
+      else guardedApps.delete(appId);
     } else if (data.type === 'hub:openExternal') {
       // In the installed PWA window a framed sub-app's own target=_blank opens
       // nothing, so the shims hand external links up to the top frame instead.
