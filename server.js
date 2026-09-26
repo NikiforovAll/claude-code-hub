@@ -571,14 +571,24 @@ app.use(net.hostGuard);
 app.use(net.frameGuard);
 app.use(net.originGuard);
 
-// The accent hex per color theme, read from the same registry generate-themes.mjs compiles into each
-// sub-app's themes.css. Served rather than hand-copied into public/app.js so there is one source of
-// truth; the palette is the hub's only themed surface, so only ember (the accent role) is needed.
+// The hub's CSS variables per color theme and mode, read from the same registry generate-themes.mjs
+// compiles into each sub-app's themes.css. Served rather than hand-copied into public/app.js so there
+// is one source of truth. --bg is the sub-apps' --bg-deep, so the loading screen hands off to an
+// iframe without a flash of another color.
 // Read once — themes.json only changes when the generator is re-run, which restarts the hub anyway.
-const themeAccents = (() => {
+const hubVars = (p) => ({
+  '--accent': p.ember,
+  '--bg': p.field,
+  '--surface': p.surface,
+  '--surface-hover': p.hover,
+  '--border': p.border,
+  '--text': p.ink1,
+  '--text-dim': p.inkMuted,
+});
+const themePalettes = (() => {
   try {
     const themes = JSON.parse(fs.readFileSync(path.join(__dirname, 'scripts/themes.json'), 'utf8'));
-    return Object.fromEntries(themes.map((t) => [t.id, { dark: t.dark.ember, light: t.light.ember }]));
+    return Object.fromEntries(themes.map((t) => [t.id, { dark: hubVars(t.dark), light: hubVars(t.light) }]));
   } catch {
     // Palette falls back to the --accent in index.html; not worth failing startup over.
     return {};
@@ -597,7 +607,7 @@ function appsConfig() {
 }
 
 app.get('/api/config', (_req, res) => {
-  res.json({ themeAccents, apps: appsConfig(), activeConfigDir: hubConfig.activeConfigDir, defaultConfigDir });
+  res.json({ themePalettes, apps: appsConfig(), activeConfigDir: hubConfig.activeConfigDir, defaultConfigDir });
 });
 
 app.get('/api/config-dirs', (_req, res) => {

@@ -25,6 +25,7 @@
       --text: #e8e8ef;
       --text-dim: #8a8fa3;
       --shadow: rgba(0, 0, 0, 0.55);
+      --ghost-mix: 22%;
     }
 
     /* applyHubTheme() owns light/dark and stamps this class, resolving the pushed hub:theme first
@@ -39,6 +40,7 @@
       --text: #18181b;
       --text-dim: #71717a;
       --shadow: rgba(0, 0, 0, 0.18);
+      --ghost-mix: 10%;
     }
 
     * { margin: 0; padding: 0; box-sizing: border-box; }
@@ -78,7 +80,9 @@
       gap: 14px;
       align-items: center;
       justify-content: center;
-      background: var(--bg);
+      background:
+        radial-gradient(circle at 50% 50%, color-mix(in srgb, var(--accent) 14%, transparent), transparent 45%),
+        var(--bg);
       z-index: 10;
       transition: opacity 0.3s ease;
     }
@@ -110,25 +114,36 @@
       .clawd { animation: none; }
     }
 
-    /* A faint outline of the app being loaded, so the wait reads as "the page is coming" rather
-       than a blank screen. showLoading() keys it off the overlay's data-app. */
-    .ghost {
+    /* Faint outlines of the four apps, one per quadrant, so the wait reads as "the pages are
+       coming" rather than a blank screen. */
+    .ghosts {
+      --ghost: color-mix(in srgb, var(--accent) 60%, var(--text-dim));
       position: absolute;
       inset: 0;
-      display: none;
+      display: grid;
+      grid-template: 1fr 1fr / 1fr 1fr;
       gap: 16px;
       padding: 16px;
-      overflow: hidden;
       pointer-events: none;
       -webkit-mask-image: radial-gradient(circle at 50% 50%, transparent 0 80px, #000 240px);
       mask-image: radial-gradient(circle at 50% 50%, transparent 0 80px, #000 240px);
+    }
+
+    .ghost {
+      display: grid;
+      gap: 12px;
+      padding: 14px;
+      min-height: 0;
+      overflow: hidden;
+      border: 1px solid color-mix(in srgb, var(--ghost) calc(var(--ghost-mix) * 0.8), transparent);
+      border-radius: 10px;
     }
 
     .ghost i {
       display: block;
       min-height: 12px;
       border-radius: 6px;
-      background: color-mix(in srgb, var(--text-dim) 10%, transparent);
+      background: color-mix(in srgb, var(--ghost) var(--ghost-mix), transparent);
     }
 
     .ghost .h { height: 18px; width: 45%; }
@@ -136,30 +151,26 @@
     .ghost .row { display: flex; gap: 16px; }
     .ghost .row > i { flex: 1; }
 
-    .loading-overlay[data-app="kanban"] .ghost-kanban,
-    .loading-overlay[data-app="cost"] .ghost-cost,
-    .loading-overlay[data-app="memory"] .ghost-memory,
-    .loading-overlay[data-app="marketplace"] .ghost-marketplace { display: grid; }
+    .ghost-kanban { grid-template-columns: 22% repeat(3, 1fr); }
+    .ghost-kanban .side i { height: 24px; }
+    .ghost-kanban .col i:not(.h) { height: 60px; }
 
-    .ghost-kanban { grid-template-columns: 240px repeat(3, 1fr); }
-    .ghost-kanban .side i { height: 30px; }
-    .ghost-kanban .col i:not(.h) { height: 76px; }
-
-    .ghost-cost { grid-template-rows: 84px 280px 150px; align-content: start; }
-    .ghost-cost .bars { display: flex; align-items: flex-end; gap: 10px; }
+    .ghost-cost { grid-template-rows: 56px 1fr auto; }
+    .ghost-cost .row > i { height: 56px; }
+    .ghost-cost .bars { display: flex; align-items: flex-end; gap: 8px; min-height: 0; }
     .ghost-cost .bars i { flex: 1; }
-    .ghost-cost .stack i:not(.h) { height: 22px; }
+    .ghost-cost .stack i:not(.h) { height: 16px; }
 
-    .ghost-memory { grid-template-columns: 280px 1fr; }
-    .ghost-memory .side i { height: 22px; }
-    .ghost-memory .side .in { margin-left: 18px; }
-    .ghost-memory .side .in2 { margin-left: 36px; }
-    .ghost-memory .doc i:not(.h) { height: 14px; }
+    .ghost-memory { grid-template-columns: 28% 1fr; }
+    .ghost-memory .side i { height: 18px; }
+    .ghost-memory .side .in { margin-left: 14px; }
+    .ghost-memory .side .in2 { margin-left: 28px; }
+    .ghost-memory .doc i:not(.h) { height: 12px; }
 
-    .ghost-marketplace { grid-template-rows: 40px 1fr; }
-    .ghost-marketplace .cards { display: grid; grid-template-columns: repeat(3, 1fr); grid-auto-rows: 130px; gap: 16px; }
+    .ghost-marketplace { grid-template-rows: 32px 1fr; }
+    .ghost-marketplace .cards { display: grid; grid-template-columns: repeat(3, 1fr); grid-auto-rows: 1fr; gap: 12px; min-height: 0; }
 
-    .loading-overlay > :not(.ghost) { position: relative; }
+    .loading-overlay > :not(.ghosts) { position: relative; }
 
     .loading-text {
       color: var(--text-dim);
@@ -295,13 +306,14 @@
 <body>
   <div class="iframe-container" id="iframe-container">
     <div class="loading-overlay" id="loading-overlay">
-      <div class="ghost ghost-kanban" aria-hidden="true">
+      <div class="ghosts" aria-hidden="true">
+      <div class="ghost ghost-kanban">
         <div class="stack side"><i class="h"></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i></div>
         <div class="stack col"><i class="h"></i><i></i><i></i><i></i></div>
         <div class="stack col"><i class="h"></i><i></i><i></i></div>
         <div class="stack col"><i class="h"></i><i></i><i></i><i></i><i></i></div>
       </div>
-      <div class="ghost ghost-cost" aria-hidden="true">
+      <div class="ghost ghost-cost">
         <div class="row"><i></i><i></i><i></i><i></i></div>
         <div class="bars">
           <i style="height:35%"></i><i style="height:60%"></i><i style="height:45%"></i><i style="height:80%"></i>
@@ -310,7 +322,7 @@
         </div>
         <div class="stack"><i class="h"></i><i></i><i></i><i></i></div>
       </div>
-      <div class="ghost ghost-memory" aria-hidden="true">
+      <div class="ghost ghost-memory">
         <div class="stack side">
           <i class="h"></i><i></i><i class="in"></i><i class="in2"></i><i class="in2"></i><i class="in"></i>
           <i></i><i class="in"></i><i class="in2"></i><i class="in"></i><i></i>
@@ -319,9 +331,10 @@
           <i class="h"></i><i></i><i></i><i style="width:70%"></i><i></i><i style="width:85%"></i><i style="width:40%"></i>
         </div>
       </div>
-      <div class="ghost ghost-marketplace" aria-hidden="true">
+      <div class="ghost ghost-marketplace">
         <i></i>
         <div class="cards"><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i></div>
+      </div>
       </div>
       <svg class="clawd" viewBox="1 0 16 10" shape-rendering="crispEdges" aria-hidden="true">
         <rect x="3" y="0" width="12" height="2"/>

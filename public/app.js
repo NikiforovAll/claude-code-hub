@@ -54,18 +54,30 @@ function themeMessage() {
   return { type: 'hub:theme', theme: themeState.theme ?? osTheme(), colorTheme: activeColorTheme() };
 }
 
-// {<themeId>: {dark, light}} from /api/config, which derives it from scripts/themes.json — the same
-// registry that generates each sub-app's themes.css. Empty until config arrives, and empty if the
-// registry is unreadable; either way the palette keeps the --accent from index.html.
-let themeAccents = {};
+// {<themeId>: {dark, light}}, each a map of CSS variables, from /api/config, which derives it from
+// scripts/themes.json — the same registry that generates each sub-app's themes.css. Empty until
+// config arrives, and empty if the registry is unreadable; then the hub keeps index.html's colors.
+let themePalettes = {};
+// The last applied variables, so the loading screen paints in the theme before /api/config lands.
+const PALETTE_KEY = 'hub-palette';
 
-// Paints the palette — the hub's only themed surface — in the active theme. The hub relays
+// Paints the hub's own surfaces (loading screen, palette) in the active theme. The hub relays
 // hub:theme to the sub-apps; this is what makes it apply to the hub's own chrome too.
 function applyHubTheme() {
   const mode = themeState.theme ?? osTheme();
-  document.documentElement.classList.toggle('light', mode === 'light');
-  const pair = themeAccents[activeColorTheme()];
-  if (pair) document.documentElement.style.setProperty('--accent', pair[mode]);
+  const root = document.documentElement;
+  root.classList.toggle('light', mode === 'light');
+  const key = `${activeColorTheme()}/${mode}`;
+  let vars = themePalettes[activeColorTheme()]?.[mode];
+  try {
+    if (vars) localStorage.setItem(PALETTE_KEY, JSON.stringify({ key, vars }));
+    else {
+      const cached = JSON.parse(localStorage.getItem(PALETTE_KEY));
+      if (cached?.key === key) vars = cached.vars;
+    }
+  } catch {}
+  root.style.cssText = '';
+  for (const [name, value] of Object.entries(vars ?? {})) root.style.setProperty(name, value);
 }
 
 // Claude's on-disk project-directory name. Matches memory/server.js encodeProjectPath. The hub
@@ -143,7 +155,7 @@ async function init() {
   defaultConfigDir = config.defaultConfigDir ?? null;
   activeConfigDir = config.activeConfigDir ?? null;
   applyTitle(config.activeConfigDir);
-  themeAccents = config.themeAccents ?? {};
+  themePalettes = config.themePalettes ?? {};
   applyHubTheme();
   buildIframes();
   switchTab(Object.keys(apps)[0]);
@@ -240,9 +252,7 @@ function showLoading() {
     i = (i + 1 + Math.floor(Math.random() * (verbs.length - 1))) % verbs.length;
     text.textContent = verbs[i];
   }, 1200);
-  const overlay = document.getElementById('loading-overlay');
-  overlay.dataset.app = activeApp ?? '';
-  overlay.classList.remove('fade-out');
+  document.getElementById('loading-overlay').classList.remove('fade-out');
 }
 
 function hideLoading() {
