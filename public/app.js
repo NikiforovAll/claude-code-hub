@@ -268,7 +268,7 @@ function buildIframes() {
     iframe.id = `iframe-${id}`;
     iframe.src = appSrc(id);
     iframe.className = 'hidden';
-    iframe.allow = 'clipboard-write';
+    iframe.allow = 'clipboard-write; microphone';
     iframe.addEventListener('load', () => onIframeLoad(id));
     container.appendChild(iframe);
     iframes[id] = iframe;
