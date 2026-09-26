@@ -136,6 +136,7 @@ async function init() {
   // Twice: light/dark comes from localStorage and shouldn't wait on the fetch, the accent can't be
   // resolved until the registry arrives with it.
   applyHubTheme();
+  showLoading();
   const res = await fetch('/api/config');
   const config = await res.json();
   setApps(config.apps);
@@ -180,12 +181,72 @@ function appSrc(id, path = '') {
   return apps[id].url + path + (token ? `#t=${token}` : '');
 }
 
-function showLoading(text = '') {
-  document.getElementById('loading-text').textContent = text;
-  document.getElementById('loading-overlay').classList.remove('fade-out');
+const LOADING_VERBS = {
+  kanban: [
+    'Shuffling cards…',
+    'Herding tasks…',
+    'Waking sessions…',
+    'Sorting the board…',
+    'Pinning sticky notes…',
+    'Moving cards to done…',
+    'Nudging agents…',
+    'Drawing columns…',
+    'Reading the backlog…',
+  ],
+  cost: [
+    'Counting tokens…',
+    'Tallying the bill…',
+    'Stacking bars…',
+    'Crunching numbers…',
+    'Checking the cache hits…',
+    'Adding up the days…',
+    'Balancing the books…',
+    'Plotting the trend…',
+    'Weighing the models…',
+  ],
+  memory: [
+    'Recalling memories…',
+    'Walking the tree…',
+    'Dusting off notes…',
+    'Reading CLAUDE.md…',
+    'Following imports…',
+    'Tracing the context…',
+    'Flipping through pages…',
+    'Connecting the dots…',
+    'Checking what sticks…',
+  ],
+  marketplace: [
+    'Unpacking plugins…',
+    'Polishing skills…',
+    'Dusting off agents…',
+    'Wiring up hooks…',
+    'Fetching manifests…',
+    'Reading SKILL.md files…',
+    'Listing commands…',
+    'Scanning MCP servers…',
+    'Gathering plugins…',
+  ],
+};
+
+let loadingTimer = null;
+
+function showLoading() {
+  const verbs = LOADING_VERBS[activeApp] ?? Object.values(LOADING_VERBS).flat();
+  const text = document.getElementById('loading-text');
+  let i = Math.floor(Math.random() * verbs.length);
+  text.textContent = verbs[i];
+  clearInterval(loadingTimer);
+  loadingTimer = setInterval(() => {
+    i = (i + 1 + Math.floor(Math.random() * (verbs.length - 1))) % verbs.length;
+    text.textContent = verbs[i];
+  }, 1200);
+  const overlay = document.getElementById('loading-overlay');
+  overlay.dataset.app = activeApp ?? '';
+  overlay.classList.remove('fade-out');
 }
 
 function hideLoading() {
+  clearInterval(loadingTimer);
   document.getElementById('loading-text').textContent = '';
   document.getElementById('loading-overlay').classList.add('fade-out');
 }
@@ -246,7 +307,10 @@ function listenMessages() {
     if (data.type === 'hub:navigate') {
       if (!apps[data.app]) return;
       switchTab(data.app);
-      if (data.url) iframes[data.app].src = appSrc(data.app, data.url);
+      if (typeof data.url !== 'string' || !data.url) return;
+      // A url such as '@evil.example/' turns the app host into userinfo, and the token rides in the fragment.
+      const src = appSrc(data.app, data.url);
+      if (URL.canParse(src) && new URL(src).origin === originOf(data.app)) iframes[data.app].src = src;
     } else if (data.type === 'hub:keydown') {
       handleForwardedKey(data);
     } else if (data.type === 'hub:closeGuard') {
@@ -714,7 +778,7 @@ async function commitConfigDir(row) {
   closePalette();
   // The server would no-op too, but the client would still reload every iframe.
   if (target === palette.configDirs.active) return;
-  showLoading(`Switching to ${target}...`);
+  showLoading();
   try {
     setApps((await sendJson('POST', '/api/config-dirs/activate', { path: target })).apps);
     // The palette renders from this cache before its refetch lands, and initialSel keys off it.

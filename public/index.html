@@ -88,16 +88,78 @@
       pointer-events: none;
     }
 
-    .spinner {
-      width: 28px;
-      height: 28px;
-      border: 3px solid var(--border);
-      border-top-color: var(--accent);
-      border-radius: 50%;
-      animation: spin 0.8s linear infinite;
+    /* Clawd, drawn from the Claude Code banner's block art; cck's boot splash uses the same one. */
+    .clawd {
+      width: 64px;
+      height: 40px;
+      fill: #d97757;
+      overflow: visible;
+      transform-origin: 50% 100%;
+      animation: clawd-jump 0.9s ease-in-out infinite;
     }
 
-    @keyframes spin { to { transform: rotate(360deg); } }
+    @keyframes clawd-jump {
+      0%, 100% { transform: translateY(0) scale(1, 1); }
+      15% { transform: translateY(0) scale(1.1, 0.85); }
+      45% { transform: translateY(-14px) scale(0.95, 1.05); }
+      70% { transform: translateY(0) scale(1.08, 0.9); }
+      85% { transform: translateY(0) scale(1, 1); }
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      .clawd { animation: none; }
+    }
+
+    /* A faint outline of the app being loaded, so the wait reads as "the page is coming" rather
+       than a blank screen. showLoading() keys it off the overlay's data-app. */
+    .ghost {
+      position: absolute;
+      inset: 0;
+      display: none;
+      gap: 16px;
+      padding: 16px;
+      overflow: hidden;
+      pointer-events: none;
+      -webkit-mask-image: radial-gradient(circle at 50% 50%, transparent 0 80px, #000 240px);
+      mask-image: radial-gradient(circle at 50% 50%, transparent 0 80px, #000 240px);
+    }
+
+    .ghost i {
+      display: block;
+      min-height: 12px;
+      border-radius: 6px;
+      background: color-mix(in srgb, var(--text-dim) 10%, transparent);
+    }
+
+    .ghost .h { height: 18px; width: 45%; }
+    .ghost .stack { display: flex; flex-direction: column; gap: 10px; min-width: 0; }
+    .ghost .row { display: flex; gap: 16px; }
+    .ghost .row > i { flex: 1; }
+
+    .loading-overlay[data-app="kanban"] .ghost-kanban,
+    .loading-overlay[data-app="cost"] .ghost-cost,
+    .loading-overlay[data-app="memory"] .ghost-memory,
+    .loading-overlay[data-app="marketplace"] .ghost-marketplace { display: grid; }
+
+    .ghost-kanban { grid-template-columns: 240px repeat(3, 1fr); }
+    .ghost-kanban .side i { height: 30px; }
+    .ghost-kanban .col i:not(.h) { height: 76px; }
+
+    .ghost-cost { grid-template-rows: 84px 280px 150px; align-content: start; }
+    .ghost-cost .bars { display: flex; align-items: flex-end; gap: 10px; }
+    .ghost-cost .bars i { flex: 1; }
+    .ghost-cost .stack i:not(.h) { height: 22px; }
+
+    .ghost-memory { grid-template-columns: 280px 1fr; }
+    .ghost-memory .side i { height: 22px; }
+    .ghost-memory .side .in { margin-left: 18px; }
+    .ghost-memory .side .in2 { margin-left: 36px; }
+    .ghost-memory .doc i:not(.h) { height: 14px; }
+
+    .ghost-marketplace { grid-template-rows: 40px 1fr; }
+    .ghost-marketplace .cards { display: grid; grid-template-columns: repeat(3, 1fr); grid-auto-rows: 130px; gap: 16px; }
+
+    .loading-overlay > :not(.ghost) { position: relative; }
 
     .loading-text {
       color: var(--text-dim);
@@ -233,7 +295,46 @@
 <body>
   <div class="iframe-container" id="iframe-container">
     <div class="loading-overlay" id="loading-overlay">
-      <div class="spinner"></div>
+      <div class="ghost ghost-kanban" aria-hidden="true">
+        <div class="stack side"><i class="h"></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i></div>
+        <div class="stack col"><i class="h"></i><i></i><i></i><i></i></div>
+        <div class="stack col"><i class="h"></i><i></i><i></i></div>
+        <div class="stack col"><i class="h"></i><i></i><i></i><i></i><i></i></div>
+      </div>
+      <div class="ghost ghost-cost" aria-hidden="true">
+        <div class="row"><i></i><i></i><i></i><i></i></div>
+        <div class="bars">
+          <i style="height:35%"></i><i style="height:60%"></i><i style="height:45%"></i><i style="height:80%"></i>
+          <i style="height:55%"></i><i style="height:30%"></i><i style="height:70%"></i><i style="height:50%"></i>
+          <i style="height:65%"></i><i style="height:40%"></i><i style="height:75%"></i><i style="height:58%"></i>
+        </div>
+        <div class="stack"><i class="h"></i><i></i><i></i><i></i></div>
+      </div>
+      <div class="ghost ghost-memory" aria-hidden="true">
+        <div class="stack side">
+          <i class="h"></i><i></i><i class="in"></i><i class="in2"></i><i class="in2"></i><i class="in"></i>
+          <i></i><i class="in"></i><i class="in2"></i><i class="in"></i><i></i>
+        </div>
+        <div class="stack doc">
+          <i class="h"></i><i></i><i></i><i style="width:70%"></i><i></i><i style="width:85%"></i><i style="width:40%"></i>
+        </div>
+      </div>
+      <div class="ghost ghost-marketplace" aria-hidden="true">
+        <i></i>
+        <div class="cards"><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i></div>
+      </div>
+      <svg class="clawd" viewBox="1 0 16 10" shape-rendering="crispEdges" aria-hidden="true">
+        <rect x="3" y="0" width="12" height="2"/>
+        <rect x="3" y="2" width="2" height="2"/>
+        <rect x="6" y="2" width="6" height="2"/>
+        <rect x="13" y="2" width="2" height="2"/>
+        <rect x="1" y="4" width="16" height="2"/>
+        <rect x="3" y="6" width="12" height="2"/>
+        <rect x="4" y="8" width="1" height="2"/>
+        <rect x="6" y="8" width="1" height="2"/>
+        <rect x="11" y="8" width="1" height="2"/>
+        <rect x="13" y="8" width="1" height="2"/>
+      </svg>
       <div class="loading-text" id="loading-text"></div>
     </div>
   </div>
