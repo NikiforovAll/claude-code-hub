@@ -44,7 +44,8 @@ function activePool() {
 // Every sub-app resolves CLAUDE_CONFIG_DIR once at startup into a module constant, so switching
 // the dir means restarting the children. Kept on the server, not in the browser: the dir has to
 // be known before the first spawn, and the hub already has one localStorage key to reason about.
-const HUB_CONFIG_FILE = path.join(os.homedir(), '.claude-hub', 'config.json');
+const HUB_DIR = path.join(os.homedir(), '.claude-hub');
+const HUB_CONFIG_FILE = path.join(HUB_DIR, 'config.json');
 
 // The dir the hub would use with no saved config. Set by loadHubConfig; the client uses it to keep
 // the default dir out of the window title.
@@ -120,6 +121,52 @@ const TERMINAL = {
   enabled: !process.argv.includes('--disable-terminal') && hubConfig.terminal?.enabled !== false,
 };
 const TERMINAL_TOKEN = TERMINAL.enabled ? crypto.randomBytes(32).toString('hex') : null;
+
+// Loopback is not a user boundary: any local account can reach the hub port, and /api/config carries
+// the terminal token. Persisted, unlike the terminal token, so an installed PWA's cookie outlives a
+// hub restart.
+const HUB_TOKEN_FILE = path.join(HUB_DIR, 'token');
+const TOKEN_COOKIE = 'hub_token';
+const TOKEN_COOKIE_RE = /(?:^|;\s*)hub_token=([^;]*)/;
+const TOKEN_COOKIE_MAX_AGE_MS = 400 * 24 * 60 * 60 * 1000;
+const LOCKED_PAGE = path.join(__dirname, 'public', 'locked.html');
+
+function loadHubToken() {
+  try {
+    const saved = fs.readFileSync(HUB_TOKEN_FILE, 'utf8').trim();
+    if (/^[0-9a-f]{64}$/.test(saved)) return saved;
+  } catch {}
+  const token = crypto.randomBytes(32).toString('hex');
+  fs.mkdirSync(HUB_DIR, { recursive: true, mode: 0o700 });
+  fs.writeFileSync(HUB_TOKEN_FILE, `${token}\n`, { mode: 0o600 });
+  return token;
+}
+
+const HUB_TOKEN = loadHubToken();
+const HUB_TOKEN_BUF = Buffer.from(HUB_TOKEN);
+
+function tokenMatches(candidate) {
+  if (typeof candidate !== 'string' || candidate.length !== HUB_TOKEN.length) return false;
+  return crypto.timingSafeEqual(Buffer.from(candidate), HUB_TOKEN_BUF);
+}
+
+// Scripts, styles, icons and the manifest stay public: they hold no secrets, and Chrome fetches the
+// manifest without cookies, so gating it would break PWA install.
+function tokenGuard(req, res, next) {
+  const isApi = req.path.startsWith('/api/');
+  if (!isApi && req.path !== '/' && req.path !== '/index.html') return next();
+  if (tokenMatches(req.query.token)) {
+    res.cookie(TOKEN_COOKIE, HUB_TOKEN, { httpOnly: true, sameSite: 'strict', maxAge: TOKEN_COOKIE_MAX_AGE_MS });
+    if (isApi) return next();
+    const url = new URL(req.originalUrl, 'http://hub');
+    url.searchParams.delete('token');
+    return res.redirect(302, url.pathname + url.search);
+  }
+  if (tokenMatches(TOKEN_COOKIE_RE.exec(req.headers.cookie || '')?.[1])) return next();
+  res.setHeader('Cache-Control', 'no-store');
+  if (isApi) return res.status(401).json({ error: 'hub token required' });
+  res.status(401).sendFile(LOCKED_PAGE, { cacheControl: false });
+}
 
 function childEnv(pool, name) {
   const env = {
@@ -563,13 +610,14 @@ for (const [name, port] of Object.entries(DEFAULT_PORTS)) {
 ensurePool(hubConfig.activeConfigDir);
 
 const app = express();
-app.use(express.json());
 
 // Mounted before the routes below, which are registered ahead of the first
 // app.use() and would otherwise bypass the guards entirely.
 app.use(net.hostGuard);
 app.use(net.frameGuard);
 app.use(net.originGuard);
+app.use(tokenGuard);
+app.use(express.json());
 
 // The hub's CSS variables per color theme and mode, read from the same registry generate-themes.mjs
 // compiles into each sub-app's themes.css. Served rather than hand-copied into public/app.js so there
@@ -712,14 +760,18 @@ app.use(express.static(path.join(__dirname, 'public')));
 const onReady = (actual) => {
   printBanner(actual);
   if (process.argv.includes('--open')) {
-    import('open').then((m) => m.default(`http://localhost:${actual}`));
+    import('open').then((m) => m.default(accessUrl(actual)));
   }
 };
 
 listenWithFallback(app, HUB_PORT, onReady, '');
 
+function accessUrl(port) {
+  return `http://localhost:${port}/?token=${HUB_TOKEN}`;
+}
+
 function printBanner(port) {
-  console.log(`Claude Code Hub running at http://localhost:${port}`);
+  console.log(`Claude Code Hub running at ${accessUrl(port)}`);
   const warning = net.exposureWarning();
   if (warning) console.log(warning);
   console.log('Type "q" or "exit" to stop the server');
