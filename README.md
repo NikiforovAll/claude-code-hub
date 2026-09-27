@@ -4,84 +4,154 @@
 [![license](https://img.shields.io/npm/l/claude-code-hub)](LICENSE)
 [![npm downloads](https://img.shields.io/npm/dm/claude-code-hub)](https://www.npmjs.com/package/claude-code-hub)
 
-Unified launcher for Claude Code tools — browse plugins in **Marketplace**, track tasks in **Kanban**, monitor costs in **Cost**, and explore memory in **Memory Diagnoser**, all from a single chromeless PWA.
+One window for your Claude Code tools: Kanban, Marketplace, Cost, and Memory Diagnoser, in a single chromeless PWA that you drive from the keyboard.
 
-## Kanban:
+Website: [nikiforovall.blog/claude-code-hub](https://nikiforovall.blog/claude-code-hub/)
 
-![Kanban Screenshot](./assets/cck.png)
+## The tools
 
-## Marketplace:
-![Marketplace Screenshot](./assets/marketplace.png)
+### Kanban
 
-## Cost:
-![Cost Screenshot](./assets/cost.png)
+See tasks, sessions, and live agent activity as a board. Open a Claude Code session in the embedded terminal.
 
-## Memory Diagnoser:
-![Memory Diagnoser Screenshot](./assets/memory.png)
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="assets/kanban-dark.webp">
+  <img alt="Kanban board with sessions and tasks" src="assets/kanban-light.webp">
+</picture>
 
-## Quick Start
+### Marketplace
+
+Browse and manage Claude Code marketplace plugins.
+
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="assets/marketplace-dark.webp">
+  <img alt="Marketplace with the plugin list" src="assets/marketplace-light.webp">
+</picture>
+
+### Cost
+
+See what your Claude Code usage costs, per session and per project.
+
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="assets/cost-dark.webp">
+  <img alt="Cost dashboard with usage charts" src="assets/cost-light.webp">
+</picture>
+
+### Memory Diagnoser
+
+Explore the memory files that Claude Code loads for a project.
+
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="assets/memory-dark.webp">
+  <img alt="Memory Diagnoser with loaded memory files" src="assets/memory-light.webp">
+</picture>
+
+## Quick start
 
 ```bash
 npx claude-code-hub --open
 ```
 
-### From Source
+The hub starts on `http://localhost:3540` and opens the browser. To get a window with no browser UI, install the page as an app from the browser menu.
+
+### From source
 
 ```bash
 git clone --recurse-submodules https://github.com/NikiforovAll/claude-code-hub.git
 cd claude-code-hub
-npm install && npm install --prefix marketplace && npm install --prefix cck && npm install --prefix memory
+npm install && npm install --prefix marketplace && npm install --prefix cck && npm install --prefix cost && npm install --prefix memory
 npm start        # http://localhost:3540
 ```
 
-## Agent Observability (one-time setup)
+## Agent observability (one-time setup)
 
-For the full Kanban experience — agent log, live subagent tracking, waiting-for-user indicators, and context window monitoring — install the hooks:
+For the full Kanban view (agent log, live subagent tracking, waiting-for-user indicators, and context window use), install the hooks:
 
 ```bash
 npx claude-code-kanban --install
 ```
 
-Without hooks you still get the task board, but no agent activity or live indicators. See the [Kanban README](https://github.com/NikiforovAll/claude-task-viewer#getting-started) for details.
+Without the hooks you still get the task board and sessions, but no live agent activity. The hooks and status line are installed per Claude config dir, so run the command again for each dir you use. See the [Kanban docs](https://nikiforovall.blog/claude-code-kanban/) for details.
 
-## Keyboard Shortcuts
+## Hub token
 
-| Shortcut         | Action                  |
-| ---------------- | ----------------------- |
-| `Alt+1`          | Switch to Kanban        |
-| `Alt+2`          | Switch to Marketplace   |
-| `Alt+3`          | Switch to Cost          |
-| `Alt+4`          | Switch to Memory Diagnoser |
-| `Ctrl+M`         | Open Memory Diagnoser for current session (Kanban) |
-| `Ctrl+Alt+Right` | Switch to next tool     |
-| `Ctrl+Alt+Left`  | Switch to previous tool |
-| `Ctrl+Alt+P`     | Switch project          |
-| `Ctrl+Alt+W`     | Switch Claude config dir (`CLAUDE_CONFIG_DIR`); restarts the sub-apps |
+The hub page and its API need a token. Any local account can reach a loopback port, and the API carries the terminal token.
 
-## How It Works
+- The token is in `~/.claude-hub/token`. The hub creates it on the first run and keeps it across restarts.
+- The startup banner prints the URL with the token, `http://localhost:3540/?token=…`, and `--open` uses that URL. The hub sets a cookie and then removes the token from the address bar, so later visits and the installed app need no token.
+- Without the token, the page shows a locked screen.
+- To change the token, delete the file and restart the hub.
 
-The hub server spawns both sub-apps as child processes, each on its own port. A minimal shell page embeds them in iframes and switches visibility on tab change — zero UI chrome, just keyboard shortcuts.
+## Config dirs
 
-## Included Tools
+The hub can run the tools against more than one Claude config dir (`CLAUDE_CONFIG_DIR`), for example a work dir and a personal dir.
 
-| Tool                                                                   | Submodule      | Default Port |
-| ---------------------------------------------------------------------- | -------------- | ------------ |
-| [Marketplace](https://github.com/NikiforovAll/claude-code-marketplace) | `marketplace/` | 3542         |
-| [Kanban](https://github.com/NikiforovAll/claude-task-viewer)           | `cck/`         | 3541         |
-| [Cost](https://github.com/NikiforovAll/claude-code-cost)               | `cost/`        | 3543         |
-| [Memory Diagnoser](https://github.com/NikiforovAll/claude-code-memory) | `memory/`      | 3544         |
+- Press <kbd>Ctrl</kbd>+<kbd>Alt</kbd>+<kbd>W</kbd> to open the config-dir palette. Pick a dir to switch to it, or type a path to add a new one. <kbd>Ctrl</kbd>+<kbd>D</kbd> removes the selected dir.
+- Each dir gets its own set of the four tools. When you switch, the hub keeps the old set running, so switching back is instant. `--pool-size` sets how many sets stay alive (default 3). When the pool is full, the hub stops the least recently used set, but not a set whose Kanban has open terminals.
+- The list and the active dir are saved in `~/.claude-hub/config.json`.
 
-## CLI Flags
+## Embedded terminal
+
+Under the hub, Kanban has an embedded terminal, on by default, so you can start or resume Claude Code sessions from the board. While a terminal is attached, the hub asks before it closes the window, because <kbd>Ctrl</kbd>+<kbd>W</kbd> meant for the terminal would close it.
+
+To turn the terminal off, start the hub with `--disable-terminal`, or add this to `~/.claude-hub/config.json`:
+
+```json
+{
+  "terminal": { "enabled": false }
+}
+```
+
+## Keyboard shortcuts
+
+The hub has no visible UI of its own. Use these shortcuts:
+
+| Shortcut | Action |
+| --- | --- |
+| <kbd>Ctrl</kbd>+<kbd>Alt</kbd>+<kbd>→</kbd> | Next tool |
+| <kbd>Ctrl</kbd>+<kbd>Alt</kbd>+<kbd>←</kbd> | Previous tool |
+| <kbd>Alt</kbd>+<kbd>1</kbd> | Kanban |
+| <kbd>Alt</kbd>+<kbd>2</kbd> | Marketplace |
+| <kbd>Alt</kbd>+<kbd>3</kbd> | Cost |
+| <kbd>Alt</kbd>+<kbd>4</kbd> | Memory Diagnoser |
+| <kbd>Ctrl</kbd>+<kbd>Alt</kbd>+<kbd>P</kbd> | Project palette: set the project for all tools |
+| <kbd>Ctrl</kbd>+<kbd>Alt</kbd>+<kbd>W</kbd> | Config-dir palette: switch, add, or remove a config dir |
+
+In a palette, use <kbd>↑</kbd>/<kbd>↓</kbd> or <kbd>Tab</kbd> to move, <kbd>Enter</kbd> to select, and <kbd>Esc</kbd> to close.
+
+The shortcuts also work when focus is inside a tool. Kanban keeps <kbd>Ctrl</kbd>+<kbd>Alt</kbd>+<kbd>N</kbd> (new session), <kbd>Ctrl</kbd>+<kbd>Alt</kbd>+<kbd>R</kbd> (resume session), and <kbd>Ctrl</kbd>+<kbd>Alt</kbd>+<kbd>S</kbd> (previous session) for itself. From Kanban you can also jump to another tool for the selected session:
+
+| Shortcut | Action |
+| --- | --- |
+| <kbd>M</kbd> | Open Marketplace for the session's project |
+| <kbd>$</kbd> | Open Cost for the session |
+| <kbd>Ctrl</kbd>+<kbd>M</kbd> | Open Memory Diagnoser for the session's project |
+
+## CLI flags
 
 ```
 --port <n>              Hub port (default: 3540)
---marketplace-port <n>  Marketplace port (default: 3542)
 --kanban-port <n>       Kanban port (default: 3541)
+--marketplace-port <n>  Marketplace port (default: 3542)
 --cost-port <n>         Cost port (default: 3543)
 --memory-port <n>       Memory Diagnoser port (default: 3544)
---pool-size <n>         Config dirs kept running after a switch (default: 3)
---open                  Auto-open browser
+--pool-size <n>         Config-dir sets kept running after a switch (default: 3)
+--disable-terminal      Turn off the embedded terminal in Kanban
+--host <addr>           Bind address (default: 127.0.0.1)
+--allowed-hosts <list>  Extra host names to accept, comma-separated
+--open                  Open the browser on start
 ```
+
+If a port is busy, the hub uses a free port and reports it.
+
+## Included tools
+
+| Tool | Docs | Repo | Submodule | Default port |
+| --- | --- | --- | --- | --- |
+| Kanban | [Docs](https://nikiforovall.blog/claude-code-kanban/) | [claude-code-kanban](https://github.com/NikiforovAll/claude-code-kanban) | `cck/` | 3541 |
+| Marketplace | [Docs](https://nikiforovall.blog/claude-code-marketplace/) | [claude-code-marketplace](https://github.com/NikiforovAll/claude-code-marketplace) | `marketplace/` | 3542 |
+| Cost | [Docs](https://nikiforovall.blog/claude-code-cost/) | [claude-code-cost](https://github.com/NikiforovAll/claude-code-cost) | `cost/` | 3543 |
+| Memory Diagnoser | [Docs](https://nikiforovall.blog/claude-code-memory/) | [claude-code-memory](https://github.com/NikiforovAll/claude-code-memory) | `memory/` | 3544 |
 
 ## License
 
