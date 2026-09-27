@@ -8,6 +8,15 @@ One window for your Claude Code tools: Kanban, Marketplace, Cost, and Memory Dia
 
 Website: [nikiforovall.blog/claude-code-hub](https://nikiforovall.blog/claude-code-hub/)
 
+<a href="https://youtu.be/9tMiNn1v6bY">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="website/public/video/hub-dark.webp">
+    <img alt="Claude Code Hub tour video (37 seconds). Opens on YouTube." src="website/public/video/hub-light.webp">
+  </picture>
+</a>
+
+Watch the tour on YouTube: [light](https://youtu.be/9tMiNn1v6bY), [dark](https://youtu.be/avZk-3qOpWk).
+
 ## The tools
 
 ### Kanban
