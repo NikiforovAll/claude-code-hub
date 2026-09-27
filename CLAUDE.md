@@ -60,4 +60,8 @@ All sub-apps expose `GET /hub-config` (returns `{enabled, url}` from env vars) a
 
 ## Website
 
-`website/` — Astro + Starlight landing and docs, published at https://nikiforovall.blog/claude-code-hub/. It shares its design kit (`src/kit/`, `src/components/`) with the four sub-app sites; keep the copies the same. Screenshots come from `~/dev/claude-code-hub-demo` (`node export-site.mjs hub`). `.github/workflows/pages.yml` deploys it on push to master that changes `website/`. See `website/README.md`.
+`website/` — Astro + Starlight landing and docs, published at https://nikiforovall.blog/claude-code-hub/. It shares its design kit (`src/kit/`, `src/components/`) with the four sub-app sites; keep the copies the same. Screenshots come from `~/dev/claude-code-hub-demo` (`node export-site.mjs hub`). `.github/workflows/pages.yml` deploys it after a stable release, or when run by hand. See `website/README.md`.
+
+## Release
+
+Every repo (hub and the 4 sub-apps) has the same `.github/workflows/release.yml`. A `v*` tag push, or a manual run from a tag, checks that the tag matches `package.json`, runs `npm test` if the package has one, and publishes to npm through trusted publishing (OIDC, environment `release`, no token). A version with `-` in it goes to the `rc` dist-tag and skips the docs deploy. The hub's `npm ci` installs the sub-apps from npm, so release the sub-apps first and wait for their packages before you tag the hub. Use `/release`.

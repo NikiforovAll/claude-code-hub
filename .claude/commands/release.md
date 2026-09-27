@@ -1,72 +1,70 @@
 ---
-description: Bump version, tag, push, and create a GitHub release with auto-generated notes
+description: Release the hub last, after every sub-app is released and on npm; tag, GitHub release, CI publishes
 argument-hint: "[version e.g. 1.13.0 or rc4]"
 ---
 
 # Release
 
-Create a new release for this project.
+The hub ships **last**. It pins the sub-apps by npm version, and its release run installs them from npm with `npm ci`. So every submodule must sit on a released tag whose package is already on npm. The **gate** in step 3 enforces this. The tag push starts `.github/workflows/release.yml`, the only publisher: it publishes to npm through trusted publishing and deploys the docs site.
 
 ## Inputs
 
-- `$ARGUMENTS` — target version or shorthand. Examples:
-  - `1.13.0` — full version
-  - `rc4` — shorthand for next RC (e.g. if current is `1.19.0-rc.3`, becomes `1.19.0-rc.4`)
-  - If not provided, ask the user.
+`$ARGUMENTS` is the target version or a shorthand. Ask the user when it is empty.
+
+- `1.13.0` is a full version.
+- `rc4` means the next RC: `1.19.0-rc.3` becomes `1.19.0-rc.4`.
+
+A version with `-` is a **prerelease**. Its GitHub release gets `--prerelease`, the workflow publishes it to the `rc` dist-tag, and the docs deploy is skipped.
 
 ## Steps
 
-1. **Determine version**: Use `$ARGUMENTS` or ask user. Handle `rc<N>` shorthand by reading current version from `package.json` and replacing/appending the RC suffix. Validate it's different from the current version.
+1. **Version.** Resolve `$ARGUMENTS` against `package.json`. Done when you have a version different from the current one.
 
-2. **Detect prerelease**: If version contains `-rc.`, `-alpha.`, `-beta.`, treat as prerelease.
+2. **Clean tree.** Run `git status`. Stop on modified tracked files. Untracked files and submodule pointer changes are fine, because step 3 resets the pointers.
 
-3. **Check working tree**: Run `git status`. Warn and stop on tracked-file modifications. Ignore untracked-only state (e.g. `.vscode/`) and submodule pointer bumps (those get refreshed in step 4).
+3. **Gate: sub-apps first.** Move every submodule to its remote tip, attached to its default branch:
+   ```
+   git submodule sync && git submodule update --init --remote
+   git -C <sub> symbolic-ref --short refs/remotes/origin/HEAD   # origin/<branch>
+   git -C <sub> checkout <branch>
+   ```
+   A submodule with local commits (`git -C <sub> log origin/<branch>..HEAD` is not empty) stays ahead, because `--remote` does not rewind it. Stop and show those commits to the user: the hub would point at a commit that does not exist on the remote. The user picks one: push and release that sub-app, or reset it to `origin/<branch>`.
 
-4. **Update submodules**: Ensure all submodules are initialized and fast-forwarded to their remote branch tips:
+   Each submodule passes when both checks pass:
    ```
-   git submodule sync
-   git submodule update --init
-   git submodule update --remote
+   git -C <sub> describe --tags --exact-match HEAD   # prints v<version>: HEAD is a release
+   npm view <pkg>@<version> version                  # prints <version>: it is on npm
    ```
-   `submodule update --remote` leaves each submodule in detached HEAD at the remote branch tip. Re-attach by checking out the submodule's own default branch — it lands on the same commit, just attached. **Branch names differ per submodule** — detect each one with `git -C <submodule> symbolic-ref refs/remotes/origin/HEAD` (strips to `main` or `master`). Current mapping:
-   ```
-   git -C cck checkout main
-   git -C marketplace checkout main
-   git -C cost checkout main
-   git -C memory checkout main
-   ```
-   Skip any submodule that had no changes.
+   - If `describe` fails, the sub-app has commits after its last release. Stop, have the user run `/release` in that repo, then run this step again.
+   - If `npm view` prints nothing, that sub-app's release run is still going or failed. Check it with `gh -R NikiforovAll/<repo> run list --workflow release.yml --limit 1`. Wait for it or fix it.
 
-   **If a submodule is _ahead_ of its remote** (local unpushed commits — `git -C <sub> log origin/<branch>..HEAD` is non-empty), `submodule update --remote` will NOT rewind it. Stop and surface those commits to the user before bundling them into the hub release: an unpushed submodule commit means the hub would reference a SHA that doesn't exist on the remote (broken for anyone cloning). Decide with the user whether to (a) push + release that submodule properly first, or (b) reset the pointer to `origin/<branch>` and exclude it. If a submodule has a real feature commit, give it its own version bump + tag + release before pointing the hub at it.
+   Done when all 4 submodules pass both checks.
 
-5. **Bump version and commit everything in one commit**:
-   - Run `npm version <version> --no-git-tag-version`
-   - Update `package.json` dependency versions to match the submodule versions:
-     - Read each submodule's `package.json` to get its current version
-     - Update the corresponding `^x.y.z` ranges in the hub's `package.json` (fields: `claude-code-cost`, `claude-code-kanban`, `claude-code-marketplace`, `claude-code-memory-explorer`)
-   - Stage and commit all changes together (include every submodule that moved):
-   ```
-   git add package.json package-lock.json marketplace cck cost memory
-   git commit -m "🔖 chore: Bump version to <version>"
-   git push origin HEAD
-   ```
-   If submodules have no changes, skip staging them.
+4. **Bump and commit.**
+   - Run `npm version <version> --no-git-tag-version`.
+   - Set the `^x.y.z` ranges for `claude-code-cost`, `claude-code-kanban`, `claude-code-marketplace` and `claude-code-memory-explorer` in `package.json` to each submodule's `package.json` version.
+   - Run `npm install`, so `package-lock.json` records those versions. `npm ci` fails on a lock that does not match `package.json`.
+   - Commit and push:
+     ```
+     git add package.json package-lock.json cck marketplace cost memory
+     git commit -m "🔖 chore: Bump version to <version>"
+     git push origin HEAD
+     ```
 
-7. **Tag & push tag**:
-   ```
-   git tag v<version>
-   git push origin v<version>
-   ```
+   Done when `npm ls claude-code-cost claude-code-kanban claude-code-marketplace claude-code-memory-explorer` shows the gate's versions and the push succeeded.
 
-8. **Generate release notes**: The hub's own commits since the previous tag are usually just the version bump — the meaningful changes live in the bumped submodules. Group the **submodule-level** changes the user cares about:
-   - Features (✨) — per sub-app (e.g. "Kanban (→ vX.Y.Z): …"), describe what was added, not raw commit messages
-   - Fixes (🐛)
-   - Other notable changes
-   Include a "Full Changelog" compare link at the bottom.
+5. **Tag.** Run `git tag v<version> && git push origin v<version>`. This starts the release run.
 
-9. **Create GitHub release** (add `--prerelease` flag for RC/alpha/beta):
+6. **GitHub release.** The hub's own commits are mostly bumps, so the notes cover the sub-apps. For each sub-app that moved (for example "Kanban (→ v4.28.0): …"), group the changes under Features (✨), Fixes (🐛) and Other. Describe what changed for a user, not raw commit messages. End with a Full Changelog compare link.
    ```
    gh release create v<version> --title "v<version>" --notes "<notes>" [--prerelease]
    ```
 
-10. **Report**: Show the release URL. Then present the manual `npm publish` commands for the hub and any submodules that got their own release — do **not** run `npm publish` automatically; let the user decide.
+7. **Watch the run.**
+   ```
+   gh run list --workflow release.yml --limit 1
+   gh run watch <run-id> --exit-status
+   ```
+   If it fails, fix the cause and run it again from the tag: `gh workflow run release.yml --ref v<version>`. The publish step skips a version that is already on npm. Done when the run is green and `npm view claude-code-hub@<version> version` prints the version.
+
+8. **Report** the GitHub release URL, the run URL and the published npm version.
