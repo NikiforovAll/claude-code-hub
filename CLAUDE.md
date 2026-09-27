@@ -58,6 +58,6 @@ All sub-apps expose `GET /hub-config` (returns `{enabled, url}` from env vars) a
 - Keyboard forwarding (`Ctrl+Alt+Arrow`, any `Ctrl+Alt+<letter>`, `Alt+digit` → `postMessage` to parent, modifiers included). The hub owns the letter keymap and ignores letters it has no binding for, so a new hub shortcut needs no submodule change. The exceptions are cck's `Ctrl+Alt+N` (New session), `Ctrl+Alt+R` (Resume session) and `Ctrl+Alt+S` (Swap to previous session), which cck keeps and never forwards, so the hub cannot bind N, R or S. The payload carries `code` beside `key` because macOS composes Option+&lt;key&gt; into a character; the hub normalizes the pair in `bindingKey()`, so a shim never needs to know a binding.
 - `hubNavigate(app, url)` — callable API for cross-app deep links (no-op when standalone)
 
-## Landing Page
+## Website
 
-`docs/index.html` — static GitHub Pages landing site. Screenshots in `docs/assets/`. Deployed automatically on push to master.
+`website/` — Astro + Starlight landing and docs, published at https://nikiforovall.blog/claude-code-hub/. It shares its design kit (`src/kit/`, `src/components/`) with the four sub-app sites; keep the copies the same. Screenshots come from `~/dev/claude-code-hub-demo` (`node export-site.mjs hub`). `.github/workflows/pages.yml` deploys it on push to master that changes `website/`. See `website/README.md`.

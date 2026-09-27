@@ -1,0 +1,57 @@
+---
+title: Embedded terminal
+description: Start and resume Claude Code sessions in the terminal inside Kanban, and turn the terminal off if you do not want it.
+---
+
+import Shot from '../../../kit/Shot.astro';
+import Lightbox from '../../../kit/Lightbox.astro';
+
+Kanban has a terminal that runs Claude Code for a session, in the same place as its task board. Under the hub the terminal is on by default. When you run Kanban alone, it is off.
+
+<Shot themed="terminal" alt="Kanban in zen mode with Claude Code running in the embedded terminal" />
+
+## Use the terminal
+
+In Kanban:
+
+| Key | Action |
+| --- | --- |
+| <kbd>Ctrl+Alt+N</kbd> | Start a new session |
+| <kbd>Ctrl+Alt+R</kbd> | Resume a past session |
+| <kbd>Ctrl+Alt+S</kbd> | Swap to the previous session |
+| <kbd>Ctrl+&#96;</kbd> | Show or hide the terminal for the selected session |
+| <kbd>Alt+&#96;</kbd> | Move focus between the terminal and the page |
+
+<Shot themed="09-new-session" alt="The New session dialog with Folder, Name, Prompt, Worktree and Model fields" />
+
+The terminal process runs on the hub's machine. When you switch tools, switch sessions, or reload the page, it keeps running. For the full guide, see [Embedded terminal](https://nikiforovall.blog/claude-code-kanban/guides/embedded-terminal/) in the Kanban docs.
+
+## The window asks before it closes
+
+While a terminal is attached, the hub asks before the window closes. In a terminal, <kbd>Ctrl+W</kbd> deletes a word, but the browser uses the same key to close the window. The prompt stops a key meant for the terminal from closing the hub.
+
+## The terminal token
+
+The terminal can run any command, so it needs its own token. The hub makes a new one each time it starts and gives it to Kanban. You do not type it.
+
+If the hub restarts while the page stays open, Kanban asks the hub for the new token and connects again. You do not have to reload.
+
+## Turn the terminal off
+
+Start the hub with `--disable-terminal`:
+
+```bash
+npx claude-code-hub --disable-terminal
+```
+
+Or add this to `~/.claude-hub/config.json`, then restart the hub:
+
+```json
+{
+  "terminal": { "enabled": false }
+}
+```
+
+The terminal is also off when the hub listens on an address other than loopback, for example with `--host 0.0.0.0`. Kanban refuses to run it there.
+
+<Lightbox />

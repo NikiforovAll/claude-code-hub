@@ -1,0 +1,50 @@
+---
+title: Move between the tools
+description: Switch tools with the keyboard, jump from a Kanban session to its cost or memory files, and keep one theme in all four tools.
+---
+
+import Shot from '../../../kit/Shot.astro';
+import Lightbox from '../../../kit/Lightbox.astro';
+
+The hub shows one tool at a time, and the tool fills the window. There are no tabs to click. You switch with the keyboard.
+
+## Switch tools
+
+| Key | Action |
+| --- | --- |
+| <kbd>Ctrl+Alt+→</kbd> | Next tool |
+| <kbd>Ctrl+Alt+←</kbd> | Previous tool |
+| <kbd>Alt+1</kbd> | Kanban |
+| <kbd>Alt+2</kbd> | Marketplace |
+| <kbd>Alt+3</kbd> | Cost |
+| <kbd>Alt+4</kbd> | Memory Diagnoser |
+
+The next and previous keys wrap around: after Memory Diagnoser comes Kanban.
+
+A browser does not pass key presses from a framed page to the page around it. So each tool sends these keys to the hub itself. They work while focus is inside a tool, for example in a search field. A key press that also holds <kbd>Shift</kbd> or <kbd>Meta</kbd> stays in the tool.
+
+The tools stay loaded when you switch away. When you come back, a tool is where you left it: the same scroll position, filters, and open panels.
+
+## Jump from a Kanban session
+
+In Kanban, select a session and press one of these keys to open another tool for it:
+
+| Key | Opens |
+| --- | --- |
+| <kbd>$</kbd> | Cost, with the detail for that session |
+| <kbd>M</kbd> | Marketplace, for the session's project |
+| <kbd>Ctrl+M</kbd> | Memory Diagnoser, for the session's project |
+
+<Shot themed="h2-hub-cost" alt="The Cost dashboard in the hub" />
+
+## One theme for all four tools
+
+The tools share the light/dark mode and the color theme. Change either one in any tool, and the other three follow. The hub remembers your choice in the browser.
+
+The hub keeps a color theme for each [config dir](/claude-code-hub/guides/config-dirs/). If you give your work dir one theme and your personal dir another, the color tells you which dir you are in.
+
+## Keys the tools keep
+
+Kanban keeps <kbd>Ctrl+Alt+N</kbd> (new session), <kbd>Ctrl+Alt+R</kbd> (resume session), and <kbd>Ctrl+Alt+S</kbd> (swap to the previous session) for itself. The hub does not bind these keys. For the full list, see [Keyboard shortcuts](/claude-code-hub/reference/shortcuts/).
+
+<Lightbox />

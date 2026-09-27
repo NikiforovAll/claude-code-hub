@@ -1,0 +1,62 @@
+---
+title: Keyboard shortcuts
+description: Every key the hub binds, the palette keys, and the keys the tools keep for themselves.
+---
+
+The hub has no visible controls. These keys drive it. They work while focus is inside a tool, because each tool sends them to the hub.
+
+## Hub
+
+| Key | Action |
+| --- | --- |
+| <kbd>Ctrl+Alt+→</kbd> | Next tool |
+| <kbd>Ctrl+Alt+←</kbd> | Previous tool |
+| <kbd>Alt+1</kbd> | Kanban |
+| <kbd>Alt+2</kbd> | Marketplace |
+| <kbd>Alt+3</kbd> | Cost |
+| <kbd>Alt+4</kbd> | Memory Diagnoser |
+| <kbd>Ctrl+Alt+P</kbd> | Open or close the project palette |
+| <kbd>Ctrl+Alt+W</kbd> | Open or close the config-dir palette |
+
+On macOS, use <kbd>Control+Option</kbd> for <kbd>Ctrl+Alt</kbd> and <kbd>Option</kbd> for <kbd>Alt</kbd>.
+
+## Palettes
+
+| Key | Action |
+| --- | --- |
+| <kbd>↓</kbd> or <kbd>Tab</kbd> | Next row |
+| <kbd>↑</kbd> or <kbd>Shift+Tab</kbd> | Previous row |
+| <kbd>Enter</kbd> | Pick the selected row |
+| <kbd>Ctrl+D</kbd> | Config-dir palette: remove the selected dir from the list |
+| <kbd>Esc</kbd> | Close the palette |
+
+While a palette is open, the tool keys do nothing, so you can type a path that has digits in it.
+
+## From a Kanban session
+
+Select a session in Kanban, then:
+
+| Key | Action |
+| --- | --- |
+| <kbd>$</kbd> | Open Cost for the session |
+| <kbd>M</kbd> | Open Marketplace for the session's project |
+| <kbd>Ctrl+M</kbd> | Open Memory Diagnoser for the session's project |
+
+## Keys Kanban keeps
+
+Kanban uses these keys itself and does not send them to the hub:
+
+| Key | Action |
+| --- | --- |
+| <kbd>Ctrl+Alt+N</kbd> | New session |
+| <kbd>Ctrl+Alt+R</kbd> | Resume session |
+| <kbd>Ctrl+Alt+S</kbd> | Swap to the previous session |
+
+## Keys inside each tool
+
+Each tool has its own keys. Press <kbd>?</kbd> in a tool to see them, or read its docs:
+
+- [Kanban](https://nikiforovall.blog/claude-code-kanban/reference/keyboard-shortcuts/)
+- [Marketplace](https://nikiforovall.blog/claude-code-marketplace/reference/keyboard-shortcuts/)
+- [Cost](https://nikiforovall.blog/claude-code-cost/reference/keyboard-shortcuts/)
+- [Memory Diagnoser](https://nikiforovall.blog/claude-code-memory/reference/shortcuts/)

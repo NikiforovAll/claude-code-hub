@@ -1,0 +1,73 @@
+---
+title: Getting started
+description: Start Claude Code Hub, open it with its token, install it as an app, and turn on live agent activity in Kanban.
+---
+
+import Shot from '../../kit/Shot.astro';
+import Lightbox from '../../kit/Lightbox.astro';
+
+Claude Code Hub runs four Claude Code tools on your machine and shows them in one browser window: Kanban, Marketplace, Cost, and Memory Diagnoser. The hub has no tabs or buttons of its own. You move between the tools with the keyboard.
+
+## Requirements
+
+- Node.js 18 or later.
+- Claude Code, installed. The tools read its files from your Claude config dir, `~/.claude` by default.
+
+## Start the hub
+
+```bash
+npx claude-code-hub --open
+```
+
+The hub starts the four tools as child processes, then prints a banner:
+
+```text
+Claude Code Hub running at http://localhost:3540/?token=<token>
+Type "q" or "exit" to stop the server
+```
+
+`--open` opens that URL in your default browser. The token in the URL lets the browser in. The hub then sets a cookie and removes the token from the address bar, so you need the URL only once per browser. See [Security and the hub token](/claude-code-hub/reference/security/).
+
+The default port is 3540. If it is busy, the hub uses a free port and prints it in the banner. The tools have their own default ports, 3541 to 3544, with the same fallback. See [CLI and configuration](/claude-code-hub/reference/configuration/).
+
+To stop the hub, type `q` or `exit` in its terminal, or press <kbd>Ctrl+C</kbd>. The hub stops the four tools too.
+
+## The screen
+
+<Shot themed="board" alt="Claude Code Hub showing Kanban, with sessions in the sidebar, task columns, and the agent log" />
+
+The hub opens on Kanban. The whole window is the tool that is on screen. To go to the next tool, press <kbd>Ctrl+Alt+→</kbd>. To jump to a tool, press <kbd>Alt+1</kbd> to <kbd>Alt+4</kbd>:
+
+| Key | Tool |
+| --- | --- |
+| <kbd>Alt+1</kbd> | Kanban |
+| <kbd>Alt+2</kbd> | Marketplace |
+| <kbd>Alt+3</kbd> | Cost |
+| <kbd>Alt+4</kbd> | Memory Diagnoser |
+
+The keys work while focus is inside a tool. See [Move between the tools](/claude-code-hub/guides/navigate/).
+
+## Install as an app
+
+The hub page is a progressive web app. In Chrome or Edge, use the install button in the address bar to open the hub in its own window, with no browser UI. The cookie from your first visit lets the app window in, so it needs no token.
+
+The app window opens the address you installed it from, so keep the hub on the same port.
+
+## Turn on live agent activity (one time)
+
+Kanban shows tasks and sessions without any setup. For the agent log, live subagents, waiting-for-you badges, and context window use, install its hooks:
+
+```bash
+npx claude-code-kanban --install
+```
+
+The hooks and the status line are installed in one Claude config dir. If you use more than one dir, run the command for each dir, with `CLAUDE_CONFIG_DIR` set to that dir. See the [Kanban docs](https://nikiforovall.blog/claude-code-kanban/) for details.
+
+## Next steps
+
+- [Move between the tools](/claude-code-hub/guides/navigate/)
+- [Pick a project](/claude-code-hub/guides/projects/)
+- [Use more than one config dir](/claude-code-hub/guides/config-dirs/)
+- [Embedded terminal](/claude-code-hub/guides/terminal/)
+
+<Lightbox />
