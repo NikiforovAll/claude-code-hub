@@ -107,6 +107,17 @@ function saveHubConfig() {
 
 const hubConfig = loadHubConfig();
 
+// Every keystroke into cck's terminal passes through the upgrade proxy below. Windows only, for the
+// reasons in cck/lib/priority.js; the children spawned after this still start at normal.
+if (process.platform === 'win32' && process.env.CCK_PRIORITY_BOOST !== '0') {
+  try {
+    if (os.getPriority() > os.constants.priority.PRIORITY_ABOVE_NORMAL)
+      os.setPriority(os.constants.priority.PRIORITY_ABOVE_NORMAL);
+  } catch {
+    /* keep the default priority */
+  }
+}
+
 // Created before spawnApp so the same host/allowed-hosts decision reaches the
 // children. Without that propagation, `--host 0.0.0.0` would expose the hub shell
 // while every iframe 403'd on its own Host check.
