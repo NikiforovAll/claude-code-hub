@@ -9,6 +9,7 @@ const tcp = require('net');
 const os = require('os');
 const path = require('path');
 const { selectApps } = require('./lib/apps');
+const { stripCookie } = require('./lib/cookies');
 const { createNetGuard } = require('./lib/net-guard');
 
 function getArg(name) {
@@ -20,6 +21,7 @@ function getArg(name) {
 }
 
 const HUB_PORT = parseInt(getArg('port') || process.env.PORT || '3540', 10);
+let hubPort = HUB_PORT;
 
 const POOL_SIZE = Math.max(1, parseInt(getArg('pool-size') || '3', 10));
 const RESTART_DELAY_MS = 500;
@@ -191,7 +193,7 @@ function childEnv(pool, name) {
     PORT: '0',
     CLAUDE_CONFIG_DIR: pool.dir,
     CLAUDE_HUB: '1',
-    HUB_URL: `http://localhost:${HUB_PORT}`,
+    HUB_URL: `http://localhost:${hubPort}`,
     HOST: net.BIND_HOST,
     ALLOWED_HOSTS: net.ALLOWED_HOSTS,
   };
@@ -530,10 +532,14 @@ function forward(name, req, res, childPort, headers, replayable, onUpstream) {
 // Host is forwarded untouched so the child's hostGuard still sees what the browser sent. Origin is
 // the one header the child cannot judge on its own: its guard compares the port to its own
 // ephemeral one, so the public-port spelling is mapped to the child's; anything else passes
-// through as-is and the child rejects it.
+// through as-is and the child rejects it. Cookies on localhost are shared across ports, so the
+// browser sends the hub's own token cookie to every app; it never reaches a child.
 function proxyHandler(name) {
   return async (req, res) => {
     const headers = { ...req.headers };
+    const cookie = stripCookie(headers.cookie, TOKEN_COOKIE);
+    if (cookie) headers.cookie = cookie;
+    else delete headers.cookie;
     // req is consumed by the first attempt, so only a request with no body can be re-sent. Waiting
     // for a port is not a replay — nothing has been sent yet — so every method gets the same wait.
     const replayable = req.method === 'GET' || req.method === 'HEAD' || req.method === 'OPTIONS';
@@ -580,22 +586,44 @@ function proxyUpgrade(name) {
     }
     const lines = [`${req.method} ${req.url} HTTP/${req.httpVersion}`];
     for (let i = 0; i < req.rawHeaders.length; i += 2) {
+      const header = req.rawHeaders[i].toLowerCase();
       let value = req.rawHeaders[i + 1];
-      if (req.rawHeaders[i].toLowerCase() === 'origin') value = rewriteOrigin(value, publicPorts[name], childPort);
+      if (header === 'origin') value = rewriteOrigin(value, publicPorts[name], childPort);
+      if (header === 'cookie' && !(value = stripCookie(value, TOKEN_COOKIE))) continue;
       lines.push(`${req.rawHeaders[i]}: ${value}`);
     }
-    const upstream = tcp.connect(childPort, '127.0.0.1', () => {
-      clearTimeout(connectTimer);
-      upstream.write(`${lines.join('\r\n')}\r\n\r\n`);
-      if (head?.length) upstream.write(head);
-      upstream.pipe(socket);
-      socket.pipe(upstream);
-    });
-    const connectTimer = setTimeout(() => upstream.destroy(), CONNECT_TIMEOUT_MS);
-    upstream.on('error', () => socket.destroy());
-    socket.on('close', () => upstream.destroy());
-    upstream.on('close', () => socket.destroy());
+    tunnel(name, childPort, `${lines.join('\r\n')}\r\n\r\n`, head, socket, 1);
   };
+}
+
+// A fresh loopback connect to a child sometimes fails at once with ETIMEDOUT on Windows (cause
+// unknown, seen only on a just-started hub), so a connect that never opened is tried once more.
+function tunnel(name, childPort, request, head, socket, retries) {
+  let connected = false;
+  const upstream = tcp.connect(childPort, '127.0.0.1', () => {
+    connected = true;
+    clearTimeout(connectTimer);
+    upstream.write(request);
+    if (head?.length) upstream.write(head);
+    upstream.pipe(socket);
+    socket.pipe(upstream);
+  });
+  const connectTimer = setTimeout(() => upstream.destroy(), CONNECT_TIMEOUT_MS);
+  const onSocketClose = () => upstream.destroy();
+  socket.on('close', onSocketClose);
+  upstream.on('error', (err) => {
+    if (connected || socket.destroyed || retries < 1) {
+      if (!connected) console.warn(`[${name}] upgrade connect to 127.0.0.1:${childPort} failed (${err.code})`);
+      socket.destroy();
+      return;
+    }
+    console.warn(`[${name}] upgrade connect to 127.0.0.1:${childPort} failed (${err.code}), retrying`);
+    clearTimeout(connectTimer);
+    socket.off('close', onSocketClose);
+    upstream.removeAllListeners('close');
+    tunnel(name, childPort, request, head, socket, retries - 1);
+  });
+  upstream.on('close', () => socket.destroy());
 }
 
 function listenWithFallback(handler, port, onReady, label, onUpgrade) {
@@ -620,8 +648,6 @@ for (const [name, port] of Object.entries(publicPorts)) {
     proxyUpgrade(name),
   );
 }
-
-ensurePool(hubConfig.activeConfigDir);
 
 const app = express();
 
@@ -770,7 +796,11 @@ app.get('/api/resolve-path', (req, res) => {
 
 app.use(express.static(path.join(__dirname, 'public')));
 
+// Children get HUB_URL at spawn and trust only that origin, so the first pool waits for the port
+// the hub actually bound: HUB_PORT may be busy and fall back to a random one.
 const onReady = (actual) => {
+  hubPort = actual;
+  ensurePool(hubConfig.activeConfigDir);
   printBanner(actual);
   if (process.argv.includes('--open')) {
     import('open').then((m) => m.default(accessUrl(actual)));
