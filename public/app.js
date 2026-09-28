@@ -294,19 +294,17 @@ function onIframeLoad(appId) {
   loadedApps.add(appId);
   guardedApps.delete(appId);
   if (appId === activeApp) hideLoading();
-  postTo(appId, themeMessage());
-  postProjectTo(appId);
-  postActiveTo(appId);
-  postTo(appId, keysMessage());
-  // Posted twice: the shims gate their origin check on window.__HUB__, which they populate from
-  // an async /hub-config fetch that resolves after this load event, so the first post can be
-  // dropped. Safe to repeat — every shim's apply is idempotent.
-  setTimeout(() => {
+  const postState = () => {
     postTo(appId, themeMessage());
     postProjectTo(appId);
     postActiveTo(appId);
-    postTo(appId, keysMessage());
-  }, 400);
+    postTo(appId, { type: 'hub:keys', keys: Object.keys(bindings()) });
+  };
+  postState();
+  // Posted twice: the shims gate their origin check on window.__HUB__, which they populate from
+  // an async /hub-config fetch that resolves after this load event, so the first post can be
+  // dropped. Safe to repeat — every shim's apply is idempotent.
+  setTimeout(postState, 400);
 }
 
 function listenMessages() {
@@ -375,33 +373,39 @@ function handleForwardedKey(d) {
   // The modifier fields are new. A sub-app running an older service-worker-cached bundle sends
   // {key} only; it forwards nothing but the pre-existing bindings, and each of those is
   // unambiguous from the key alone, so normalize instead of dispatching twice.
-  const alt = typeof d.alt === 'boolean' ? d.alt : true;
-  const ctrl = typeof d.alt === 'boolean' ? d.ctrl : d.key.startsWith('Arrow');
-  if (!alt || d.shift === true) return;
-  const k = bindingKey(d);
-  if (!ctrl) {
-    if (/^[1-9]$/.test(k)) switchByIndex(Number(k) - 1);
-    return;
-  }
-  if (k === 'ArrowLeft') cycleTab(-1);
-  else if (k === 'ArrowRight') cycleTab(1);
-  else if (PALETTE_KEYS[k]) togglePalette(PALETTE_KEYS[k]);
+  const legacy = typeof d.alt !== 'boolean';
+  const e = {
+    key: d.key,
+    code: d.code,
+    altKey: legacy || d.alt,
+    ctrlKey: legacy ? d.key.startsWith('Arrow') : d.ctrl,
+    shiftKey: d.shift === true,
+  };
+  bindings()[comboOf(e)]?.run();
 }
 
-// Ctrl+Alt+<letter> bindings. keysMessage() lists them for the shims, so this is the one keymap.
-const PALETTE_KEYS = { p: 'project', w: 'configDir' };
+// The one keymap. Its combo names are what the hub:keys message lists for the shims.
+// inPalette: the binding still fires while the palette is open.
+function bindings() {
+  const map = {
+    'ctrl+alt+p': { run: () => togglePalette('project'), inPalette: true },
+    'ctrl+alt+w': { run: () => togglePalette('configDir'), inPalette: true },
+    'ctrl+alt+ArrowLeft': { run: () => cycleTab(-1) },
+    'ctrl+alt+ArrowRight': { run: () => cycleTab(1) },
+  };
+  Object.keys(apps)
+    .slice(0, 9)
+    .forEach((id, i) => {
+      map[`alt+${i + 1}`] = { run: () => switchTab(id) };
+    });
+  return map;
+}
 
-// The shims forward only these combos. A shim names a press as modifiers in ctrl, alt, shift,
-// meta order joined by '+' to the key, normalized as bindingKey() does.
-function keysMessage() {
-  const count = Math.min(Object.keys(apps).length, 9);
-  const keys = [
-    ...Object.keys(PALETTE_KEYS).map((k) => `ctrl+alt+${k}`),
-    'ctrl+alt+ArrowLeft',
-    'ctrl+alt+ArrowRight',
-    ...Array.from({ length: count }, (_, i) => `alt+${i + 1}`),
-  ];
-  return { type: 'hub:keys', keys };
+// Each shim's hubCombo() is a copy of this: modifiers in ctrl, alt, shift, meta order, joined by
+// '+' to the key as bindingKey() names it.
+function comboOf(e) {
+  const mods = [e.ctrlKey && 'ctrl', e.altKey && 'alt', e.shiftKey && 'shift', e.metaKey && 'meta'];
+  return [...mods, bindingKey(e)].filter(Boolean).join('+');
 }
 
 // macOS composes Option+<key> into a character — Option+1 is '¡', Option+P is 'π' — and holding
@@ -422,20 +426,13 @@ function cycleTab(delta) {
   switchTab(next);
 }
 
-function switchByIndex(idx) {
-  const ids = Object.keys(apps);
-  if (idx < ids.length) switchTab(ids[idx]);
-}
-
 function listenKeys() {
   document.addEventListener('keydown', (e) => {
-    if (e.ctrlKey && e.altKey && !e.shiftKey && !e.metaKey) {
-      const mode = PALETTE_KEYS[bindingKey(e)];
-      if (mode) {
-        e.preventDefault();
-        togglePalette(mode);
-        return;
-      }
+    const binding = bindings()[comboOf(e)];
+    if (binding?.inPalette) {
+      e.preventDefault();
+      binding.run();
+      return;
     }
     // While the palette is open the input owns the keyboard — don't let tab shortcuts fire
     // mid-path (Alt+digit especially, since Windows paths contain digits). Escape still closes:
@@ -447,26 +444,9 @@ function listenKeys() {
       }
       return;
     }
-    if (e.altKey && !e.ctrlKey && !e.shiftKey && !e.metaKey) {
-      const k = bindingKey(e);
-      if (/^[1-9]$/.test(k)) {
-        e.preventDefault();
-        switchByIndex(Number(k) - 1);
-        return;
-      }
-    }
-    if (e.ctrlKey && e.altKey && !e.shiftKey && !e.metaKey) {
-      if (e.key === 'ArrowLeft') {
-        e.preventDefault();
-        cycleTab(-1);
-        return;
-      }
-      if (e.key === 'ArrowRight') {
-        e.preventDefault();
-        cycleTab(1);
-        return;
-      }
-    }
+    if (!binding) return;
+    e.preventDefault();
+    binding.run();
   });
 }
 
