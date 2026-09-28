@@ -26,7 +26,7 @@ A flag takes its value after a space or after `=`: `--port 4000` and `--port=400
 
 ### Ports
 
-The hub listens on all five ports itself. The tool ports forward to the tools of the active config dir, which run on free ports that the hub picks. So the tool URLs stay the same when you switch the config dir.
+The hub listens on its own port and on the port of each enabled tool. The tool ports forward to the tools of the active config dir, which run on free ports that the hub picks. So the tool URLs stay the same when you switch the config dir.
 
 If a port is busy, the hub uses a free port instead and logs `port <n> in use, trying random port...`. The banner shows the hub's real port.
 
@@ -47,12 +47,18 @@ The hub keeps its settings in `~/.claude-hub/config.json`:
 {
   "configDirs": ["C:\\Users\\me\\.claude", "C:\\Users\\me\\.claude-work"],
   "activeConfigDir": "C:\\Users\\me\\.claude",
-  "terminal": { "enabled": false }
+  "terminal": { "enabled": false },
+  "apps": [
+    { "id": "kanban" },
+    { "id": "cost" },
+    { "id": "marketplace", "enabled": false }
+  ]
 }
 ```
 
 - `configDirs` and `activeConfigDir` are the config-dir list and the active dir. The config-dir palette writes them. You do not need to edit them.
 - `terminal` is for you to edit. `"enabled": false` turns off the embedded terminal. The hub gives the whole block to Kanban as its terminal config, so you can also set keys like `shell` and `fontFamily` here. See [Terminal config](https://nikiforovall.blog/claude-code-kanban/reference/configuration/#terminal-config) in the Kanban docs. The hub keeps this block when it writes the file.
+- `apps` is for you to edit. It sets which tools run and the tab order. The ids are `kanban`, `marketplace`, `cost` and `memory`. The tools you list come first, in list order, and the tools you do not list follow in the default order. A tool with `"enabled": false` does not start, gets no tab and no port, and links from other tools to it do nothing. With Kanban off, the embedded terminal is off and the project palette has no project list. <kbd>Alt</kbd>+<kbd>1</kbd> to <kbd>Alt</kbd>+<kbd>4</kbd> follow the tab order. The hub keeps this list when it writes the file, and does not start when every tool is off.
 
 Restart the hub after you edit the file.
 
@@ -60,7 +66,7 @@ Restart the hub after you edit the file.
 
 | File | Content |
 | --- | --- |
-| `~/.claude-hub/config.json` | The config-dir list, the active dir, and your `terminal` block |
+| `~/.claude-hub/config.json` | The config-dir list, the active dir, and your `terminal` block and `apps` list |
 | `~/.claude-hub/token` | The [hub token](/claude-code-hub/reference/security/#the-hub-token) |
 
 The tools write their own files. See their docs:

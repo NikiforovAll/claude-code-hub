@@ -99,6 +99,26 @@ The hub can run the tools against more than one Claude config dir (`CLAUDE_CONFI
 - Each dir gets its own set of the four tools. When you switch, the hub keeps the old set running, so switching back is instant. `--pool-size` sets how many sets stay alive (default 3). When the pool is full, the hub stops the least recently used set, but not a set whose Kanban has open terminals.
 - The list and the active dir are saved in `~/.claude-hub/config.json`.
 
+## Choose the tools
+
+By default the hub runs all four tools. To turn a tool off or change the tab order, add an `apps` list to `~/.claude-hub/config.json`:
+
+```json
+{
+  "apps": [
+    { "id": "kanban" },
+    { "id": "cost" },
+    { "id": "marketplace", "enabled": false }
+  ]
+}
+```
+
+- The ids are `kanban`, `marketplace`, `cost` and `memory`.
+- The tools you list come first, in list order. The tools you do not list follow in the default order.
+- A tool with `"enabled": false` does not start and gets no tab. Links from other tools to it do nothing.
+- With Kanban off, the embedded terminal is off, and the project palette has no project list. You can still type a path.
+- Restart the hub after you edit the file.
+
 ## Embedded terminal
 
 Under the hub, Kanban has an embedded terminal, on by default, so you can start or resume Claude Code sessions from the board. While a terminal is attached, the hub asks before it closes the window, because <kbd>Ctrl</kbd>+<kbd>W</kbd> meant for the terminal would close it.
@@ -125,6 +145,8 @@ The hub has no visible UI of its own. Use these shortcuts:
 | <kbd>Alt</kbd>+<kbd>4</kbd> | Memory Diagnoser |
 | <kbd>Ctrl</kbd>+<kbd>Alt</kbd>+<kbd>P</kbd> | Project palette: set the project for all tools |
 | <kbd>Ctrl</kbd>+<kbd>Alt</kbd>+<kbd>W</kbd> | Config-dir palette: switch, add, or remove a config dir |
+
+<kbd>Alt</kbd>+<kbd>1</kbd> to <kbd>Alt</kbd>+<kbd>4</kbd> follow the tab order, so they change when you [choose the tools](#choose-the-tools).
 
 In a palette, use <kbd>↑</kbd>/<kbd>↓</kbd> or <kbd>Tab</kbd> to move, <kbd>Enter</kbd> to select, and <kbd>Esc</kbd> to close.
 

@@ -19,6 +19,8 @@ CLI flags: `--port <n>`, `--marketplace-port <n>`, `--kanban-port <n>`, `--cost-
 
 ## Architecture
 
+**Apps.** `lib/apps.js` lists the four built-in apps (id, submodule dir, npm package, name, icon, default port) in default tab order; nothing else in `server.js` names them all. The hand-edited `apps` list in `~/.claude-hub/config.json` (`[{id, enabled}]`) reorders them and turns them off: a disabled app is not spawned and gets no proxy port or tab. Kanban off also turns the terminal off, and `/api/projects` fails at once (`waitForPort` does not wait for an app the pool never spawned).
+
 **Hub server** (`server.js`) spawns four child processes — marketplace, kanban, cost, and memory — passing `CLAUDE_HUB=1`, `HUB_URL`, and `CLAUDE_CONFIG_DIR` env vars. It parses their stdout to detect actual ports (handles fallback when default ports are busy) and exposes `GET /api/config` returning the live app URLs.
 
 **Config dirs.** The hub keeps a list of Claude config dirs and the active one in `~/.claude-hub/config.json` (`GET/POST/DELETE /api/config-dirs`, `POST /api/config-dirs/activate`). Every sub-app resolves `CLAUDE_CONFIG_DIR` once at startup, so each dir gets its own set of four children. Sets stay alive after a switch (LRU pool, `--pool-size`, default 3) so switching back is instant; the activate response carries that set's app URLs (fallback ports when the defaults are taken) and the client reloads every iframe. Removing a dir kills its set. cck's hooks and statusLine are installed per dir, so a dir without them shows tasks and sessions but no live agent activity.

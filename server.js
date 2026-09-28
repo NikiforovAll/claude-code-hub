@@ -8,6 +8,7 @@ const http = require('http');
 const tcp = require('net');
 const os = require('os');
 const path = require('path');
+const { selectApps } = require('./lib/apps');
 const { createNetGuard } = require('./lib/net-guard');
 
 function getArg(name) {
@@ -19,13 +20,8 @@ function getArg(name) {
 }
 
 const HUB_PORT = parseInt(getArg('port') || process.env.PORT || '3540', 10);
-const MARKETPLACE_PORT = parseInt(getArg('marketplace-port') || '3542', 10);
-const KANBAN_PORT = parseInt(getArg('kanban-port') || '3541', 10);
-const COST_PORT = parseInt(getArg('cost-port') || '3543', 10);
-const MEMORY_PORT = parseInt(getArg('memory-port') || '3544', 10);
 
 const POOL_SIZE = Math.max(1, parseInt(getArg('pool-size') || '3', 10));
-const DEFAULT_PORTS = { marketplace: MARKETPLACE_PORT, kanban: KANBAN_PORT, cost: COST_PORT, memory: MEMORY_PORT };
 const RESTART_DELAY_MS = 500;
 // A rate window, not a total: a child may die and recover all session, but one that cannot stay up
 // stops being restarted. A consecutive counter cannot express that — anything that starts at all
@@ -87,6 +83,7 @@ function loadHubConfig() {
   const config = { configDirs: dirs, activeConfigDir: active };
   // Hand-edited only; kept verbatim so a rewrite of the file does not drop it.
   if (saved.terminal && typeof saved.terminal === 'object') config.terminal = saved.terminal;
+  if (Array.isArray(saved.apps)) config.apps = saved.apps;
   // Configs saved before canonicalization can hold one dir under two spellings; persist the merge.
   if (serializeConfig(config) !== raw) writeHubConfig(config);
   return config;
@@ -106,6 +103,14 @@ function saveHubConfig() {
 }
 
 const hubConfig = loadHubConfig();
+
+const { apps: ENABLED_APPS, unknown: unknownApps } = selectApps(hubConfig.apps);
+for (const id of unknownApps) console.log(`Unknown app "${id}" in ${HUB_CONFIG_FILE}, ignored`);
+if (!ENABLED_APPS.length) {
+  console.error(`Every app is disabled in ${HUB_CONFIG_FILE}. Enable at least one.`);
+  process.exit(1);
+}
+const appEnabled = (id) => ENABLED_APPS.some((a) => a.id === id);
 
 // Every keystroke into cck's terminal passes through the upgrade proxy below. Windows only, for the
 // reasons in cck/lib/priority.js; the children spawned after this still start at normal.
@@ -129,7 +134,8 @@ const net = createNetGuard({ appName: 'Claude Code Hub' });
 // the WebSocket. cck applies the rest of its policy (exposure refusal, Origin, session cap) itself.
 const TERMINAL = {
   ...(hubConfig.terminal || {}),
-  enabled: !process.argv.includes('--disable-terminal') && hubConfig.terminal?.enabled !== false,
+  enabled:
+    appEnabled('kanban') && !process.argv.includes('--disable-terminal') && hubConfig.terminal?.enabled !== false,
 };
 const TERMINAL_TOKEN = TERMINAL.enabled ? crypto.randomBytes(32).toString('hex') : null;
 
@@ -367,10 +373,7 @@ function resolveApp(submoduleDir, npmPackage) {
   return require.resolve(`${npmPackage}/server.js`);
 }
 
-const marketplacePath = resolveApp('marketplace', 'claude-code-marketplace');
-const kanbanPath = resolveApp('cck', 'claude-code-kanban');
-const costPath = resolveApp('cost', 'claude-code-cost');
-const memoryPath = resolveApp('memory', 'claude-code-memory-explorer');
+const appPaths = Object.fromEntries(ENABLED_APPS.map((a) => [a.id, resolveApp(a.dir, a.pkg)]));
 
 // Raise header size limit to 64KB — localhost cookies from sibling apps can pile up and
 // trip Node's default 16KB limit, breaking iframes with HTTP 431.
@@ -381,13 +384,12 @@ const NODE_HDR = `--max-http-header-size=${HDR_BYTES}`;
 // localStorage is keyed by origin, so the sub-app origin has to stay put across switches or the
 // user loses pins and filters every time the active set changes.
 function spawnChildren(pool) {
-  spawnApp(pool, 'marketplace', process.execPath, [NODE_HDR, marketplacePath]);
-  spawnApp(pool, 'kanban', process.execPath, [NODE_HDR, kanbanPath]);
-  spawnApp(pool, 'cost', process.execPath, [NODE_HDR, costPath]);
-  spawnApp(pool, 'memory', process.execPath, [NODE_HDR, memoryPath]);
+  for (const a of ENABLED_APPS) spawnApp(pool, a.id, process.execPath, [NODE_HDR, appPaths[a.id]]);
 }
 
-const publicPorts = { ...DEFAULT_PORTS };
+const publicPorts = Object.fromEntries(
+  ENABLED_APPS.map((a) => [a.id, parseInt(getArg(`${a.id}-port`) || String(a.port), 10)]),
+);
 
 function rewriteOrigin(origin, publicPort, childPort) {
   try {
@@ -432,6 +434,7 @@ async function waitForPort(name, deadline) {
     const pool = activePool();
     const port = pool?.ports[name];
     if (port) return port;
+    if (pool && !pool.children.has(name)) return null;
     const remaining = deadline - Date.now();
     if (remaining <= 0) return null;
     await Promise.race([pool?.children.get(name)?.ready, delay(Math.min(remaining, 250))]);
@@ -606,7 +609,7 @@ function listenWithFallback(handler, port, onReady, label, onUpgrade) {
   return server;
 }
 
-for (const [name, port] of Object.entries(DEFAULT_PORTS)) {
+for (const [name, port] of Object.entries(publicPorts)) {
   listenWithFallback(
     proxyHandler(name),
     port,
@@ -655,14 +658,13 @@ const themePalettes = (() => {
 })();
 
 function appsConfig() {
-  const kanban = { name: 'Kanban', url: `http://localhost:${publicPorts.kanban}`, icon: 'columns' };
-  if (TERMINAL_TOKEN) kanban.terminalToken = TERMINAL_TOKEN;
-  return {
-    kanban,
-    marketplace: { name: 'Marketplace', url: `http://localhost:${publicPorts.marketplace}`, icon: 'store' },
-    cost: { name: 'Cost', url: `http://localhost:${publicPorts.cost}`, icon: 'dollar-sign' },
-    memory: { name: 'Memory Diagnoser', url: `http://localhost:${publicPorts.memory}`, icon: 'database' },
-  };
+  return Object.fromEntries(
+    ENABLED_APPS.map((a) => {
+      const entry = { name: a.name, url: `http://localhost:${publicPorts[a.id]}`, icon: a.icon };
+      if (a.id === 'kanban' && TERMINAL_TOKEN) entry.terminalToken = TERMINAL_TOKEN;
+      return [a.id, entry];
+    }),
+  );
 }
 
 app.get('/api/config', (_req, res) => {
