@@ -19,9 +19,11 @@ The hub shows one tool at a time, and the tool fills the window. There are no ta
 | <kbd>Alt+3</kbd> | Cost |
 | <kbd>Alt+4</kbd> | Memory Diagnoser |
 
-The next and previous keys wrap around: after Memory Diagnoser comes Kanban.
+The next and previous keys wrap around: after the last tool comes the first.
 
-A browser does not pass key presses from a framed page to the page around it. So each tool sends these keys to the hub itself. They work while focus is inside a tool, for example in a search field. A key press that also holds <kbd>Shift</kbd> or <kbd>Meta</kbd> stays in the tool.
+This is the default order. The `apps` list in the [config file](/claude-code-hub/reference/configuration/#the-config-file) changes the order and turns tools off. The numbers follow the tab order, so a tool that is off has no number.
+
+A browser does not pass key presses from a framed page to the page around it. So the hub tells each tool which keys it binds, and the tool sends only those keys to the hub. Every other key stays in the tool, the Kanban terminal included. The hub keys work while focus is inside a tool, for example in a search field. A key press that also holds <kbd>Shift</kbd> or <kbd>Meta</kbd> stays in the tool.
 
 The tools stay loaded when you switch away. When you come back, a tool is where you left it: the same scroll position, filters, and open panels.
 
