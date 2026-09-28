@@ -3,7 +3,6 @@ let activeApp = null;
 const iframes = {};
 const loadedApps = new Set();
 const guardedApps = new Set();
-let allowedOrigins = new Set();
 // {theme: 'dark'|'light', colorTheme: '<id>', colorThemes: {<configDir>: '<id>'}} — survives hub
 // reloads so late-loading iframes and fresh sessions get the last chosen theme. Light/dark is
 // global; the color theme is per config dir, and colorTheme is the last one picked anywhere, which
@@ -151,7 +150,7 @@ async function init() {
   showLoading();
   const res = await fetch('/api/config');
   const config = await res.json();
-  setApps(config.apps);
+  apps = config.apps;
   defaultConfigDir = config.defaultConfigDir ?? null;
   activeConfigDir = config.activeConfigDir ?? null;
   applyTitle(config.activeConfigDir);
@@ -170,11 +169,6 @@ async function init() {
 // manifest name, so a product name here would read as "Claude Code Hub - .claude-eom · Hub".
 function applyTitle(dir) {
   document.title = dir && dir !== defaultConfigDir ? basename(dir) : 'Claude Code Hub';
-}
-
-function setApps(next) {
-  apps = next;
-  allowedOrigins = new Set(Object.values(apps).map((a) => new URL(a.url).origin));
 }
 
 // After a config-dir switch every child is a new process, possibly on a new port. Reloading each
@@ -312,7 +306,8 @@ function listenMessages() {
     if (guardedApps.size) e.preventDefault();
   });
   window.addEventListener('message', (e) => {
-    if (!allowedOrigins.has(e.origin)) return;
+    const appId = appIdOf(e.source);
+    if (!appId || e.origin !== originOf(appId)) return;
     const data = e.data ?? {};
     if (data.type === 'hub:navigate') {
       if (!apps[data.app]) return;
@@ -324,14 +319,10 @@ function listenMessages() {
     } else if (data.type === 'hub:keydown') {
       handleForwardedKey(data);
     } else if (data.type === 'hub:closeGuard') {
-      const appId = appIdOf(e.source);
-      if (!appId) return;
       if (data.on === true) guardedApps.add(appId);
       else guardedApps.delete(appId);
     } else if (data.type === 'hub:terminalToken') {
       // This hub page may have outlived the restart too, so the cached token is not trusted.
-      const appId = appIdOf(e.source);
-      if (!appId) return;
       sendJson('GET', '/api/config')
         .then((cfg) => {
           const token = cfg.apps?.[appId]?.terminalToken;
@@ -785,7 +776,7 @@ async function commitConfigDir(row) {
   if (target === palette.configDirs.active) return;
   showLoading();
   try {
-    setApps((await sendJson('POST', '/api/config-dirs/activate', { path: target })).apps);
+    apps = (await sendJson('POST', '/api/config-dirs/activate', { path: target })).apps;
     // The palette renders from this cache before its refetch lands, and initialSel keys off it.
     palette.configDirs.active = target;
     activeConfigDir = target;
