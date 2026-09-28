@@ -3,8 +3,8 @@
 //
 // All sub-apps share the same core variable names, so one palette→var mapping
 // serves every app; APP_EXTRAS adds per-app derived vars (e.g. cost's chart
-// accent). "ember" is each app's :root default and gets no override block —
-// clearing data-color-theme is how you select it.
+// accent). "ember" is selected by clearing data-color-theme; its block matches
+// that state so Ember follows the registry, not each app's :root defaults.
 //
 // Usage: node scripts/generate-themes.mjs [app ...]   (default: all apps)
 
@@ -51,9 +51,11 @@ const APP_EXTRAS = {
 
 // Selector templates per mode. cck additionally honors OS light preference
 // unless dark is forced (matches its prefers-color-scheme block).
+const themeAttr = (id) => (id === 'ember' ? ':not([data-color-theme])' : `[data-color-theme="${id}"]`);
 const SELECTORS = {
-  dark: (id) => `body[data-color-theme="${id}"]:not(.light)`,
-  light: (id) => `body.light[data-color-theme="${id}"]`,
+  dark: (id) => `body${themeAttr(id)}:not(.light)`,
+  light: (id) => `body.light${themeAttr(id)}`,
+  cckOsLight: (id) => `body:not(.dark-forced)${themeAttr(id)}`,
 };
 
 function vars(app, p, mode) {
@@ -76,18 +78,17 @@ function generate(app) {
   }
 
   for (const t of themes) {
-    if (t.id === 'ember') continue; // :root default
     css += `\n/* ${t.label} */\n`;
     css += `${SELECTORS.dark(t.id)} {\n${vars(app, t.dark, 'dark')}\n}\n`;
     css += `${SELECTORS.light(t.id)} {\n${vars(app, t.light, 'light')}\n}\n`;
     if (app === 'cck') {
       css += `@media (prefers-color-scheme: light) {\n`;
-      css += `body:not(.dark-forced)[data-color-theme="${t.id}"] {\n${vars(app, t.light, 'light')}\n}\n}\n`;
+      css += `${SELECTORS.cckOsLight(t.id)} {\n${vars(app, t.light, 'light')}\n}\n}\n`;
     }
   }
   const out = join(root, app, 'public/themes.css');
   writeFileSync(out, css);
-  console.log(`${out}: ${themes.length - 1} themes, ${css.length} bytes`);
+  console.log(`${out}: ${themes.length} themes, ${css.length} bytes`);
 }
 
 const apps = process.argv.slice(2).length ? process.argv.slice(2) : Object.keys(APP_EXTRAS);
