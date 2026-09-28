@@ -297,6 +297,7 @@ function onIframeLoad(appId) {
   postTo(appId, themeMessage());
   postProjectTo(appId);
   postActiveTo(appId);
+  postTo(appId, keysMessage());
   // Posted twice: the shims gate their origin check on window.__HUB__, which they populate from
   // an async /hub-config fetch that resolves after this load event, so the first post can be
   // dropped. Safe to repeat — every shim's apply is idempotent.
@@ -304,6 +305,7 @@ function onIframeLoad(appId) {
     postTo(appId, themeMessage());
     postProjectTo(appId);
     postActiveTo(appId);
+    postTo(appId, keysMessage());
   }, 400);
 }
 
@@ -386,8 +388,21 @@ function handleForwardedKey(d) {
   else if (PALETTE_KEYS[k]) togglePalette(PALETTE_KEYS[k]);
 }
 
-// Ctrl+Alt+<letter> bindings. Sub-app shims forward every letter, so this is the one keymap.
+// Ctrl+Alt+<letter> bindings. keysMessage() lists them for the shims, so this is the one keymap.
 const PALETTE_KEYS = { p: 'project', w: 'configDir' };
+
+// The shims forward only these combos. A shim names a press as modifiers in ctrl, alt, shift,
+// meta order joined by '+' to the key, normalized as bindingKey() does.
+function keysMessage() {
+  const count = Math.min(Object.keys(apps).length, 9);
+  const keys = [
+    ...Object.keys(PALETTE_KEYS).map((k) => `ctrl+alt+${k}`),
+    'ctrl+alt+ArrowLeft',
+    'ctrl+alt+ArrowRight',
+    ...Array.from({ length: count }, (_, i) => `alt+${i + 1}`),
+  ];
+  return { type: 'hub:keys', keys };
+}
 
 // macOS composes Option+<key> into a character — Option+1 is '¡', Option+P is 'π' — and holding
 // Control does not undo it, so e.key alone cannot carry these bindings there. e.code is the

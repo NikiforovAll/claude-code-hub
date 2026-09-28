@@ -34,6 +34,7 @@ The page and the tools talk with `postMessage`. The hub accepts a message only f
 | Message | Direction | Content |
 | --- | --- | --- |
 | `hub:navigate` | Tool to hub | Switch to another tool, with an optional deep link |
+| `hub:keys` | Hub to tool | The key combos the hub binds, for example `ctrl+alt+p` and `alt+1` |
 | `hub:keydown` | Tool to hub | A hub key pressed inside the tool |
 | `hub:theme` | Both | Light/dark mode and color theme |
 | `hub:project` | Hub to tool | The project picked in the palette |
@@ -47,7 +48,7 @@ The page and the tools talk with `postMessage`. The hub accepts a message only f
 A tool that runs in the hub:
 
 1. Serves `GET /hub-config`, which returns `{enabled, url}` from `CLAUDE_HUB` and `HUB_URL`.
-2. Sends <kbd>Ctrl+Alt+Arrow</kbd>, every <kbd>Ctrl+Alt+Letter</kbd>, and <kbd>Alt+Digit</kbd> to the hub as `hub:keydown`, with `key`, `code`, and the modifiers. The hub owns the key map and ignores keys it does not bind.
+2. Sends the keys listed in `hub:keys` to the hub as `hub:keydown`, with `key`, `code`, and the modifiers, and keeps all other keys. A combo is the pressed modifiers in the order `ctrl`, `alt`, `shift`, `meta`, then the key, joined by `+`. The key is a lowercase letter or digit. Use `e.code` when `e.key` is not one, because macOS turns <kbd>Option</kbd>+<kbd>P</kbd> into `π`. Other keys, such as `ArrowLeft`, keep their `e.key` name. Until `hub:keys` arrives, send <kbd>Ctrl+Alt+Arrow</kbd>, every <kbd>Ctrl+Alt+Letter</kbd>, and <kbd>Alt+Digit</kbd>, because an older hub does not send the list.
 3. Applies `hub:theme` and `hub:project`, and sends `hub:theme` when the user changes the theme in the tool.
 4. Allows framing from the hub origin.
 
