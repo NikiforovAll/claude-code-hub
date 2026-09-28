@@ -55,7 +55,7 @@ function themeMessage() {
 }
 
 // {<themeId>: {dark, light}}, each a map of CSS variables, from /api/config, which derives it from
-// scripts/themes.json — the same registry that generates each sub-app's themes.css. Empty until
+// lib/themes.json — the same registry that generates each sub-app's themes.css. Empty until
 // config arrives, and empty if the registry is unreadable; then the hub keeps index.html's colors.
 let themePalettes = {};
 // The last applied variables, so the loading screen paints in the theme before /api/config lands.

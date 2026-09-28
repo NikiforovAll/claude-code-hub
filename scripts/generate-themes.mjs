@@ -13,7 +13,7 @@ import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const root = join(dirname(fileURLToPath(import.meta.url)), '..');
-const themes = JSON.parse(readFileSync(join(root, 'scripts/themes.json'), 'utf8'));
+const themes = JSON.parse(readFileSync(join(root, 'lib/themes.json'), 'utf8'));
 
 const hexToRgb = (hex) => {
   const n = parseInt(hex.slice(1), 16);

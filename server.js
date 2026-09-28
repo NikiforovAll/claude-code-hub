@@ -649,7 +649,7 @@ const hubVars = (p) => ({
 });
 const themePalettes = (() => {
   try {
-    const themes = JSON.parse(fs.readFileSync(path.join(__dirname, 'scripts/themes.json'), 'utf8'));
+    const themes = JSON.parse(fs.readFileSync(path.join(__dirname, 'lib/themes.json'), 'utf8'));
     return Object.fromEntries(themes.map((t) => [t.id, { dark: hubVars(t.dark), light: hubVars(t.light) }]));
   } catch {
     // Palette falls back to the --accent in index.html; not worth failing startup over.
