@@ -17,7 +17,7 @@ SRC="$ROOT/scripts/security-lib"
 # source is scripts/security-lib/<basename>. The shared test file skips whatever a
 # given package does not ship, so every package can run the same one.
 TARGETS=(
-  ".:lib/net-guard.js"
+  ".:lib/contain.js,lib/net-guard.js"
   "cck:lib/open-editor.js,lib/contain.js,lib/net-guard.js,test/security.test.js"
   "marketplace:lib/open-editor.js,lib/contain.js,lib/net-guard.js,test/security.test.js"
   "memory:lib/open-editor.js,lib/net-guard.js,test/security.test.js"

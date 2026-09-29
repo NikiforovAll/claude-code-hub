@@ -8,7 +8,7 @@ const http = require('http');
 const tcp = require('net');
 const os = require('os');
 const path = require('path');
-const { selectApps } = require('./lib/apps');
+const { selectApps, loadApp } = require('./lib/apps');
 const { stripCookie } = require('./lib/cookies');
 const { createNetGuard } = require('./lib/net-guard');
 
@@ -106,7 +106,8 @@ function saveHubConfig() {
 
 const hubConfig = loadHubConfig();
 
-const { apps: ENABLED_APPS, unknown: unknownApps } = selectApps(hubConfig.apps);
+const { apps: selectedApps, unknown: unknownApps } = selectApps(hubConfig.apps);
+const ENABLED_APPS = selectedApps.map((a) => loadApp(a));
 for (const id of unknownApps) console.log(`Unknown app "${id}" in ${HUB_CONFIG_FILE}, ignored`);
 if (!ENABLED_APPS.length) {
   console.error(`Every app is disabled in ${HUB_CONFIG_FILE}. Enable at least one.`);
@@ -366,17 +367,6 @@ process.stdin.on('data', (data) => {
 process.stdin.on('end', shutdown);
 process.stdin.on('close', shutdown);
 
-function resolveApp(submoduleDir, npmPackage) {
-  const local = path.join(__dirname, submoduleDir, 'server.js');
-  try {
-    require.resolve(local);
-    return local;
-  } catch {}
-  return require.resolve(`${npmPackage}/server.js`);
-}
-
-const appPaths = Object.fromEntries(ENABLED_APPS.map((a) => [a.id, resolveApp(a.dir, a.pkg)]));
-
 // Raise header size limit to 64KB — localhost cookies from sibling apps can pile up and
 // trip Node's default 16KB limit, breaking iframes with HTTP 431.
 const HDR_BYTES = 65536;
@@ -386,7 +376,7 @@ const NODE_HDR = `--max-http-header-size=${HDR_BYTES}`;
 // localStorage is keyed by origin, so the sub-app origin has to stay put across switches or the
 // user loses pins and filters every time the active set changes.
 function spawnChildren(pool) {
-  for (const a of ENABLED_APPS) spawnApp(pool, a.id, process.execPath, [NODE_HDR, appPaths[a.id]]);
+  for (const a of ENABLED_APPS) spawnApp(pool, a.id, process.execPath, [NODE_HDR, a.entry]);
 }
 
 const publicPorts = Object.fromEntries(

@@ -1,0 +1,25 @@
+{
+  "manifest": 1,
+  "id": "memory",
+  "name": "Memory Diagnoser",
+  "icon": "database",
+  "run": { "entry": "server.js", "defaultPort": 3544 },
+  "loading": {
+    "verbs": [
+      "Recalling memories…",
+      "Walking the tree…",
+      "Dusting off notes…",
+      "Reading CLAUDE.md…",
+      "Following imports…",
+      "Tracing the context…",
+      "Flipping through pages…",
+      "Connecting the dots…",
+      "Checking what sticks…"
+    ]
+  },
+  "actions": {
+    "handles": {
+      "project.memory": { "params": { "project": "string" }, "url": "?project={project}" }
+    }
+  }
+}

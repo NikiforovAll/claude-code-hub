@@ -19,7 +19,7 @@ CLI flags: `--port <n>`, `--marketplace-port <n>`, `--kanban-port <n>`, `--cost-
 
 ## Architecture
 
-**Apps.** `lib/apps.js` lists the four built-in apps (id, submodule dir, npm package, name, icon, default port) in default tab order; nothing else in `server.js` names them all. The hand-edited `apps` list in `~/.claude-hub/config.json` (`[{id, enabled}]`) reorders them and turns them off: a disabled app is not spawned and gets no proxy port or tab. Kanban off also turns the terminal off, and `/api/projects` fails at once (`waitForPort` does not wait for an app the pool never spawned).
+**Apps.** `lib/apps.js` lists the four built-in apps (id, submodule dir, npm package) in default tab order; nothing else in `server.js` names them all. Name, icon, entry, default port, loading verbs and actions come from the app's `hub-app.json` (in the submodule, else the npm package), else from the built-in copy in `lib/manifests/<id>.json`. A manifest that fails validation is logged and the built-in copy is used. The hand-edited `apps` list in `~/.claude-hub/config.json` (`[{id, enabled}]`) reorders them and turns them off: a disabled app is not spawned and gets no proxy port or tab. Kanban off also turns the terminal off, and `/api/projects` fails at once (`waitForPort` does not wait for an app the pool never spawned).
 
 **Hub server** (`server.js`) spawns four child processes — marketplace, kanban, cost, and memory — passing `CLAUDE_HUB=1`, `HUB_URL`, and `CLAUDE_CONFIG_DIR` env vars. It parses their stdout to detect actual ports (handles fallback when default ports are busy) and exposes `GET /api/config` returning the live app URLs.
 

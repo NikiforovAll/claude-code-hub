@@ -1,0 +1,25 @@
+{
+  "manifest": 1,
+  "id": "marketplace",
+  "name": "Marketplace",
+  "icon": "store",
+  "run": { "entry": "server.js", "defaultPort": 3542 },
+  "loading": {
+    "verbs": [
+      "Unpacking plugins…",
+      "Polishing skills…",
+      "Dusting off agents…",
+      "Wiring up hooks…",
+      "Fetching manifests…",
+      "Reading SKILL.md files…",
+      "Listing commands…",
+      "Scanning MCP servers…",
+      "Gathering plugins…"
+    ]
+  },
+  "actions": {
+    "handles": {
+      "project.plugins": { "params": { "project": "string" }, "url": "?project={project}" }
+    }
+  }
+}
