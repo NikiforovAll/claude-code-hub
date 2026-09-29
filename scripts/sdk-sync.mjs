@@ -1,5 +1,6 @@
-// Copies the SDK into an app, with a stamp line on top: the client as public/vendor/claude-hub-sdk.js
-// and the server module as lib/vendor/claude-hub-sdk.js.
+// Copies the SDK stub into an app as public/vendor/claude-hub-sdk.js, with a stamp line on top. The app
+// serves it only when run alone: under a hub, the hub hands the app its own SDK. The real client goes to
+// test/vendor, so the app's tests run against it; it is not shipped.
 //
 // Usage: node scripts/sdk-sync.mjs <app id | app dir> [...]
 
@@ -19,8 +20,8 @@ const stamped = (file) => {
   return `// claude-hub-sdk ${version} (sha256 ${hash}). Copied by npm run sdk:sync in claude-code-hub. Do not edit.\n${src}`;
 };
 const copies = [
-  ['public/vendor/claude-hub-sdk.js', stamped('client.js')],
-  ['lib/vendor/claude-hub-sdk.js', stamped('server.js')],
+  ['public/vendor/claude-hub-sdk.js', stamped('stub.js')],
+  ['test/vendor/claude-hub-sdk.js', stamped('client.js')],
 ];
 
 const targets = process.argv.slice(2);

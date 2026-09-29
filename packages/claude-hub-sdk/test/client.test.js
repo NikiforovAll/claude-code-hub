@@ -4,6 +4,7 @@ const fs = require('node:fs');
 const path = require('node:path');
 const vm = require('node:vm');
 const { createClaudeHub, comboOf } = require('../src/client');
+const stub = require('../src/stub');
 
 const HUB = 'http://localhost:3540';
 const VARS = { '--accent': '#e86f33', '--bg-deep': '#111' };
@@ -447,5 +448,57 @@ describe('standalone', () => {
   it('removes the cached set when framed by a page that is not the hub', async () => {
     const { env } = await connected({}, { config: { enabled: false }, storage: { ...CACHED } });
     assert.equal(env.style.size, 0);
+  });
+});
+
+// An app run alone serves the stub, so it must answer like the client does with no hub.
+describe('stub', () => {
+  const standalone = { 'session.cost': ({ id }) => `http://localhost:3543/?session=${id}` };
+  const both = async () => {
+    const real = await connected({ standalone }, { framed: false, config: {} });
+    const env = fakeEnv({ framed: false });
+    return { real, fake: { env, hub: stub.createClaudeHub(env.win).connect({ standalone }) } };
+  };
+
+  it('has the same API as the client', async () => {
+    const { real, fake } = await both();
+    assert.deepEqual(Object.keys(fake.hub).sort(), Object.keys(real.hub).sort());
+    for (const k of Object.keys(real.hub)) assert.equal(typeof fake.hub[k], typeof real.hub[k], k);
+  });
+
+  it('answers like the client with no hub', async () => {
+    const { real, fake } = await both();
+    for (const { env, hub } of [real, fake]) {
+      const e = ctrlAlt('p', 'KeyP');
+      assert.deepEqual(
+        {
+          status: hub.status,
+          inHub: hub.inHub,
+          themes: hub.themes,
+          can: [hub.can('session.cost'), hub.can('project.plugins')],
+          forwards: hub.forwards(e),
+          token: await hub.terminalToken(),
+          cost: await hub.invoke('session.cost', { id: 's1' }),
+          plugins: await hub.invoke('project.plugins', {}),
+        },
+        {
+          status: 'standalone',
+          inHub: false,
+          themes: [],
+          can: [true, false],
+          forwards: false,
+          token: null,
+          cost: { ok: true, handledBy: 'standalone' },
+          plugins: { ok: false, reason: 'unhandled' },
+        },
+      );
+      hub.openExternal('https://example.com/');
+      assert.deepEqual(env.opened, [
+        ['http://localhost:3543/?session=s1', '_blank', 'noopener'],
+        ['https://example.com/', '_blank', 'noopener'],
+      ]);
+      assert.equal(typeof hub.bindTheme({ get: () => ({}), set() {} }), 'function');
+      assert.deepEqual(env.sent(), []);
+    }
   });
 });

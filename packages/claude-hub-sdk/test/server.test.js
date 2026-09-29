@@ -1,6 +1,7 @@
 const { describe, it, afterEach } = require('node:test');
 const assert = require('node:assert/strict');
 const { fork } = require('node:child_process');
+const fs = require('node:fs');
 const path = require('node:path');
 
 const FIXTURE = path.join(__dirname, 'fixtures', 'app.js');
@@ -10,7 +11,7 @@ let child;
 afterEach(() => child?.kill());
 
 async function start(env = {}) {
-  child = fork(FIXTURE, { env: { ...process.env, CLAUDE_HUB: '', HUB_URL: '', HUB_SDK_SRC: '', ...env } });
+  child = fork(FIXTURE, { env: { ...process.env, CLAUDE_HUB: '', HUB_URL: '', ...env } });
   const { port } = await new Promise((resolve) => child.once('message', resolve));
   return `http://127.0.0.1:${port}`;
 }
@@ -52,11 +53,9 @@ describe('server mount', () => {
     assert.deepEqual(body, { enabled: false, url: null });
   });
 
-  it('serves the vendored client, or HUB_SDK_SRC when set', async () => {
-    const vendored = await start();
-    assert.equal(await (await fetch(`${vendored}/vendor/claude-hub-sdk.js`)).text(), '// vendored copy\n');
-    child.kill();
-    const live = await start({ HUB_SDK_SRC: CLIENT_SRC });
-    assert.match(await (await fetch(`${live}/vendor/claude-hub-sdk.js`)).text(), /createClaudeHub/);
+  it("serves the hub's client over the app's own file", async () => {
+    const url = await start();
+    const body = await (await fetch(`${url}/vendor/claude-hub-sdk.js`)).text();
+    assert.equal(body, fs.readFileSync(CLIENT_SRC, 'utf8'));
   });
 });
