@@ -568,6 +568,9 @@ function proxyHandler(name) {
         sendUnavailable(req, res, name, 502, err.message);
         return;
       }
+      console.warn(
+        `[${name}] ${req.method} ${req.url.split('?')[0]} to 127.0.0.1:${childPort} failed (${err.code}), retrying`,
+      );
       await delay(ATTEMPT_DELAY_MS);
     }
   };
