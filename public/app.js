@@ -73,6 +73,8 @@ function sendTheme(appId) {
 let themeVars = {};
 // The picker list that welcome carries.
 let hubThemes = [];
+// {<action>: {app, params, url, mode}} from the manifests, one handler each, from /api/config.
+let actions = {};
 // The hub page's names for the core variables. --bg is the apps' --bg-deep, so the loading screen
 // hands off to an iframe without a flash of another color.
 const HUB_VARS = {
@@ -174,6 +176,7 @@ async function init() {
   applyTitle(config.activeConfigDir);
   themeVars = config.themeVars ?? {};
   hubThemes = config.themes ?? [];
+  actions = config.actions ?? {};
   applyHubTheme();
   buildIframes();
   switchTab(Object.keys(apps)[0]);
@@ -298,9 +301,48 @@ function onHello(appId, data) {
     protocol: Math.max(...common),
     forward: boundCombos(),
     themes: hubThemes,
-    actions: [],
+    actions: Object.keys(actions),
   });
   sendState(appId);
+}
+
+// A url such as '@evil.example/' turns the app host into userinfo, and the token rides in the fragment.
+function navigateApp(appId, url) {
+  const src = appSrc(appId, url);
+  if (URL.canParse(src) && new URL(src).origin === originOf(appId)) iframes[appId].src = src;
+}
+
+function badParams(declared, params) {
+  if (typeof params !== 'object' || params === null || Array.isArray(params)) return true;
+  const given = Object.entries(params);
+  if (given.some(([name, value]) => !Object.hasOwn(declared, name) || typeof value !== 'string')) return true;
+  return Object.entries(declared).some(([name, type]) => type === 'string' && !Object.hasOwn(params, name));
+}
+
+// Null when the template names a param the call left out.
+function fillUrl(template, params) {
+  const slot = /\{([^}]+)\}/g;
+  if ([...template.matchAll(slot)].some(([, name]) => !Object.hasOwn(params, name))) return null;
+  return template.replace(slot, (_, name) => encodeURIComponent(params[name]));
+}
+
+// Protocol §7. The result does not wait for the handler: the hub queues nothing.
+function onInvoke(appId, { id, action, params = {} }) {
+  if (typeof id !== 'string') return;
+  const reply = (result) => postTo(appId, { type: 'hub:result', id, ...result });
+  const spec = typeof action === 'string' && Object.hasOwn(actions, action) ? actions[action] : null;
+  if (!spec) return reply({ ok: false, reason: 'unhandled' });
+  if (badParams(spec.params, params)) return reply({ ok: false, reason: 'bad-params' });
+  const { app: handler, mode, url: template } = spec;
+  switchTab(handler);
+  if (mode === 'message' && liveApps.has(handler)) {
+    postTo(handler, { type: 'hub:action', id, action, params });
+  } else {
+    // Setting src reloads the app, so a guarded app only gets the switch.
+    const url = template && fillUrl(template, params);
+    if (url && !guardedApps.has(handler)) navigateApp(handler, url);
+  }
+  reply({ ok: true, handledBy: handler });
 }
 
 function listenMessages() {
@@ -313,13 +355,12 @@ function listenMessages() {
     const data = e.data ?? {};
     if (data.type === 'hub:hello') {
       onHello(appId, data);
+    } else if (data.type === 'hub:invoke') {
+      onInvoke(appId, data);
     } else if (data.type === 'hub:navigate') {
       if (!apps[data.app]) return;
       switchTab(data.app);
-      if (typeof data.url !== 'string' || !data.url) return;
-      // A url such as '@evil.example/' turns the app host into userinfo, and the token rides in the fragment.
-      const src = appSrc(data.app, data.url);
-      if (URL.canParse(src) && new URL(src).origin === originOf(data.app)) iframes[data.app].src = src;
+      if (typeof data.url === 'string' && data.url) navigateApp(data.app, data.url);
     } else if (data.type === 'hub:keydown') {
       handleForwardedKey(data);
     } else if (data.type === 'hub:closeGuard') {

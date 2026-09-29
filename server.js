@@ -8,6 +8,7 @@ const http = require('http');
 const tcp = require('net');
 const os = require('os');
 const path = require('path');
+const { actionTable } = require('./lib/actions');
 const { selectApps, loadApp } = require('./lib/apps');
 const { stripCookie } = require('./lib/cookies');
 const { createNetGuard } = require('./lib/net-guard');
@@ -115,6 +116,7 @@ if (!ENABLED_APPS.length) {
   process.exit(1);
 }
 const appEnabled = (id) => ENABLED_APPS.some((a) => a.id === id);
+const ACTIONS = actionTable(ENABLED_APPS);
 
 // Every keystroke into cck's terminal passes through the upgrade proxy below. Windows only, for the
 // reasons in cck/lib/priority.js; the children spawned after this still start at normal.
@@ -673,7 +675,13 @@ function appsConfig() {
 }
 
 app.get('/api/config', (_req, res) => {
-  res.json({ ...THEME_CONFIG, apps: appsConfig(), activeConfigDir: hubConfig.activeConfigDir, defaultConfigDir });
+  res.json({
+    ...THEME_CONFIG,
+    apps: appsConfig(),
+    actions: ACTIONS,
+    activeConfigDir: hubConfig.activeConfigDir,
+    defaultConfigDir,
+  });
 });
 
 app.get('/api/config-dirs', (_req, res) => {
