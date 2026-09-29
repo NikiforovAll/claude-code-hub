@@ -3,6 +3,10 @@ let activeApp = null;
 const iframes = {};
 const loadedApps = new Set();
 const guardedApps = new Set();
+// App id → the topics its hub:hello subscribes to. An app is live from its hello until the next
+// iframe load: e.source is the same WindowProxy across reloads, so a new document starts unknown.
+const liveApps = new Map();
+const HUB_PROTOCOLS = [1];
 // {theme: 'dark'|'light', colorTheme: '<id>', colorThemes: {<configDir>: '<id>'}} — survives hub
 // reloads so late-loading iframes and fresh sessions get the last chosen theme. Light/dark is
 // global; the color theme is per config dir, and colorTheme is the last one picked anywhere, which
@@ -245,20 +249,44 @@ function switchTab(appId) {
 }
 
 function onIframeLoad(appId) {
+  liveApps.delete(appId);
   loadedApps.add(appId);
   guardedApps.delete(appId);
   if (appId === activeApp) hideLoading();
-  const postState = () => {
-    postTo(appId, themeMessage());
-    postProjectTo(appId);
-    postActiveTo(appId);
-    postTo(appId, { type: 'hub:keys', keys: Object.keys(bindings()) });
-  };
-  postState();
+  sendState(appId);
   // Posted twice: the shims gate their origin check on window.__HUB__, which they populate from
   // an async /hub-config fetch that resolves after this load event, so the first post can be
   // dropped. Safe to repeat — every shim's apply is idempotent.
-  setTimeout(postState, 400);
+  setTimeout(() => {
+    if (!liveApps.has(appId)) sendState(appId);
+  }, 400);
+}
+
+function boundCombos() {
+  return Object.keys(bindings());
+}
+
+// Before hello the hub cannot know the app's version, so it sends the legacy set.
+function sendState(appId) {
+  const subscribes = liveApps.get(appId);
+  if (!subscribes?.has('theme.changed')) postTo(appId, themeMessage());
+  if (!subscribes?.has('project.changed')) postProjectTo(appId);
+  postActiveTo(appId);
+  if (!subscribes) postTo(appId, { type: 'hub:keys', keys: boundCombos() });
+}
+
+function onHello(appId, data) {
+  const common = Array.isArray(data.protocol) ? HUB_PROTOCOLS.filter((v) => data.protocol.includes(v)) : [];
+  if (!common.length) return;
+  liveApps.set(appId, new Set(Array.isArray(data.subscribes) ? data.subscribes : []));
+  postTo(appId, {
+    type: 'hub:welcome',
+    protocol: Math.max(...common),
+    forward: boundCombos(),
+    themes: [],
+    actions: [],
+  });
+  sendState(appId);
 }
 
 function listenMessages() {
@@ -269,7 +297,9 @@ function listenMessages() {
     const appId = appIdOf(e.source);
     if (!appId || e.origin !== originOf(appId)) return;
     const data = e.data ?? {};
-    if (data.type === 'hub:navigate') {
+    if (data.type === 'hub:hello') {
+      onHello(appId, data);
+    } else if (data.type === 'hub:navigate') {
       if (!apps[data.app]) return;
       switchTab(data.app);
       if (typeof data.url !== 'string' || !data.url) return;
