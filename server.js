@@ -42,7 +42,7 @@ function activePool() {
 // Every sub-app resolves CLAUDE_CONFIG_DIR once at startup into a module constant, so switching
 // the dir means restarting the children. Kept on the server, not in the browser: the dir has to
 // be known before the first spawn, and the hub already has one localStorage key to reason about.
-const HUB_DIR = path.join(os.homedir(), '.claude-hub');
+const HUB_DIR = path.resolve(expandHome(getArg('hub-dir') || process.env.CLAUDE_HUB_DIR || '~/.claude-hub'));
 const HUB_CONFIG_FILE = path.join(HUB_DIR, 'config.json');
 
 // The dir the hub would use with no saved config. Set by loadHubConfig; the client uses it to keep
@@ -107,7 +107,7 @@ function saveHubConfig() {
 const hubConfig = loadHubConfig();
 
 const { apps: selectedApps, unknown: unknownApps } = selectApps(hubConfig.apps);
-const ENABLED_APPS = selectedApps.map((a) => loadApp(a));
+const ENABLED_APPS = selectedApps.map((a) => loadApp(a, { flagPort: getArg(`${a.id}-port`) }));
 for (const id of unknownApps) console.log(`Unknown app "${id}" in ${HUB_CONFIG_FILE}, ignored`);
 if (!ENABLED_APPS.length) {
   console.error(`Every app is disabled in ${HUB_CONFIG_FILE}. Enable at least one.`);
@@ -379,9 +379,7 @@ function spawnChildren(pool) {
   for (const a of ENABLED_APPS) spawnApp(pool, a.id, process.execPath, [NODE_HDR, a.entry]);
 }
 
-const publicPorts = Object.fromEntries(
-  ENABLED_APPS.map((a) => [a.id, parseInt(getArg(`${a.id}-port`) || String(a.port), 10)]),
-);
+const publicPorts = Object.fromEntries(ENABLED_APPS.map((a) => [a.id, a.port]));
 
 function rewriteOrigin(origin, publicPort, childPort) {
   try {

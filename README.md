@@ -116,8 +116,13 @@ By default the hub runs all four tools. To turn a tool off or change the tab ord
 - The ids are `kanban`, `marketplace`, `cost` and `memory`.
 - The tools you list come first, in list order. The tools you do not list follow in the default order.
 - A tool with `"enabled": false` does not start and gets no tab. Links from other tools to it do nothing.
+- `"port": 4543` sets the tool's port. See [Ports](https://nikiforovall.blog/claude-code-hub/reference/configuration/#ports) for the order and the busy-port fallback.
 - With Kanban off, the embedded terminal is off, and the project palette has no project list. You can still type a path.
 - Restart the hub after you edit the file.
+
+## Run a second hub
+
+Give the second hub its own folder for the config file and token with `--hub-dir <path>` or `CLAUDE_HUB_DIR`. See [Run a second hub](https://nikiforovall.blog/claude-code-hub/reference/configuration/#run-a-second-hub).
 
 ## Embedded terminal
 

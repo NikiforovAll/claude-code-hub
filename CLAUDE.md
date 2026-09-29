@@ -15,7 +15,11 @@ npm run dev              # Start with auto-open browser
 
 The hub is usually already running on :3540. Check it with `curl -s -o /dev/null -w '%{http_code}' http://localhost:3540/api/config` (401 without the token still means it is up; add `?token=$(cat ~/.claude-hub/token)` to read it). Use it only for read-only checks. To test a fix, start a second hub on other ports (`--port`, `--marketplace-port`, `--kanban-port`, `--cost-port`, `--memory-port`) so the running one is not disturbed.
 
-CLI flags: `--port <n>`, `--marketplace-port <n>`, `--kanban-port <n>`, `--cost-port <n>`, `--memory-port <n>`, `--pool-size <n>`, `--open`
+CLI flags: `--port <n>`, `--<id>-port <n>` (`kanban`, `marketplace`, `cost`, `memory`), `--hub-dir <path>`, `--pool-size <n>`, `--open`
+
+**Hub dir.** `--hub-dir`, else `CLAUDE_HUB_DIR`, else `~/.claude-hub`. It holds `config.json` and `token`. A test hub can use its own dir instead of overriding `USERPROFILE`.
+
+**App ports.** `--<id>-port`, else `port` in the app's `apps` entry in `config.json`, else the manifest's `run.defaultPort`. A busy port falls back to a random one for that run. Nothing saves it: the port is the app's origin, so the app has empty `localStorage` for that run.
 
 ## Architecture
 

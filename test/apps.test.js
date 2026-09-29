@@ -23,6 +23,12 @@ describe('selectApps', () => {
     );
     assert.deepEqual(unknown, ['nope']);
   });
+
+  it('carries the port of the entry', () => {
+    const { apps } = selectApps([{ id: 'cost', port: 4643 }]);
+    assert.equal(apps.find((a) => a.id === 'cost').port, 4643);
+    assert.equal(apps.find((a) => a.id === 'memory').port, undefined);
+  });
 });
 
 describe('built-in manifests', () => {
@@ -106,6 +112,28 @@ describe('loadApp', () => {
     assert.equal(app.name, 'Spend');
     assert.equal(app.port, 0);
     assert.deepEqual(app.loading, {});
+  });
+
+  describe('port', () => {
+    const portOf = (port, flagPort) => {
+      submodule();
+      return loadApp({ ...COST, port }, { flagPort, hubRoot, resolve: noPackage, log }).port;
+    };
+    const defaultPort = builtInManifest('cost').run.defaultPort;
+
+    it('takes the flag, then the config entry, then the manifest', () => {
+      assert.equal(portOf(4643, '4743'), 4743);
+      assert.equal(portOf(4643), 4643);
+      assert.equal(portOf(undefined), defaultPort);
+      assert.deepEqual(logs, []);
+    });
+
+    it('logs and skips a value that is not a port', () => {
+      assert.equal(portOf('4643', 'abc'), defaultPort);
+      assert.equal(logs.length, 2);
+      assert.match(logs[0], /--cost-port is not a valid port/);
+      assert.match(logs[1], /"port" of "cost" in config.json is not a valid port/);
+    });
   });
 
   it('falls back to the built-in manifest when the file is invalid', () => {
