@@ -19,7 +19,7 @@
   },
   "actions": {
     "handles": {
-      "project.memory": { "params": { "project": "string?" }, "url": "?project={project}" }
+      "project.memory": { "params": { "project": "string?" }, "url": "?project={project}", "mode": "message" }
     }
   }
 }

@@ -19,7 +19,7 @@
   },
   "actions": {
     "handles": {
-      "project.plugins": { "params": { "project": "string?" }, "url": "?project={project}" }
+      "project.plugins": { "params": { "project": "string?" }, "url": "?project={project}", "mode": "message" }
     }
   }
 }
