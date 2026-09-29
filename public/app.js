@@ -55,17 +55,15 @@ function osTheme() {
 
 // Sub-apps disagree on their first-run default (marketplace follows the OS, the rest start dark),
 // so an unset theme resolves to the OS preference here and reaches every iframe on load.
-function themeMessage() {
-  return { type: 'hub:theme', theme: themeState.theme ?? osTheme(), colorTheme: activeColorTheme() };
+function themePayload() {
+  return { theme: themeState.theme ?? osTheme(), colorTheme: activeColorTheme() };
 }
 
 // A live app gets the vars too: once welcome listed themes, it ignores a hub:theme with none.
 function sendTheme(appId) {
-  const subscribes = liveApps.get(appId);
-  if (subscribes?.has('theme.changed')) return;
-  const message = themeMessage();
-  const vars = themeVars[message.colorTheme ?? 'ember']?.[message.theme];
-  postTo(appId, subscribes && vars ? { ...message, vars } : message);
+  const payload = themePayload();
+  const vars = themeVars[payload.colorTheme ?? 'ember']?.[payload.theme];
+  sendTopic(appId, 'theme.changed', liveApps.has(appId) && vars ? { ...payload, vars } : payload, 'hub:theme');
 }
 
 // {<themeId>: {dark, light}}, each a map of the apps' core CSS variables, from /api/config, which
@@ -124,15 +122,6 @@ function parentOf(p) {
   return i <= 0 ? '' : p.slice(0, i);
 }
 
-function projectMessage() {
-  return {
-    type: 'hub:project',
-    project: projectState.project,
-    encoded: projectState.encoded,
-    name: projectState.name,
-  };
-}
-
 function originOf(appId) {
   return new URL(apps[appId].url).origin;
 }
@@ -149,22 +138,21 @@ function appIdOf(source) {
   return Object.keys(iframes).find((id) => iframes[id].contentWindow === source);
 }
 
-// exceptWindow lets an echo of a sub-app's own message skip that sub-app.
-function broadcast(message, exceptWindow) {
-  for (const [id, iframe] of Object.entries(iframes)) {
-    if (exceptWindow && iframe.contentWindow === exceptWindow) continue;
-    postTo(id, message);
-  }
+// A live app that subscribes to the topic gets it as a hub:event, every other app as the legacy
+// message. The last value lives in themeState and projectState, so a replay after welcome is a send.
+function sendTopic(appId, topic, payload, legacyType) {
+  const subscribed = liveApps.get(appId)?.has(topic);
+  postTo(appId, subscribed ? { type: 'hub:event', topic, payload } : { type: legacyType, ...payload });
 }
 
 function setProject(absPath) {
   projectState = { project: absPath, encoded: encodeProjectPath(absPath), name: basename(absPath) };
-  broadcast(projectMessage());
+  for (const id of Object.keys(iframes)) sendProject(id);
 }
 
-function postProjectTo(appId) {
+function sendProject(appId) {
   if (!projectState) return;
-  postTo(appId, projectMessage());
+  sendTopic(appId, 'project.changed', projectState, 'hub:project');
 }
 
 // Sub-apps can't detect this themselves: inactive iframes are display:none, and a nested
@@ -295,11 +283,10 @@ function boundCombos() {
 
 // Before hello the hub cannot know the app's version, so it sends the legacy set.
 function sendState(appId) {
-  const subscribes = liveApps.get(appId);
   sendTheme(appId);
-  if (!subscribes?.has('project.changed')) postProjectTo(appId);
+  sendProject(appId);
   postActiveTo(appId);
-  if (!subscribes) postTo(appId, { type: 'hub:keys', keys: boundCombos() });
+  if (!liveApps.has(appId)) postTo(appId, { type: 'hub:keys', keys: boundCombos() });
 }
 
 function onHello(appId, data) {
