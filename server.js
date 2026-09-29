@@ -150,6 +150,10 @@ const TOKEN_COOKIE = 'hub_token';
 const TOKEN_COOKIE_RE = /(?:^|;\s*)hub_token=([^;]*)/;
 const TOKEN_COOKIE_MAX_AGE_MS = 400 * 24 * 60 * 60 * 1000;
 const LOCKED_PAGE = path.join(__dirname, 'public', 'locked.html');
+// Only a repo checkout has packages/: the npm package does not ship it. An app serves this file in
+// place of its vendored copy, so an SDK edit shows up with no sync.
+const SDK_SRC = path.join(__dirname, 'packages', 'claude-hub-sdk', 'src', 'client.js');
+const HUB_SDK_SRC = fs.existsSync(SDK_SRC) ? SDK_SRC : null;
 
 function loadHubToken() {
   try {
@@ -198,6 +202,7 @@ function childEnv(pool, name) {
     HOST: net.BIND_HOST,
     ALLOWED_HOSTS: net.ALLOWED_HOSTS,
   };
+  if (HUB_SDK_SRC) env.HUB_SDK_SRC = HUB_SDK_SRC;
   if (name === 'kanban' && TERMINAL.enabled) {
     env.CCK_TERMINAL = JSON.stringify(TERMINAL);
     env.CCK_TERMINAL_TOKEN = TERMINAL_TOKEN;

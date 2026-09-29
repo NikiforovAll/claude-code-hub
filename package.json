@@ -17,6 +17,7 @@
     "prepare": "husky",
     "check:escaping": "node scripts/check-escaping.mjs",
     "check:security-lib": "bash scripts/sync-security-lib.sh --check",
+    "sdk:sync": "node scripts/sdk-sync.mjs",
     "perf": "node scripts/perf.mjs run",
     "perf:compare": "node scripts/perf.mjs compare",
     "perf:report": "node scripts/perf.mjs report",

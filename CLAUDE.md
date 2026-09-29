@@ -25,7 +25,7 @@ CLI flags: `--port <n>`, `--<id>-port <n>` (`kanban`, `marketplace`, `cost`, `me
 
 **Apps.** `lib/apps.js` lists the four built-in apps (id, submodule dir, npm package) in default tab order; nothing else in `server.js` names them all. Name, icon, entry, default port, loading verbs and actions come from the app's `hub-app.json` (in the submodule, else the npm package), else from the built-in copy in `lib/manifests/<id>.json`. A manifest that fails validation is logged and the built-in copy is used. The hand-edited `apps` list in `~/.claude-hub/config.json` (`[{id, enabled}]`) reorders them and turns them off: a disabled app is not spawned and gets no proxy port or tab. Kanban off also turns the terminal off, and `/api/projects` fails at once (`waitForPort` does not wait for an app the pool never spawned).
 
-**Hub server** (`server.js`) spawns four child processes — marketplace, kanban, cost, and memory — passing `CLAUDE_HUB=1`, `HUB_URL`, and `CLAUDE_CONFIG_DIR` env vars. It parses their stdout to detect actual ports (handles fallback when default ports are busy) and exposes `GET /api/config` returning the live app URLs.
+**Hub server** (`server.js`) spawns four child processes — marketplace, kanban, cost, and memory — passing `CLAUDE_HUB=1`, `HUB_URL`, and `CLAUDE_CONFIG_DIR` env vars, plus `HUB_SDK_SRC` when it runs from the repo. It parses their stdout to detect actual ports (handles fallback when default ports are busy) and exposes `GET /api/config` returning the live app URLs.
 
 **Config dirs.** The hub keeps a list of Claude config dirs and the active one in `~/.claude-hub/config.json` (`GET/POST/DELETE /api/config-dirs`, `POST /api/config-dirs/activate`). Every sub-app resolves `CLAUDE_CONFIG_DIR` once at startup, so each dir gets its own set of four children. Sets stay alive after a switch (LRU pool, `--pool-size`, default 3) so switching back is instant; the activate response carries that set's app URLs (fallback ports when the defaults are taken) and the client reloads every iframe. Removing a dir kills its set. cck's hooks and statusLine are installed per dir, so a dir without them shows tasks and sessions but no live agent activity.
 
@@ -64,6 +64,10 @@ All sub-apps expose `GET /hub-config` (returns `{enabled, url}` from env vars) a
 - `initHub()` — fetches config, stores in `window.__HUB__`
 - Keyboard forwarding: a shim forwards a press (`key`, `code`, modifiers) only when its combo name is in the `hub:keys` list; every other key stays in the app, cck's terminal included. A new hub shortcut goes in `bindings()` and needs no submodule change. Each shim's `hubCombo()` is a copy of the hub's `comboOf()`; the combo format is in `website/src/content/docs/reference/architecture.md`. Until a list arrives the shim uses the old filter (`Ctrl+Alt+Arrow`, any `Ctrl+Alt+<letter>`, `Alt+digit`), which an older hub expects. The hub must not bind cck's `Ctrl+Alt+N` (New session), `Ctrl+Alt+R` (Resume session) or `Ctrl+Alt+S` (Swap to previous session).
 - `hubNavigate(app, url)` — callable API for cross-app deep links (no-op when standalone)
+
+## SDK
+
+`packages/claude-hub-sdk/src/client.js` is the app side of the hub protocol, a classic script that sets `window.ClaudeHub`. It is not published. `npm run sdk:sync -- <app id | dir>` copies it, with a stamp line, to `<app>/public/vendor/claude-hub-sdk.js`. In a repo checkout the hub passes `HUB_SDK_SRC` (the source path) to its children, so an app can serve the live source in place of its copy. `npm test` runs its tests; one of them checks its `comboOf` against the hub's.
 
 ## Website
 
