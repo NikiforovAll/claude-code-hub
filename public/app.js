@@ -187,57 +187,17 @@ function appSrc(id, path = '') {
   return apps[id].url + path + (token ? `#t=${token}` : '');
 }
 
-const LOADING_VERBS = {
-  kanban: [
-    'Shuffling cards…',
-    'Herding tasks…',
-    'Waking sessions…',
-    'Sorting the board…',
-    'Pinning sticky notes…',
-    'Moving cards to done…',
-    'Nudging agents…',
-    'Drawing columns…',
-    'Reading the backlog…',
-  ],
-  cost: [
-    'Counting tokens…',
-    'Tallying the bill…',
-    'Stacking bars…',
-    'Crunching numbers…',
-    'Checking the cache hits…',
-    'Adding up the days…',
-    'Balancing the books…',
-    'Plotting the trend…',
-    'Weighing the models…',
-  ],
-  memory: [
-    'Recalling memories…',
-    'Walking the tree…',
-    'Dusting off notes…',
-    'Reading CLAUDE.md…',
-    'Following imports…',
-    'Tracing the context…',
-    'Flipping through pages…',
-    'Connecting the dots…',
-    'Checking what sticks…',
-  ],
-  marketplace: [
-    'Unpacking plugins…',
-    'Polishing skills…',
-    'Dusting off agents…',
-    'Wiring up hooks…',
-    'Fetching manifests…',
-    'Reading SKILL.md files…',
-    'Listing commands…',
-    'Scanning MCP servers…',
-    'Gathering plugins…',
-  ],
-};
+// From each app's manifest. Before /api/config lands there are none, and the first line is generic.
+function loadingVerbs() {
+  const own = apps[activeApp]?.loading?.verbs ?? [];
+  const verbs = own.length ? own : Object.values(apps).flatMap((a) => a.loading?.verbs ?? []);
+  return verbs.length ? verbs : ['Loading…'];
+}
 
 let loadingTimer = null;
 
 function showLoading() {
-  const verbs = LOADING_VERBS[activeApp] ?? Object.values(LOADING_VERBS).flat();
+  const verbs = loadingVerbs();
   const text = document.getElementById('loading-text');
   let i = Math.floor(Math.random() * verbs.length);
   text.textContent = verbs[i];

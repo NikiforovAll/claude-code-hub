@@ -679,7 +679,7 @@ const themePalettes = (() => {
 function appsConfig() {
   return Object.fromEntries(
     ENABLED_APPS.map((a) => {
-      const entry = { name: a.name, url: `http://localhost:${publicPorts[a.id]}`, icon: a.icon };
+      const entry = { name: a.name, url: `http://localhost:${publicPorts[a.id]}`, icon: a.icon, loading: a.loading };
       if (a.id === 'kanban' && TERMINAL_TOKEN) entry.terminalToken = TERMINAL_TOKEN;
       return [a.id, entry];
     }),
