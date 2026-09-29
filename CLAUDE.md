@@ -33,17 +33,17 @@ CLI flags: `--port <n>`, `--<id>-port <n>` (`kanban`, `marketplace`, `cost`, `me
 
 **Hub client** (`public/app.js`) fetches config, creates one iframe per app, and switches visibility on tab change. No visible chrome — switching is keyboard-only via `Ctrl+Alt+Left/Right`. `Ctrl+Alt+P` opens the project palette, `Ctrl+Alt+W` the config-dir palette (same widget, typing a path adds a new dir).
 
-**postMessage protocol** enables cross-app communication:
-- `hub:navigate` — sub-app requests the hub to switch to another app (with optional deep link URL)
-- `hub:keys` — hub → sub-apps, `{keys}`: the combos the hub binds (`ctrl+alt+p`, `ctrl+alt+ArrowLeft`, `alt+1` … `alt+N` for N enabled apps), the keys of `bindings()`. Posted on iframe load and in the 400 ms re-post.
-- `hub:keydown` — sub-app forwards keyboard shortcuts that don't bubble out of iframes
-- `hub:theme` — light/dark + color theme, echoed both ways so a change in one app reaches all
-- `hub:project` — hub → sub-apps, the current project scope (the hub owns the abs-path → encoded transform)
+**postMessage protocol (v1)** enables cross-app communication:
+- `hub:hello` / `hub:welcome` — the app says hello with the topics it subscribes to; the hub answers with `forward` (the combos it binds, the keys of `bindings()`: `ctrl+alt+p`, `ctrl+alt+ArrowLeft`, `alt+1` … `alt+N` for N enabled apps), `themes` and `actions`. The hub sends nothing else to an app until its hello. An app with no welcome after 2 s runs as if alone.
+- `hub:event` — hub → sub-apps, a topic the app subscribed to: `theme.changed` (light/dark, color theme and vars) and `project.changed` (the hub owns the abs-path → encoded transform). Both are replayed on hello. A document the hub loaded from an action URL skips the `project.changed` replay once, so the link keeps its project.
+- `hub:invoke` / `hub:result` / `hub:action` — an app calls a hub action; the hub routes it to the target app as `hub:action` or loads its URL
+- `hub:keydown` — sub-app forwards the `welcome.forward` presses that don't bubble out of iframes, with `key`, `code` and modifiers
+- `hub:theme` — app → hub, a theme change in the app; the hub sends `theme.changed` to every app, the sender too, for the vars
 - `hub:active` — hub → sub-apps, whether that app is the one on screen. Sub-apps can't detect this themselves: inactive iframes are `display:none`, and a nested document's `visibilityState` follows the top-level tab regardless. Cost uses it to gate auto-refresh.
 - `hub:closeGuard` — sub-app → hub, `{on}`. While any app has it on, the hub asks before the window closes. cck turns it on while its embedded terminal is attached, because Ctrl+W meant for the terminal closes the window. Cleared on iframe load.
 - `hub:terminalToken` — cck → hub asks, hub → cck answers `{token}`. The hub mints the terminal token per run and hands it over in the iframe's `#t=` fragment, so a page that outlived a hub restart holds a dead one. On a 401 or a token refusal cck asks once; the hub re-reads `/api/config`, because its own page may have outlived the restart too.
 
-Origin validation on the hub side restricts messages to known sub-app origins; each sub-app shim checks `e.source === window.parent` and the hub's origin. `hub:project`/`hub:active` are re-posted 400 ms after an iframe load because the shims gate on `window.__HUB__`, which arrives from an async `/hub-config` fetch — every apply is idempotent.
+Origin validation on the hub side restricts messages to known sub-app origins; the SDK checks `e.source === window.parent` and the hub's origin.
 
 ## Git Submodules
 
@@ -63,8 +63,8 @@ Each sub-app has its own linter (Biome) and pre-commit hooks. The hub root does 
 All sub-apps expose `GET /hub-config` (returns `{enabled, url}` from env vars) and have a `HUB_INTEGRATION` region in their `public/app.js`.
 
 **On the SDK (all four apps).** The page loads `/vendor/claude-hub-sdk.js` as the first element in `<body>`, and the server serves it from `HUB_SDK_SRC`, else the vendored copy. The region calls `ClaudeHub.connect()`, which fetches `/hub-config` and forwards keys, and uses `subscribe`, `bindTheme`, `onActive`, `handle`, `invoke`, `can`, `closeGuard`, `openExternal` and `terminalToken` in place of the raw messages. `hub.inHub` is true once `/hub-config` says a hub frames the page. Each app ships a `hub-app.json` that matches `lib/manifests/<id>.json`. Marketplace and Memory apply the `project` (absolute path) of `project.changed`; Cost applies `encoded`.
-- Keyboard forwarding: the SDK forwards a press (`key`, `code`, modifiers) only when its combo name is in `welcome.forward`, else in the `hub:keys` list; every other key stays in the app. Its `comboOf()` is a copy of the hub's; the combo format is in `website/src/content/docs/reference/architecture.md`. Until a list arrives it uses the old filter (`Ctrl+Alt+Arrow`, any `Ctrl+Alt+<letter>`, `Alt+digit`), which an older hub expects.
-- cck opens Cost, Marketplace and Memory with `hub.invoke('session.cost' | 'project.plugins' | 'project.memory')` and shows each link button only when `hub.can` says so. It passes `legacy` (the `hub:navigate` URLs for a hub with no welcome) and `standalone` as a function, because `--cost-url`, `--marketplace-url` and `--memory-url` arrive with `/api/config` after connect. It passes `reserved`, so the SDK never forwards `Ctrl+Alt+N`, `R` or `S`, and its terminal key filter asks `hub.forwards(e)`, because xterm eats a key before the SDK's document listener sees it. `setupEventSource` runs before the region connects, so it hands its `hub:active` handler over through `onHubActive`.
+- Keyboard forwarding: the SDK forwards a press (`key`, `code`, modifiers) only when its combo name is in `welcome.forward`; every other key stays in the app, and before welcome it forwards nothing. Its `comboOf()` is a copy of the hub's; the combo format is in `website/src/content/docs/reference/architecture.md`.
+- cck opens Cost, Marketplace and Memory with `hub.invoke('session.cost' | 'project.plugins' | 'project.memory')` and shows each link button only when `hub.can` says so. It passes `standalone` as a function, because `--cost-url`, `--marketplace-url` and `--memory-url` arrive with `/api/config` after connect. Its terminal key filter asks `hub.forwards(e)`, because xterm eats a key before the SDK's document listener sees it. `setupEventSource` runs before the region connects, so it hands its `hub:active` handler over through `onHubActive`.
 
 A new hub shortcut goes in `bindings()` and needs no submodule change. The hub must not bind cck's `Ctrl+Alt+N` (New session), `Ctrl+Alt+R` (Resume session) or `Ctrl+Alt+S` (Swap to previous session).
 

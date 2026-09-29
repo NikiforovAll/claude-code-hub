@@ -93,6 +93,7 @@ async function connected(opts = {}, envOpts = {}) {
 }
 
 const welcome = (extra = {}) => ({ type: 'hub:welcome', protocol: 1, forward: [], themes: [], actions: [], ...extra });
+const themeEvent = (payload) => ({ type: 'hub:event', topic: 'theme.changed', payload });
 
 describe('handshake', () => {
   it('sends hello once, after load and /hub-config, to the hub origin', async () => {
@@ -149,74 +150,47 @@ describe('handshake', () => {
   });
 });
 
-describe('legacy hub', () => {
-  it('falls back 2 s after hello with no welcome', async () => {
-    const { env, hub } = await connected();
-    env.endWait();
-    assert.equal(hub.status, 'legacy');
-  });
-
-  it('maps hub:project and hub:theme to the topics', async () => {
-    const { env, hub } = await connected();
-    const got = [];
-    hub.subscribe('project.changed', (p) => got.push(['project', p]));
-    hub.subscribe('theme.changed', (p) => got.push(['theme', p]));
-    env.fromHub({ type: 'hub:project', project: 'C:/p', encoded: 'C--p', name: 'p' });
-    env.fromHub({ type: 'hub:theme', theme: 'light', colorTheme: 'ember' });
-    assert.deepEqual(got, [
-      ['project', { project: 'C:/p', encoded: 'C--p', name: 'p' }],
-      ['theme', { theme: 'light', colorTheme: 'ember' }],
-    ]);
-  });
-
-  it('sends hub:navigate for invoke once the wait ends', async () => {
-    const legacy = { 'session.cost': (p) => ({ app: 'cost', url: `?view=detail&session=${p.session}` }) };
-    const { env, hub } = await connected({ legacy });
-    assert.equal(hub.can('session.cost'), true);
+describe('no welcome', () => {
+  it('stops waiting 2 s after hello and calls no hub', async () => {
+    const standalone = { 'session.cost': () => 'http://localhost:3543/' };
+    const { env, hub } = await connected({ standalone });
     const result = hub.invoke('session.cost', { session: 's1' });
     await settle();
-    assert.equal(env.sent().length, 1);
     env.endWait();
-    assert.deepEqual(await result, { ok: true, handledBy: 'cost' });
-    assert.deepEqual(env.sent()[1], { type: 'hub:navigate', app: 'cost', url: '?view=detail&session=s1' });
-    assert.deepEqual(await hub.invoke('project.memory'), { ok: false, reason: 'unhandled' });
-    assert.equal(hub.can('project.memory'), false);
+    assert.equal(hub.status, 'unanswered');
+    assert.deepEqual(await result, { ok: false, reason: 'unhandled' });
+    assert.equal(hub.can('session.cost'), false);
+    assert.deepEqual(env.sent().slice(1), []);
+    assert.deepEqual(env.opened, []);
   });
 
-  it('forwards by hub:keys when the list comes', async () => {
-    const { env } = await connected();
-    env.fromHub({ type: 'hub:keys', keys: ['ctrl+alt+p'] });
-    assert.equal(env.key(ctrlAlt('p', 'KeyP')).prevented, true);
-    assert.equal(env.key(ctrlAlt('q', 'KeyQ')).prevented, false);
+  it('forwards no key before welcome', async () => {
+    const { env, hub } = await connected();
+    assert.equal(env.key(ctrlAlt('p', 'KeyP')).prevented, false);
+    assert.equal(hub.forwards(ctrlAlt('p', 'KeyP')), false);
   });
 
-  it('ignores the legacy forms after welcome', async () => {
+  it('ignores the v0 messages hub:keys, hub:project and hub:theme', async () => {
     const env = fakeEnv();
     const hub = createClaudeHub(env.win).connect();
     const got = [];
     hub.subscribe('project.changed', (p) => got.push(p));
+    hub.subscribe('theme.changed', (p) => got.push(p));
     await settle();
+    const v0 = () => {
+      env.fromHub({ type: 'hub:keys', keys: ['ctrl+alt+p'] });
+      env.fromHub({ type: 'hub:project', project: 'C:/p', encoded: 'C--p', name: 'p' });
+      env.fromHub({ type: 'hub:theme', theme: 'light', colorTheme: 'ember', vars: VARS });
+    };
+    v0();
     env.fromHub(welcome({ forward: ['alt+1'] }));
-    env.fromHub({ type: 'hub:keys', keys: ['ctrl+alt+p'] });
-    env.fromHub({ type: 'hub:project', project: 'C:/p', encoded: 'C--p', name: 'p' });
+    v0();
     assert.equal(env.key(ctrlAlt('p', 'KeyP')).prevented, false);
+    assert.equal(env.style.size, 0);
     assert.deepEqual(got, []);
     const payload = { project: 'C:/q', encoded: 'C--q', name: 'q' };
     env.fromHub({ type: 'hub:event', topic: 'project.changed', payload });
     assert.deepEqual(got, [payload]);
-  });
-});
-
-describe('late subscribe', () => {
-  it('keeps legacy messages for a topic not in hello', async () => {
-    const env = fakeEnv();
-    const hub = createClaudeHub(env.win).connect();
-    await settle();
-    const got = [];
-    hub.subscribe('project.changed', (p) => got.push(p.encoded));
-    env.fromHub(welcome());
-    env.fromHub({ type: 'hub:project', project: 'C:/p', encoded: 'C--p', name: 'p' });
-    assert.deepEqual(got, ['C--p']);
   });
 });
 
@@ -237,12 +211,12 @@ describe('theme', () => {
 
   it('puts vars on body, caches them and applies only a change', async () => {
     const { env } = await connected();
-    env.fromHub({ type: 'hub:theme', theme: 'dark', colorTheme: 'ember', vars: VARS });
-    env.fromHub({ type: 'hub:theme', theme: 'dark', colorTheme: 'ember', vars: { ...VARS } });
+    env.fromHub(themeEvent({ theme: 'dark', colorTheme: 'ember', vars: VARS }));
+    env.fromHub(themeEvent({ theme: 'dark', colorTheme: 'ember', vars: { ...VARS } }));
     assert.equal(env.style.get('--accent'), '#e86f33');
     assert.equal(env.styleCalls.length, 2);
     assert.deepEqual(JSON.parse(env.storage['claude-hub:vars']), VARS);
-    env.fromHub({ type: 'hub:theme', theme: 'dark', colorTheme: 'ember', vars: { '--accent': '#000' } });
+    env.fromHub(themeEvent({ theme: 'dark', colorTheme: 'ember', vars: { '--accent': '#000' } }));
     assert.deepEqual([...env.style.keys()], ['--accent']);
   });
 
@@ -255,52 +229,28 @@ describe('theme', () => {
     assert.equal(top.style.size, 0);
   });
 
-  it('keeps the cached set through a legacy hub:theme, then drops it when no welcome comes', async () => {
-    const env = fakeEnv({ storage: { ...CACHED } });
-    const hub = createClaudeHub(env.win).connect();
-    const b = binding();
-    hub.bindTheme(b);
-    await settle();
-    env.fromHub({ type: 'hub:theme', theme: 'light', colorTheme: 'ember' });
+  it('keeps the cached set while it waits, then drops it when no welcome comes', async () => {
+    const { env } = await connected({}, { storage: { ...CACHED } });
     assert.equal(env.style.get('--accent'), '#e86f33');
-    assert.deepEqual(b.sets, [{ theme: 'light', colorTheme: 'ember' }]);
     env.endWait();
     assert.equal(env.style.size, 0);
     assert.equal(env.storage['claude-hub:vars'], undefined);
   });
 
-  it('removes the vars on a hub:theme with no vars from a legacy hub', async () => {
+  it('removes the vars on a theme.changed with no vars from a hub with no registry', async () => {
     const { env } = await connected();
-    env.fromHub({ type: 'hub:theme', theme: 'dark', colorTheme: 'ember', vars: VARS });
-    env.endWait();
-    env.fromHub({ type: 'hub:theme', theme: 'dark', colorTheme: 'ember' });
+    env.fromHub(themeEvent({ theme: 'dark', colorTheme: 'ember', vars: VARS }));
+    env.fromHub(welcome());
+    env.fromHub(themeEvent({ theme: 'dark', colorTheme: 'ember' }));
     assert.equal(env.style.size, 0);
-  });
-
-  it('ignores a hub:theme with no vars after a welcome with themes', async () => {
-    const { env } = await connected();
-    env.fromHub(welcome({ themes: [{ id: 'ember' }] }));
-    env.fromHub({ type: 'hub:theme', theme: 'dark', colorTheme: 'ember', vars: VARS });
-    env.fromHub({ type: 'hub:theme', theme: 'light', colorTheme: 'ember' });
-    assert.equal(env.style.get('--accent'), '#e86f33');
-  });
-
-  it('applies theme.changed events', async () => {
-    const env = fakeEnv();
-    const hub = createClaudeHub(env.win).connect();
-    hub.subscribe('theme.changed', () => {});
-    await settle();
-    env.fromHub(welcome({ themes: [{ id: 'ember' }] }));
-    const payload = { theme: 'dark', colorTheme: 'ember', vars: VARS };
-    env.fromHub({ type: 'hub:event', topic: 'theme.changed', payload });
-    assert.equal(env.style.get('--accent'), '#e86f33');
   });
 
   it('reports a user change once and does not echo a hub change', async () => {
     const { env, hub } = await connected();
     const b = binding();
     const report = hub.bindTheme(b);
-    env.fromHub({ type: 'hub:theme', theme: 'light', colorTheme: 'ember' });
+    env.fromHub(themeEvent({ theme: 'light', colorTheme: 'ember' }));
+    assert.deepEqual(b.sets, [{ theme: 'light', colorTheme: 'ember' }]);
     report();
     assert.deepEqual(env.sent().slice(1), []);
     b.state.colorTheme = 'ocean';
@@ -313,11 +263,11 @@ describe('theme', () => {
     const { env, hub } = await connected();
     const b = binding();
     const report = hub.bindTheme(b);
-    env.fromHub({ type: 'hub:theme', theme: 'dark', colorTheme: 'ember', vars: VARS });
+    env.fromHub(themeEvent({ theme: 'dark', colorTheme: 'ember', vars: VARS }));
     b.state.theme = 'light';
     report();
     assert.equal(env.style.size, 0);
-    env.fromHub({ type: 'hub:theme', theme: 'light', colorTheme: 'ember', vars: { '--accent': '#c85a1f' } });
+    env.fromHub(themeEvent({ theme: 'light', colorTheme: 'ember', vars: { '--accent': '#c85a1f' } }));
     assert.equal(env.style.get('--accent'), '#c85a1f');
   });
 
@@ -327,20 +277,11 @@ describe('theme', () => {
     hub.bindTheme(binding());
     await settle();
     assert.deepEqual(env.sent()[0].subscribes, ['theme.changed']);
-    env.fromHub(welcome({ themes: [{ id: 'ember' }] }));
-    env.fromHub({ type: 'hub:theme', theme: 'light', colorTheme: 'ember', vars: VARS });
-    assert.equal(env.style.size, 0);
-    env.fromHub({
-      type: 'hub:event',
-      topic: 'theme.changed',
-      payload: { theme: 'dark', colorTheme: 'ember', vars: VARS },
-    });
-    assert.equal(env.style.get('--accent'), '#e86f33');
   });
 
   it('applies a theme that came before bindTheme', async () => {
     const { env, hub } = await connected();
-    env.fromHub({ type: 'hub:theme', theme: 'light', colorTheme: 'ocean' });
+    env.fromHub(themeEvent({ theme: 'light', colorTheme: 'ocean' }));
     const b = binding();
     hub.bindTheme(b);
     assert.deepEqual(b.state, { theme: 'light', colorTheme: 'ocean' });
@@ -368,8 +309,9 @@ describe('actions', () => {
   });
 
   it('answers can from welcome.actions', async () => {
-    const legacy = { 'project.memory': () => ({ app: 'memory' }) };
-    const { env, hub } = await connected({ legacy });
+    const standalone = { 'project.memory': () => 'http://localhost:3544/' };
+    const { env, hub } = await connected({ standalone });
+    assert.equal(hub.can('session.cost'), false);
     env.fromHub(welcome({ actions: ['session.cost'] }));
     assert.equal(hub.can('session.cost'), true);
     assert.equal(hub.can('project.memory'), false);
@@ -408,40 +350,23 @@ describe('keys', () => {
     for (const e of events) assert.equal(comboOf(e), hub(e), JSON.stringify(e));
   });
 
-  it('forwards Ctrl+Alt+Arrow with Shift or Meta, and no other shifted combo', async () => {
+  it('forwards only welcome.forward, as a hub:keydown', async () => {
     const { env } = await connected();
-    assert.equal(env.key({ ...ctrlAlt('ArrowLeft', 'ArrowLeft'), shiftKey: true, metaKey: true }).prevented, true);
-    assert.equal(env.key({ ...ctrlAlt('P', 'KeyP'), shiftKey: true }).prevented, false);
-    assert.equal(env.key({ ...NO_MODS, key: '1', code: 'Digit1', altKey: true, ctrlKey: true }).prevented, false);
-  });
-
-  it('uses the legacy filter with the reserved combos left out', async () => {
-    const { env } = await connected({ reserved: ['ctrl+alt+n'] });
-    assert.equal(env.key(ctrlAlt('n', 'KeyN')).prevented, false);
-    const p = env.key(ctrlAlt('p', 'KeyP'));
-    assert.equal(p.prevented, true);
+    env.fromHub(welcome({ forward: ['ctrl+alt+p'] }));
+    assert.equal(env.key(ctrlAlt('p', 'KeyP')).prevented, true);
     const keydown = { type: 'hub:keydown', key: 'p', code: 'KeyP', ctrl: true, alt: true, shift: false, meta: false };
     assert.deepEqual(env.sent()[1], keydown);
-    assert.equal(env.key({ key: '2', code: 'Digit2', altKey: true }).prevented, true);
+    assert.equal(env.key(ctrlAlt('n', 'KeyN')).prevented, false);
     assert.equal(env.key({ key: 'j', code: 'KeyJ' }).prevented, false);
   });
 
-  it('forwards only welcome.forward after welcome', async () => {
-    const { env } = await connected({ reserved: ['ctrl+alt+n'] });
-    env.fromHub(welcome({ forward: ['ctrl+alt+k'] }));
-    assert.equal(env.key(ctrlAlt('k', 'KeyK')).prevented, true);
-    assert.equal(env.key(ctrlAlt('p', 'KeyP')).prevented, false);
-  });
-
   it('tells a key-eating element which keys it forwards', async () => {
-    const { env, hub } = await connected({ reserved: ['ctrl+alt+n'] });
-    assert.equal(hub.forwards(ctrlAlt('p', 'KeyP')), true);
-    assert.equal(hub.forwards(ctrlAlt('n', 'KeyN')), false);
+    const { env, hub } = await connected();
     env.fromHub(welcome({ forward: ['ctrl+alt+k'] }));
     assert.equal(hub.forwards(ctrlAlt('k', 'KeyK')), true);
     assert.equal(hub.forwards(ctrlAlt('p', 'KeyP')), false);
     const alone = await connected({}, { config: { enabled: false } });
-    assert.equal(alone.hub.forwards(ctrlAlt('p', 'KeyP')), false);
+    assert.equal(alone.hub.forwards(ctrlAlt('k', 'KeyK')), false);
   });
 });
 

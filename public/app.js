@@ -6,6 +6,8 @@ const guardedApps = new Set();
 // App id → the topics its hub:hello subscribes to. An app is live from its hello until the next
 // iframe load: e.source is the same WindowProxy across reloads, so a new document starts unknown.
 const liveApps = new Map();
+// Apps whose next document the hub loads from an action URL.
+const linkLoads = new Set();
 const HUB_PROTOCOLS = [1];
 // {theme: 'dark'|'light', colorTheme: '<id>', colorThemes: {<configDir>: '<id>'}} — survives hub
 // reloads so late-loading iframes and fresh sessions get the last chosen theme. Light/dark is
@@ -59,11 +61,10 @@ function themePayload() {
   return { theme: themeState.theme ?? osTheme(), colorTheme: activeColorTheme() };
 }
 
-// A live app gets the vars too: once welcome listed themes, it ignores a hub:theme with none.
 function sendTheme(appId) {
   const payload = themePayload();
   const vars = themeVars[payload.colorTheme ?? 'ember']?.[payload.theme];
-  sendTopic(appId, 'theme.changed', liveApps.has(appId) && vars ? { ...payload, vars } : payload, 'hub:theme');
+  sendTopic(appId, 'theme.changed', vars ? { ...payload, vars } : payload);
 }
 
 // {<themeId>: {dark, light}}, each a map of the apps' core CSS variables, from /api/config, which
@@ -131,7 +132,7 @@ function originOf(appId) {
 function postTo(appId, message) {
   // Before the iframe commits its src its contentWindow is still on the hub's own
   // origin, so a send addressed to the sub-app origin is refused and logged. The
-  // load handler posts the current state anyway, so skipping here loses nothing.
+  // app's hello brings the current state anyway, so skipping here loses nothing.
   if (!loadedApps.has(appId)) return;
   iframes[appId]?.contentWindow?.postMessage(message, originOf(appId));
 }
@@ -140,11 +141,9 @@ function appIdOf(source) {
   return Object.keys(iframes).find((id) => iframes[id].contentWindow === source);
 }
 
-// A live app that subscribes to the topic gets it as a hub:event, every other app as the legacy
-// message. The last value lives in themeState and projectState, so a replay after welcome is a send.
-function sendTopic(appId, topic, payload, legacyType) {
-  const subscribed = liveApps.get(appId)?.has(topic);
-  postTo(appId, subscribed ? { type: 'hub:event', topic, payload } : { type: legacyType, ...payload });
+// The last value lives in themeState and projectState, so a replay after welcome is a send.
+function sendTopic(appId, topic, payload) {
+  if (liveApps.get(appId)?.has(topic)) postTo(appId, { type: 'hub:event', topic, payload });
 }
 
 function setProject(absPath) {
@@ -154,13 +153,13 @@ function setProject(absPath) {
 
 function sendProject(appId) {
   if (!projectState) return;
-  sendTopic(appId, 'project.changed', projectState, 'hub:project');
+  sendTopic(appId, 'project.changed', projectState);
 }
 
 // Sub-apps can't detect this themselves: inactive iframes are display:none, and a nested
 // document's visibilityState still follows the top-level tab. Used for polling/auto-refresh.
 function postActiveTo(appId) {
-  postTo(appId, { type: 'hub:active', active: appId === activeApp });
+  if (liveApps.has(appId)) postTo(appId, { type: 'hub:active', active: appId === activeApp });
 }
 
 async function init() {
@@ -200,7 +199,15 @@ function reloadIframes() {
   loadedApps.clear();
   projectState = null;
   // Assigning src navigates even when the URL is unchanged.
-  for (const [id, iframe] of Object.entries(iframes)) iframe.src = appSrc(id);
+  for (const id of Object.keys(iframes)) loadApp(id, appSrc(id));
+}
+
+// The old document stays live until the new one fires load, and a hub:action sent to it in between is lost.
+function loadApp(id, src, { link = false } = {}) {
+  liveApps.delete(id);
+  if (link) linkLoads.add(id);
+  else linkLoads.delete(id);
+  iframes[id].src = src;
 }
 
 // The terminal token rides in the fragment so it never reaches a server log or a Referer.
@@ -271,25 +278,6 @@ function onIframeLoad(appId) {
   loadedApps.add(appId);
   guardedApps.delete(appId);
   if (appId === activeApp) hideLoading();
-  sendState(appId);
-  // Posted twice: the shims gate their origin check on window.__HUB__, which they populate from
-  // an async /hub-config fetch that resolves after this load event, so the first post can be
-  // dropped. Safe to repeat — every shim's apply is idempotent.
-  setTimeout(() => {
-    if (!liveApps.has(appId)) sendState(appId);
-  }, 400);
-}
-
-function boundCombos() {
-  return Object.keys(bindings());
-}
-
-// Before hello the hub cannot know the app's version, so it sends the legacy set.
-function sendState(appId) {
-  sendTheme(appId);
-  sendProject(appId);
-  postActiveTo(appId);
-  if (!liveApps.has(appId)) postTo(appId, { type: 'hub:keys', keys: boundCombos() });
 }
 
 function onHello(appId, data) {
@@ -299,17 +287,22 @@ function onHello(appId, data) {
   postTo(appId, {
     type: 'hub:welcome',
     protocol: Math.max(...common),
-    forward: boundCombos(),
+    forward: Object.keys(bindings()),
     themes: hubThemes,
     actions: Object.keys(actions),
   });
-  sendState(appId);
+  sendTheme(appId);
+  // A document the hub loaded from an action URL got its project from that URL. The hub's own
+  // project would undo the link, so it goes out only with the next change.
+  if (!linkLoads.delete(appId)) sendProject(appId);
+  postActiveTo(appId);
 }
 
 // A url such as '@evil.example/' turns the app host into userinfo, and the token rides in the fragment.
 function navigateApp(appId, url) {
   const src = appSrc(appId, url);
-  if (URL.canParse(src) && new URL(src).origin === originOf(appId)) iframes[appId].src = src;
+  if (!URL.canParse(src) || new URL(src).origin !== originOf(appId)) return;
+  loadApp(appId, src, { link: true });
 }
 
 function badParams(declared, params) {
@@ -357,10 +350,6 @@ function listenMessages() {
       onHello(appId, data);
     } else if (data.type === 'hub:invoke') {
       onInvoke(appId, data);
-    } else if (data.type === 'hub:navigate') {
-      if (!apps[data.app]) return;
-      switchTab(data.app);
-      if (typeof data.url === 'string' && data.url) navigateApp(data.app, data.url);
     } else if (data.type === 'hub:keydown') {
       handleForwardedKey(data);
     } else if (data.type === 'hub:closeGuard') {
@@ -378,7 +367,7 @@ function listenMessages() {
         .catch(() => {});
     } else if (data.type === 'hub:openExternal') {
       // In the installed PWA window a framed sub-app's own target=_blank opens
-      // nothing, so the shims hand external links up to the top frame instead.
+      // nothing, so the SDK hands external links up to the top frame instead.
       let url;
       try {
         url = new URL(String(data.url));
@@ -388,7 +377,7 @@ function listenMessages() {
       if (url.protocol !== 'http:' && url.protocol !== 'https:') return;
       window.open(url.href, '_blank', 'noopener');
     } else if (data.type === 'hub:theme') {
-      // Legacy senders pass only {theme}; colorTheme is optional and sticky.
+      // colorTheme is optional and sticky.
       if (data.theme !== 'light' && data.theme !== 'dark') return;
       const hasColor = typeof data.colorTheme === 'string' && /^[a-z0-9-]{0,32}$/.test(data.colorTheme);
       const changed = data.theme !== themeState.theme || (hasColor && data.colorTheme !== activeColorTheme());
@@ -400,30 +389,25 @@ function listenMessages() {
       }
       localStorage.setItem('hub-theme', JSON.stringify(themeState));
       applyHubTheme();
-      // A live sender gets the echo for the vars, a legacy one already shows its pick.
-      for (const id of Object.keys(iframes)) {
-        if (id !== appId || liveApps.has(id)) sendTheme(id);
-      }
+      // The sender gets the echo too, for the vars.
+      for (const id of Object.keys(iframes)) sendTheme(id);
     }
   });
 }
 
 function handleForwardedKey(d) {
-  // The modifier fields are new. A sub-app running an older service-worker-cached bundle sends
-  // {key} only; it forwards nothing but the pre-existing bindings, and each of those is
-  // unambiguous from the key alone, so normalize instead of dispatching twice.
-  const legacy = typeof d.alt !== 'boolean';
   const e = {
     key: d.key,
     code: d.code,
-    altKey: legacy || d.alt,
-    ctrlKey: legacy ? d.key.startsWith('Arrow') : d.ctrl,
+    ctrlKey: d.ctrl === true,
+    altKey: d.alt === true,
     shiftKey: d.shift === true,
+    metaKey: d.meta === true,
   };
   bindings()[comboOf(e)]?.run();
 }
 
-// The one keymap. Its combo names are what the hub:keys message lists for the shims.
+// The one keymap. Its combo names are what welcome.forward lists for the apps.
 // inPalette: the binding still fires while the palette is open.
 function bindings() {
   const map = {
@@ -440,7 +424,7 @@ function bindings() {
   return map;
 }
 
-// Each shim's hubCombo() is a copy of this: modifiers in ctrl, alt, shift, meta order, joined by
+// The SDK's comboOf() is a copy of this: modifiers in ctrl, alt, shift, meta order, joined by
 // '+' to the key as bindingKey() names it.
 function comboOf(e) {
   const mods = [e.ctrlKey && 'ctrl', e.altKey && 'alt', e.shiftKey && 'shift', e.metaKey && 'meta'];
