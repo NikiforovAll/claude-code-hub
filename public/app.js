@@ -43,8 +43,10 @@ function loadThemeState() {
 }
 
 // The color theme of the active config dir, falling back to the last one picked anywhere.
+// An id the registry lacks shows as Ember everywhere, so the hub page and every app agree.
 function activeColorTheme() {
-  return themeState.colorThemes[activeConfigDir] ?? themeState.colorTheme;
+  const id = themeState.colorThemes[activeConfigDir] ?? themeState.colorTheme;
+  return id && hubThemes.length && !themeVars[id] ? 'ember' : id;
 }
 
 function osTheme() {
@@ -57,10 +59,33 @@ function themeMessage() {
   return { type: 'hub:theme', theme: themeState.theme ?? osTheme(), colorTheme: activeColorTheme() };
 }
 
-// {<themeId>: {dark, light}}, each a map of CSS variables, from /api/config, which derives it from
-// lib/themes.json — the same registry that generates each sub-app's themes.css. Empty until
-// config arrives, and empty if the registry is unreadable; then the hub keeps index.html's colors.
-let themePalettes = {};
+// A live app gets the vars too: once welcome listed themes, it ignores a hub:theme with none.
+function sendTheme(appId) {
+  const subscribes = liveApps.get(appId);
+  if (subscribes?.has('theme.changed')) return;
+  const message = themeMessage();
+  const vars = themeVars[message.colorTheme ?? 'ember']?.[message.theme];
+  postTo(appId, subscribes && vars ? { ...message, vars } : message);
+}
+
+// {<themeId>: {dark, light}}, each a map of the apps' core CSS variables, from /api/config, which
+// derives it from lib/themes.json — the same registry that generates each sub-app's themes.css.
+// Empty until config arrives, and empty if the registry is unreadable; then the hub keeps
+// index.html's colors.
+let themeVars = {};
+// The picker list that welcome carries.
+let hubThemes = [];
+// The hub page's names for the core variables. --bg is the apps' --bg-deep, so the loading screen
+// hands off to an iframe without a flash of another color.
+const HUB_VARS = {
+  '--accent': '--accent',
+  '--bg': '--bg-deep',
+  '--surface': '--bg-surface',
+  '--surface-hover': '--bg-hover',
+  '--border': '--border',
+  '--text': '--text-primary',
+  '--text-dim': '--text-muted',
+};
 // The last applied variables, so the loading screen paints in the theme before /api/config lands.
 const PALETTE_KEY = 'hub-palette';
 
@@ -71,7 +96,8 @@ function applyHubTheme() {
   const root = document.documentElement;
   root.classList.toggle('light', mode === 'light');
   const key = `${activeColorTheme()}/${mode}`;
-  let vars = themePalettes[activeColorTheme()]?.[mode];
+  const core = themeVars[activeColorTheme()]?.[mode];
+  let vars = core && Object.fromEntries(Object.entries(HUB_VARS).map(([hub, name]) => [hub, core[name]]));
   try {
     if (vars) localStorage.setItem(PALETTE_KEY, JSON.stringify({ key, vars }));
     else {
@@ -158,7 +184,8 @@ async function init() {
   defaultConfigDir = config.defaultConfigDir ?? null;
   activeConfigDir = config.activeConfigDir ?? null;
   applyTitle(config.activeConfigDir);
-  themePalettes = config.themePalettes ?? {};
+  themeVars = config.themeVars ?? {};
+  hubThemes = config.themes ?? [];
   applyHubTheme();
   buildIframes();
   switchTab(Object.keys(apps)[0]);
@@ -269,7 +296,7 @@ function boundCombos() {
 // Before hello the hub cannot know the app's version, so it sends the legacy set.
 function sendState(appId) {
   const subscribes = liveApps.get(appId);
-  if (!subscribes?.has('theme.changed')) postTo(appId, themeMessage());
+  sendTheme(appId);
   if (!subscribes?.has('project.changed')) postProjectTo(appId);
   postActiveTo(appId);
   if (!subscribes) postTo(appId, { type: 'hub:keys', keys: boundCombos() });
@@ -283,7 +310,7 @@ function onHello(appId, data) {
     type: 'hub:welcome',
     protocol: Math.max(...common),
     forward: boundCombos(),
-    themes: [],
+    themes: hubThemes,
     actions: [],
   });
   sendState(appId);
@@ -345,7 +372,10 @@ function listenMessages() {
       }
       localStorage.setItem('hub-theme', JSON.stringify(themeState));
       applyHubTheme();
-      broadcast(themeMessage(), e.source);
+      // A live sender gets the echo for the vars, a legacy one already shows its pick.
+      for (const id of Object.keys(iframes)) {
+        if (id !== appId || liveApps.has(id)) sendTheme(id);
+      }
     }
   });
 }

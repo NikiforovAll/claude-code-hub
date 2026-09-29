@@ -8,37 +8,13 @@
 //
 // Usage: node scripts/generate-themes.mjs [app ...]   (default: all apps)
 
-import { readFileSync, writeFileSync } from 'node:fs';
+import { writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { coreVars, hexToRgb, readThemes, swatch } from '../lib/themes.js';
 
 const root = join(dirname(fileURLToPath(import.meta.url)), '..');
-const themes = JSON.parse(readFileSync(join(root, 'lib/themes.json'), 'utf8'));
-
-const hexToRgb = (hex) => {
-  const n = parseInt(hex.slice(1), 16);
-  return `${(n >> 16) & 255}, ${(n >> 8) & 255}, ${n & 255}`;
-};
-
-// Core mapping: palette role → shared CSS variable. --accent-glow is mechanical
-// (rgba of the accent), mirroring how :root derives it from --accent.
-const coreVars = (p, mode) => ({
-  '--accent': p.ember,
-  '--accent-text': p.emberGlow,
-  '--accent-dim': p.emberDim,
-  '--accent-glow': `rgba(${hexToRgb(p.ember)}, ${mode === 'dark' ? '0.55' : '0.5'})`,
-  '--bg-deep': p.field,
-  '--bg-surface': p.surface,
-  '--bg-elevated': p.elevated,
-  '--bg-hover': p.hover,
-  '--border': p.border,
-  '--text-primary': p.ink1,
-  '--text-secondary': p.ink2,
-  '--text-tertiary': p.ink3,
-  '--text-muted': p.inkMuted,
-  ...(p.sidebar && { '--sidebar-bg': p.sidebar }),
-  ...(p.sidebarItem && { '--sidebar-item-bg': p.sidebarItem }),
-});
+const themes = readThemes();
 
 const APP_EXTRAS = {
   cost: (p) => ({
@@ -71,7 +47,9 @@ function generate(app) {
   // (surface, accent, ink) as variables; the picker renders them as dots.
   css += '\n/* picker swatches */\n';
   const swatchVars = (p) =>
-    `--sw-bg: ${p.surface}; --sw-accent: ${p.ember}; --sw-ink: ${p.ink1}; --sw-border: ${p.border};`;
+    Object.entries(swatch(p))
+      .map(([k, v]) => `--sw-${k}: ${v};`)
+      .join(' ');
   for (const t of themes) {
     css += `.theme-swatch-${t.id} { ${swatchVars(t.dark)} }\n`;
     css += `body.light .theme-swatch-${t.id} { ${swatchVars(t.light)} }\n`;

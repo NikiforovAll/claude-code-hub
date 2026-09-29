@@ -11,6 +11,7 @@ const path = require('path');
 const { selectApps, loadApp } = require('./lib/apps');
 const { stripCookie } = require('./lib/cookies');
 const { createNetGuard } = require('./lib/net-guard');
+const { themeConfig } = require('./lib/themes');
 
 function getArg(name) {
   const idx = process.argv.findIndex((a) => a.startsWith(`--${name}`));
@@ -657,27 +658,9 @@ app.use(express.json());
 
 // The hub's CSS variables per color theme and mode, read from the same registry generate-themes.mjs
 // compiles into each sub-app's themes.css. Served rather than hand-copied into public/app.js so there
-// is one source of truth. --bg is the sub-apps' --bg-deep, so the loading screen hands off to an
-// iframe without a flash of another color.
+// is one source of truth.
 // Read once — themes.json only changes when the generator is re-run, which restarts the hub anyway.
-const hubVars = (p) => ({
-  '--accent': p.ember,
-  '--bg': p.field,
-  '--surface': p.surface,
-  '--surface-hover': p.hover,
-  '--border': p.border,
-  '--text': p.ink1,
-  '--text-dim': p.inkMuted,
-});
-const themePalettes = (() => {
-  try {
-    const themes = JSON.parse(fs.readFileSync(path.join(__dirname, 'lib/themes.json'), 'utf8'));
-    return Object.fromEntries(themes.map((t) => [t.id, { dark: hubVars(t.dark), light: hubVars(t.light) }]));
-  } catch {
-    // Palette falls back to the --accent in index.html; not worth failing startup over.
-    return {};
-  }
-})();
+const THEME_CONFIG = themeConfig();
 
 function appsConfig() {
   return Object.fromEntries(
@@ -690,7 +673,7 @@ function appsConfig() {
 }
 
 app.get('/api/config', (_req, res) => {
-  res.json({ themePalettes, apps: appsConfig(), activeConfigDir: hubConfig.activeConfigDir, defaultConfigDir });
+  res.json({ ...THEME_CONFIG, apps: appsConfig(), activeConfigDir: hubConfig.activeConfigDir, defaultConfigDir });
 });
 
 app.get('/api/config-dirs', (_req, res) => {
