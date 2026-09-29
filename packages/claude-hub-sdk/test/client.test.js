@@ -309,6 +309,23 @@ describe('theme', () => {
     assert.deepEqual(env.sent().slice(1), [{ type: 'hub:theme', theme: 'light', colorTheme: 'ocean' }]);
   });
 
+  it('subscribes theme.changed in hello when bound before load', async () => {
+    const env = fakeEnv();
+    const hub = createClaudeHub(env.win).connect();
+    hub.bindTheme(binding());
+    await settle();
+    assert.deepEqual(env.sent()[0].subscribes, ['theme.changed']);
+    env.fromHub(welcome({ themes: [{ id: 'ember' }] }));
+    env.fromHub({ type: 'hub:theme', theme: 'light', colorTheme: 'ember', vars: VARS });
+    assert.equal(env.style.size, 0);
+    env.fromHub({
+      type: 'hub:event',
+      topic: 'theme.changed',
+      payload: { theme: 'dark', colorTheme: 'ember', vars: VARS },
+    });
+    assert.equal(env.style.get('--accent'), '#e86f33');
+  });
+
   it('applies a theme that came before bindTheme', async () => {
     const { env, hub } = await connected();
     env.fromHub({ type: 'hub:theme', theme: 'light', colorTheme: 'ocean' });
@@ -403,6 +420,17 @@ describe('keys', () => {
     assert.equal(env.key(ctrlAlt('k', 'KeyK')).prevented, true);
     assert.equal(env.key(ctrlAlt('p', 'KeyP')).prevented, false);
   });
+
+  it('tells a key-eating element which keys it forwards', async () => {
+    const { env, hub } = await connected({ reserved: ['ctrl+alt+n'] });
+    assert.equal(hub.forwards(ctrlAlt('p', 'KeyP')), true);
+    assert.equal(hub.forwards(ctrlAlt('n', 'KeyN')), false);
+    env.fromHub(welcome({ forward: ['ctrl+alt+k'] }));
+    assert.equal(hub.forwards(ctrlAlt('k', 'KeyK')), true);
+    assert.equal(hub.forwards(ctrlAlt('p', 'KeyP')), false);
+    const alone = await connected({}, { config: { enabled: false } });
+    assert.equal(alone.hub.forwards(ctrlAlt('p', 'KeyP')), false);
+  });
 });
 
 describe('standalone', () => {
@@ -422,6 +450,17 @@ describe('standalone', () => {
       assert.deepEqual(env.sent(), []);
     });
   }
+
+  it('reads a standalone function at call time', async () => {
+    const urls = {};
+    const standalone = () => (urls.cost ? { 'session.cost': () => urls.cost } : {});
+    const { env, hub } = await connected({ standalone }, { config: { enabled: false } });
+    assert.equal(hub.can('session.cost'), false);
+    urls.cost = 'http://localhost:3543/';
+    assert.equal(hub.can('session.cost'), true);
+    await hub.invoke('session.cost', {});
+    assert.deepEqual(env.opened, [['http://localhost:3543/', '_blank', 'noopener']]);
+  });
 
   it('removes the cached set when framed by a page that is not the hub', async () => {
     const { env } = await connected({}, { config: { enabled: false }, storage: { ...CACHED } });

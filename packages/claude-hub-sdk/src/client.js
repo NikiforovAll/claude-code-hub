@@ -89,7 +89,10 @@
       let nextId = 0;
 
       const waiting = () => status === 'connecting' || status === 'waiting';
-      const fallback = () => (status === 'standalone' ? standalone : legacy);
+      const fallback = () => {
+        if (status !== 'standalone') return legacy;
+        return typeof standalone === 'function' ? standalone() : standalone;
+      };
 
       function post(msg) {
         if (origin) win.parent.postMessage(msg, origin);
@@ -174,14 +177,15 @@
         }
       }
 
-      function isHubKey(e) {
+      function forwards(e) {
+        if (!origin) return false;
         const combo = comboOf(e);
         if (forward) return forward.has(combo);
         return !reservedCombos.has(combo) && LEGACY_COMBO.test(combo);
       }
 
       function onKeydown(e) {
-        if (!origin || !isHubKey(e)) return;
+        if (!forwards(e)) return;
         e.preventDefault();
         post({
           type: 'hub:keydown',
@@ -244,6 +248,11 @@
         }, WELCOME_WAIT_MS);
       });
 
+      const topicFns = (topic) => {
+        if (!topics.has(topic)) topics.set(topic, new Set());
+        return topics.get(topic);
+      };
+
       hub = {
         get status() {
           return status;
@@ -260,11 +269,12 @@
           return () => activeFns.delete(fn);
         },
         subscribe(topic, fn) {
-          if (!topics.has(topic)) topics.set(topic, new Set());
-          topics.get(topic).add(fn);
-          return () => topics.get(topic).delete(fn);
+          const fns = topicFns(topic);
+          fns.add(fn);
+          return () => fns.delete(fn);
         },
         bindTheme({ get, set }) {
+          topicFns('theme.changed');
           themeBinding = { get, set, last: themeKey(get()) };
           if (lastTheme) applyMode(lastTheme);
           return function report() {
@@ -289,6 +299,8 @@
           if (status === 'connecting') return false;
           return typeof fallback()[action] === 'function';
         },
+        // For an element that eats keys before the document sees them, like a terminal.
+        forwards,
       };
       return hub;
     }

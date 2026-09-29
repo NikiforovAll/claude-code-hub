@@ -60,10 +60,16 @@ Each sub-app has its own linter (Biome) and pre-commit hooks. The hub root does 
 
 ## Sub-app Hub Integration
 
-All sub-apps expose `GET /hub-config` (returns `{enabled, url}` from env vars) and append a `HUB_INTEGRATION` region to their `public/app.js` with:
+All sub-apps expose `GET /hub-config` (returns `{enabled, url}` from env vars) and have a `HUB_INTEGRATION` region in their `public/app.js`.
+
+**On the SDK (Cost, and cck for keys and `session.cost`).** The page loads `/vendor/claude-hub-sdk.js` as the first element in `<body>`, and the server serves it from `HUB_SDK_SRC`, else the vendored copy. The region calls `ClaudeHub.connect()`, which fetches `/hub-config` and forwards keys, and uses `subscribe`, `bindTheme`, `handle`, `invoke` and `can` in place of the raw messages. Each app ships a `hub-app.json` that matches `lib/manifests/<id>.json`. cck passes `standalone` as a function, because `--cost-url` arrives with `/api/config` after connect. It passes `reserved`, so the SDK never forwards `Ctrl+Alt+N`, `R` or `S`, and its terminal key filter asks `hub.forwards(e)`, because xterm eats a key before the SDK's document listener sees it. cck's theme, project, closeGuard, terminalToken and `hubNavigate` still use its own shim.
+
+**On the shim (Marketplace, Memory).**
 - `initHub()` — fetches config, stores in `window.__HUB__`
-- Keyboard forwarding: a shim forwards a press (`key`, `code`, modifiers) only when its combo name is in the `hub:keys` list; every other key stays in the app, cck's terminal included. A new hub shortcut goes in `bindings()` and needs no submodule change. Each shim's `hubCombo()` is a copy of the hub's `comboOf()`; the combo format is in `website/src/content/docs/reference/architecture.md`. Until a list arrives the shim uses the old filter (`Ctrl+Alt+Arrow`, any `Ctrl+Alt+<letter>`, `Alt+digit`), which an older hub expects. The hub must not bind cck's `Ctrl+Alt+N` (New session), `Ctrl+Alt+R` (Resume session) or `Ctrl+Alt+S` (Swap to previous session).
+- Keyboard forwarding: a shim forwards a press (`key`, `code`, modifiers) only when its combo name is in the `hub:keys` list; every other key stays in the app. Each shim's `hubCombo()` is a copy of the hub's `comboOf()`; the combo format is in `website/src/content/docs/reference/architecture.md`. Until a list arrives the shim uses the old filter (`Ctrl+Alt+Arrow`, any `Ctrl+Alt+<letter>`, `Alt+digit`), which an older hub expects.
 - `hubNavigate(app, url)` — callable API for cross-app deep links (no-op when standalone)
+
+A new hub shortcut goes in `bindings()` and needs no submodule change. The hub must not bind cck's `Ctrl+Alt+N` (New session), `Ctrl+Alt+R` (Resume session) or `Ctrl+Alt+S` (Swap to previous session).
 
 ## SDK
 

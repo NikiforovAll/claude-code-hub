@@ -2,28 +2,21 @@
 // scratchpad's theme.ts, itself derived from this hub's design tokens).
 //
 // All sub-apps share the same core variable names, so one palette→var mapping
-// serves every app; APP_EXTRAS adds per-app derived vars (e.g. cost's chart
-// accent). "ember" is selected by clearing data-color-theme; its block matches
-// that state so Ember follows the registry, not each app's :root defaults.
+// serves every app. An app derives its own vars on body with color-mix() (as
+// cost's --chart-fill), so they follow the vars the hub SDK writes there.
+// "ember" is selected by clearing data-color-theme; its block matches that state so Ember follows the registry, not each app's :root defaults.
 //
 // Usage: node scripts/generate-themes.mjs [app ...]   (default: all apps)
 
 import { writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { coreVars, hexToRgb, readThemes, swatch } from '../lib/themes.js';
+import { coreVars, readThemes, swatch } from '../lib/themes.js';
 
 const root = join(dirname(fileURLToPath(import.meta.url)), '..');
 const themes = readThemes();
 
-const APP_EXTRAS = {
-  cost: (p) => ({
-    '--chart-fill': `rgba(${hexToRgb(p.ember)}, 0.32)`,
-  }),
-  cck: () => ({}),
-  memory: () => ({}),
-  marketplace: () => ({}),
-};
+const APPS = ['cost', 'cck', 'memory', 'marketplace'];
 
 // Selector templates per mode. cck additionally honors OS light preference
 // unless dark is forced (matches its prefers-color-scheme block).
@@ -34,9 +27,8 @@ const SELECTORS = {
   cckOsLight: (id) => `body:not(.dark-forced)${themeAttr(id)}`,
 };
 
-function vars(app, p, mode) {
-  const all = { ...coreVars(p, mode), ...APP_EXTRAS[app](p) };
-  return Object.entries(all)
+function vars(p, mode) {
+  return Object.entries(coreVars(p, mode))
     .map(([k, v]) => `  ${k}: ${v};`)
     .join('\n');
 }
@@ -57,11 +49,11 @@ function generate(app) {
 
   for (const t of themes) {
     css += `\n/* ${t.label} */\n`;
-    css += `${SELECTORS.dark(t.id)} {\n${vars(app, t.dark, 'dark')}\n}\n`;
-    css += `${SELECTORS.light(t.id)} {\n${vars(app, t.light, 'light')}\n}\n`;
+    css += `${SELECTORS.dark(t.id)} {\n${vars(t.dark, 'dark')}\n}\n`;
+    css += `${SELECTORS.light(t.id)} {\n${vars(t.light, 'light')}\n}\n`;
     if (app === 'cck') {
       css += `@media (prefers-color-scheme: light) {\n`;
-      css += `${SELECTORS.cckOsLight(t.id)} {\n${vars(app, t.light, 'light')}\n}\n}\n`;
+      css += `${SELECTORS.cckOsLight(t.id)} {\n${vars(t.light, 'light')}\n}\n}\n`;
     }
   }
   const out = join(root, app, 'public/themes.css');
@@ -69,5 +61,5 @@ function generate(app) {
   console.log(`${out}: ${themes.length} themes, ${css.length} bytes`);
 }
 
-const apps = process.argv.slice(2).length ? process.argv.slice(2) : Object.keys(APP_EXTRAS);
+const apps = process.argv.slice(2).length ? process.argv.slice(2) : APPS;
 for (const app of apps) generate(app);
