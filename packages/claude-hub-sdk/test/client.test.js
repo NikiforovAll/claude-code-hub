@@ -309,6 +309,18 @@ describe('theme', () => {
     assert.deepEqual(env.sent().slice(1), [{ type: 'hub:theme', theme: 'light', colorTheme: 'ocean' }]);
   });
 
+  it('drops the old vars on a user change until the hub echoes the new ones', async () => {
+    const { env, hub } = await connected();
+    const b = binding();
+    const report = hub.bindTheme(b);
+    env.fromHub({ type: 'hub:theme', theme: 'dark', colorTheme: 'ember', vars: VARS });
+    b.state.theme = 'light';
+    report();
+    assert.equal(env.style.size, 0);
+    env.fromHub({ type: 'hub:theme', theme: 'light', colorTheme: 'ember', vars: { '--accent': '#c85a1f' } });
+    assert.equal(env.style.get('--accent'), '#c85a1f');
+  });
+
   it('subscribes theme.changed in hello when bound before load', async () => {
     const env = fakeEnv();
     const hub = createClaudeHub(env.win).connect();
@@ -430,6 +442,51 @@ describe('keys', () => {
     assert.equal(hub.forwards(ctrlAlt('p', 'KeyP')), false);
     const alone = await connected({}, { config: { enabled: false } });
     assert.equal(alone.hub.forwards(ctrlAlt('p', 'KeyP')), false);
+  });
+});
+
+describe('other messages', () => {
+  it('sends closeGuard and openExternal to the hub, and opens a window standalone', async () => {
+    const { env, hub } = await connected();
+    assert.equal(hub.inHub, true);
+    hub.closeGuard(true);
+    hub.openExternal('https://example.com/');
+    assert.deepEqual(env.sent().slice(1), [
+      { type: 'hub:closeGuard', on: true },
+      { type: 'hub:openExternal', url: 'https://example.com/' },
+    ]);
+    const alone = await connected({}, { config: { enabled: false } });
+    assert.equal(alone.hub.inHub, false);
+    alone.hub.closeGuard(true);
+    alone.hub.openExternal('https://example.com/');
+    assert.deepEqual(alone.env.sent(), []);
+    assert.deepEqual(alone.env.opened, [['https://example.com/', '_blank', 'noopener']]);
+  });
+
+  it('resolves terminalToken with the answer, null on timeout, and null standalone', async () => {
+    const { env, hub } = await connected();
+    const first = hub.terminalToken();
+    const second = hub.terminalToken();
+    await settle();
+    assert.deepEqual(env.sent().slice(1), [{ type: 'hub:terminalToken' }, { type: 'hub:terminalToken' }]);
+    env.fromHub({ type: 'hub:terminalToken', token: 'abc' });
+    assert.deepEqual(await Promise.all([first, second]), ['abc', 'abc']);
+    const late = hub.terminalToken();
+    await settle();
+    env.endWait();
+    assert.equal(await late, null);
+    const alone = await connected({}, { config: { enabled: false } });
+    assert.equal(await alone.hub.terminalToken(), null);
+  });
+
+  it('asks for the terminal token once /hub-config answers, not before', async () => {
+    const env = fakeEnv();
+    const hub = createClaudeHub(env.win).connect();
+    const token = hub.terminalToken();
+    await settle();
+    assert.ok(env.sent().some((m) => m.type === 'hub:terminalToken'));
+    env.fromHub({ type: 'hub:terminalToken', token: 'abc' });
+    assert.equal(await token, 'abc');
   });
 });
 
