@@ -1,0 +1,9 @@
+{
+  "name": "claude-hub-sdk",
+  "version": "0.0.0",
+  "private": true,
+  "type": "commonjs",
+  "description": "The app side of the Claude Code Hub protocol",
+  "main": "src/client.js",
+  "license": "MIT"
+}

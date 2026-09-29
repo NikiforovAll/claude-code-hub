@@ -27,6 +27,6 @@
     }
   },
   "files": {
-    "includes": ["public/app.js", "server.js"]
+    "includes": ["public/app.js", "server.js", "packages/claude-hub-sdk/**"]
   }
 }
