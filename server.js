@@ -11,7 +11,9 @@ const path = require('path');
 const { actionTable } = require('./lib/actions');
 const { selectApps, loadApp } = require('./lib/apps');
 const { stripCookie } = require('./lib/cookies');
-const { createNetGuard } = require('./lib/net-guard');
+const { createNetGuard, KEEP_ALIVE_MS } = require('./lib/net-guard');
+const { ping } = require('./lib/ping');
+const { killChild } = require('./lib/kill-child');
 const { themeConfig } = require('./lib/themes');
 
 function getArg(name) {
@@ -109,14 +111,22 @@ function saveHubConfig() {
 const hubConfig = loadHubConfig();
 
 const { apps: selectedApps, unknown: unknownApps } = selectApps(hubConfig.apps);
-const ENABLED_APPS = selectedApps.map((a) => loadApp(a, { flagPort: getArg(`${a.id}-port`) }));
+const ENABLED_APPS = selectedApps.map((a) => loadApp(a, { flagPort: getArg(`${a.id}-port`) })).filter(Boolean);
 for (const id of unknownApps) console.log(`Unknown app "${id}" in ${HUB_CONFIG_FILE}, ignored`);
-if (!ENABLED_APPS.length) {
+if (!selectedApps.length) {
   console.error(`Every app is disabled in ${HUB_CONFIG_FILE}. Enable at least one.`);
   process.exit(1);
 }
-const appEnabled = (id) => ENABLED_APPS.some((a) => a.id === id);
+if (!ENABLED_APPS.length) {
+  const ids = selectedApps.map((a) => a.id).join(', ');
+  console.error(`No enabled app could load (${ids}). The reasons are logged above.`);
+  process.exit(1);
+}
 const ACTIONS = actionTable(ENABLED_APPS);
+// The first enabled app in tab order that declares the capability in its manifest.
+const provider = (cap) => ENABLED_APPS.find((a) => a.provides[cap]);
+const PROJECTS_APP = provider('projects');
+const TERMINAL_APP = provider('terminal');
 
 // Every keystroke into cck's terminal passes through the upgrade proxy below. Windows only, for the
 // reasons in cck/lib/priority.js; the children spawned after this still start at normal.
@@ -140,8 +150,7 @@ const net = createNetGuard({ appName: 'Claude Code Hub' });
 // the WebSocket. cck applies the rest of its policy (exposure refusal, Origin, session cap) itself.
 const TERMINAL = {
   ...(hubConfig.terminal || {}),
-  enabled:
-    appEnabled('kanban') && !process.argv.includes('--disable-terminal') && hubConfig.terminal?.enabled !== false,
+  enabled: !!TERMINAL_APP && !process.argv.includes('--disable-terminal') && hubConfig.terminal?.enabled !== false,
 };
 const TERMINAL_TOKEN = TERMINAL.enabled ? crypto.randomBytes(32).toString('hex') : null;
 
@@ -206,7 +215,7 @@ function childEnv(pool, name) {
     ALLOWED_HOSTS: net.ALLOWED_HOSTS,
   };
   if (HUB_SDK_SRC) env.HUB_SDK_SRC = HUB_SDK_SRC;
-  if (name === 'kanban' && TERMINAL.enabled) {
+  if (TERMINAL.enabled && name === TERMINAL_APP.id) {
     env.CCK_TERMINAL = JSON.stringify(TERMINAL);
     env.CCK_TERMINAL_TOKEN = TERMINAL_TOKEN;
   }
@@ -217,7 +226,7 @@ function spawnApp(pool, name, cmd, args) {
   const child = spawn(cmd, args, {
     cwd: __dirname,
     env: childEnv(pool, name),
-    stdio: ['ignore', 'pipe', 'pipe'],
+    stdio: ['ignore', 'pipe', 'pipe', 'ipc'],
   });
 
   let stdoutBuf = '';
@@ -251,6 +260,7 @@ function spawnApp(pool, name, cmd, args) {
     const recent = (pool.restarts[name] || []).filter((t) => Date.now() - t < RESTART_WINDOW_MS);
     if (recent.length >= MAX_RESTARTS) {
       console.log(`[${name}] gave up after ${MAX_RESTARTS} restarts in ${RESTART_WINDOW_MS / 1000}s`);
+      child.gaveUp = true;
       return;
     }
     recent.push(Date.now());
@@ -266,22 +276,13 @@ function spawnApp(pool, name, cmd, args) {
   return child;
 }
 
-function killChild(child) {
-  if (child.exitCode !== null || child.killed) return;
-  if (process.platform === 'win32') {
-    spawn('taskkill', ['/pid', String(child.pid), '/f', '/t'], { stdio: 'ignore' });
-  } else {
-    child.kill();
-  }
-}
-
 function killPool(pool) {
   pool.retired = true;
-  for (const child of pool.children.values()) killChild(child);
+  return Promise.all([...pool.children.values()].map((child) => killChild(child)));
 }
 
 function killAll() {
-  for (const pool of pools.values()) killPool(pool);
+  return Promise.all([...pools.values()].map(killPool));
 }
 
 function withTimeout(promise, ms) {
@@ -314,10 +315,12 @@ async function ensurePool(dir) {
 }
 
 async function terminalCount(pool) {
-  const port = pool.ports.kanban;
+  const port = pool.ports[TERMINAL_APP.id];
   if (!port) return 0;
   try {
-    const r = await fetch(`http://127.0.0.1:${port}/api/terminals`, { signal: AbortSignal.timeout(1500) });
+    const r = await fetch(`http://127.0.0.1:${port}${TERMINAL_APP.provides.terminal.liveWork}`, {
+      signal: AbortSignal.timeout(1500),
+    });
     return r.ok ? (await r.json()).sessions?.length || 0 : 0;
   } catch {
     return 0;
@@ -351,9 +354,12 @@ function dropPool(dir) {
   killPool(pool);
 }
 
+// Waits for the children, so a POSIX child that ignores SIGTERM still gets SIGKILL before the hub exits.
+let shuttingDown = false;
 function shutdown() {
-  killAll();
-  process.exit(0);
+  if (shuttingDown) return;
+  shuttingDown = true;
+  killAll().then(() => process.exit(0));
 }
 
 process.on('SIGINT', shutdown);
@@ -400,7 +406,9 @@ function rewriteOrigin(origin, publicPort, childPort) {
   }
 }
 
-const proxyAgent = new http.Agent({ keepAlive: true, maxSockets: 64 });
+// The socket timeout drops idle sockets before the app's server closes them (KEEP_ALIVE_MS), so a
+// request never lands on a socket being closed. It does not cut a slow response.
+const proxyAgent = new http.Agent({ keepAlive: true, maxSockets: 64, timeout: KEEP_ALIVE_MS - 5000 });
 
 // Two failures look the same from here and both recover on their own: a pooled socket the child
 // closed under us, and a child that is restarting. The port is re-read per attempt, so a replay
@@ -432,11 +440,20 @@ async function waitForPort(name, deadline) {
     const pool = activePool();
     const port = pool?.ports[name];
     if (port) return port;
-    if (pool && !pool.children.has(name)) return null;
+    if (pool?.children.get(name)?.gaveUp) return null;
     const remaining = deadline - Date.now();
     if (remaining <= 0) return null;
     await Promise.race([pool?.children.get(name)?.ready, delay(Math.min(remaining, 250))]);
   }
+}
+
+function noPortReason(name) {
+  const child = activePool()?.children.get(name);
+  if (child?.gaveUp) {
+    const detail = `${name} exited after ${MAX_RESTARTS} restarts in ${RESTART_WINDOW_MS / 1000}s. The hub stopped restarting it`;
+    return { headline: 'stopped', detail };
+  }
+  return { headline: 'is starting', detail: `${name} is starting` };
 }
 
 const escapeHtml = (s) => String(s).replace(/[&<>"']/g, (c) => `&#${c.charCodeAt(0)};`);
@@ -445,11 +462,11 @@ const escapeHtml = (s) => String(s).replace(/[&<>"']/g, (c) => `&#${c.charCodeAt
 // hand. The cap is small because the server already waited NAV_PORT_WAIT_MS before serving this,
 // and each reload re-spends that wait. sessionStorage throws when site data is blocked, and a page
 // whose only job is to reload must still reload there.
-function retryPage(name, detail) {
+function retryPage(name, headline, detail) {
   return `<!doctype html><html><head><meta charset="utf-8"><title>${escapeHtml(name)}</title>
 <style>:root{color-scheme:light dark}body{font:14px system-ui,sans-serif;margin:0;display:grid;place-items:center;height:100vh}
 div{text-align:center;opacity:.7}code{font-size:12px;opacity:.6}</style>
-</head><body><div><p id="m">${escapeHtml(name)} is restarting…</p><p><code>${escapeHtml(detail)}</code></p></div>
+</head><body><div><p id="m">${escapeHtml(name)} ${escapeHtml(headline)}…</p><p><code>${escapeHtml(detail)}</code></p></div>
 <script>
 let n = 0;
 const k = 'hub-retry:' + location.pathname;
@@ -459,11 +476,11 @@ else { try { sessionStorage.removeItem(k); } catch {} document.getElementById('m
 </script></body></html>`;
 }
 
-function sendUnavailable(req, res, name, status, detail) {
+function sendUnavailable(req, res, name, status, detail, headline) {
   if (res.destroyed || res.headersSent) return;
   if (isNavigation(req)) {
     res.writeHead(status, { 'Retry-After': '1', 'Content-Type': 'text/html; charset=utf-8' });
-    res.end(retryPage(name, detail));
+    res.end(retryPage(name, headline, detail));
     return;
   }
   // The sub-app's own callers hand the body to .json(): plain text surfaces as a SyntaxError
@@ -472,26 +489,98 @@ function sendUnavailable(req, res, name, status, detail) {
   res.end(JSON.stringify({ error: detail }));
 }
 
+// The child on childPort, or null when it has been replaced since the connect was tried.
+function currentChild(name, childPort) {
+  const pool = activePool();
+  return pool?.ports[name] === childPort ? pool.children.get(name) : null;
+}
+
+// A busy event loop (cck's cache warmup) must not read as a dead app.
+const PING_TIMEOUT_MS = 3000;
+// A drop burst fails many requests at once; they share one ping per child.
+const pings = new WeakMap();
+function pingChild(name, childPort, err) {
+  const child = currentChild(name, childPort);
+  if (!child) return Promise.resolve(false);
+  if (!pings.has(child)) {
+    const alive = ping(child, PING_TIMEOUT_MS).then((ok) => {
+      pings.delete(child);
+      if (ok) console.warn(`[${name}] answers over IPC at 127.0.0.1:${childPort} (${err.code}) - keeping it`);
+      return ok;
+    });
+    pings.set(child, alive);
+  }
+  return pings.get(child);
+}
+
+// A drop burst fails dozens of connects that the next attempt fixes, so retries are counted and
+// logged as one line per app every RETRY_LOG_MS. The IPC check, a replace and a failure log at once.
+const RETRY_LOG_MS = 5 * 60_000;
+const retryCounts = new Map();
+function countRetry(name, code) {
+  const key = `${name} ${code}`;
+  const entry = retryCounts.get(key) || { name, code, n: 0 };
+  entry.n++;
+  retryCounts.set(key, entry);
+}
+setInterval(() => {
+  for (const { name, code, n } of retryCounts.values()) {
+    console.log(`[${name}] ${n} connects failed (${code}) and were retried in the last ${RETRY_LOG_MS / 60_000} min`);
+  }
+  retryCounts.clear();
+}, RETRY_LOG_MS).unref();
+
+const ALIVE_WAIT_MS = 30000;
+const MAX_BACKOFF_MS = 2000;
+
+// Returns {wait} before the next connect attempt, or {headline, detail} to give up with. A pong
+// moves budget.deadline to ALIVE_WAIT_MS from now: the child runs, so the request waits out the drop.
+async function afterConnectFailure(name, childPort, err, attempt, budget) {
+  const next = await nextAttempt(name, childPort, err, attempt, budget);
+  if (next.wait) countRetry(name, err.code);
+  return next;
+}
+
+async function nextAttempt(name, childPort, err, attempt, budget) {
+  if (attempt < MAX_ATTEMPTS) return { wait: ATTEMPT_DELAY_MS };
+  if (attempt === MAX_ATTEMPTS) {
+    if (!(await pingChild(name, childPort, err))) {
+      replaceChild(name, childPort, err);
+      return { headline: 'is restarting', detail: `${name} did not answer over TCP (${err.code}) or IPC` };
+    }
+    budget.deadline = Math.max(budget.deadline, Date.now() + ALIVE_WAIT_MS);
+  }
+  const wait = Math.min(ATTEMPT_DELAY_MS * 2 ** (attempt - MAX_ATTEMPTS + 1), MAX_BACKOFF_MS);
+  if (Date.now() + wait < budget.deadline) return { wait };
+  // Its listener is gone or stuck while the process lives on. A new process gets a new port.
+  if (currentChild(name, childPort)) {
+    console.warn(`[${name}] answers over IPC, but connects to 127.0.0.1:${childPort} kept failing (${err.code})`);
+    replaceChild(name, childPort, err);
+  }
+  return {
+    headline: 'is restarting',
+    detail: `${name} answers over IPC, but connects to it kept failing (${err.code}) for ${ALIVE_WAIT_MS / 1000}s`,
+  };
+}
+
 // A pooled socket the child closed under us is normal and recovers on the next attempt. A port that
 // never completes a connect does not, so the child is replaced and the respawn gives it a new one.
 function replaceChild(name, childPort, err) {
-  const pool = activePool();
-  const child = pool?.children.get(name);
-  if (!child || pool.ports[name] !== childPort) return;
+  const child = currentChild(name, childPort);
+  if (!child) return;
   console.log(`[${name}] unreachable at 127.0.0.1:${childPort} (${err.code}) - replacing it`);
-  delete pool.ports[name];
+  delete activePool().ports[name];
   killChild(child);
 }
+
+const connectTimeoutError = (name, childPort) =>
+  Object.assign(new Error(`no connect to ${name} at 127.0.0.1:${childPort}`), { code: 'ETIMEDOUT' });
 
 // Fires only while the socket is still connecting, so a slow handler is never interrupted.
 function capConnect(upstream, name, childPort) {
   upstream.on('socket', (socket) => {
     if (!socket.connecting) return;
-    const timer = setTimeout(() => {
-      const err = new Error(`no connect to ${name} at 127.0.0.1:${childPort}`);
-      err.code = 'ETIMEDOUT';
-      upstream.destroy(err);
-    }, CONNECT_TIMEOUT_MS);
+    const timer = setTimeout(() => upstream.destroy(connectTimeoutError(name, childPort)), CONNECT_TIMEOUT_MS);
     const clear = () => clearTimeout(timer);
     socket.once('connect', clear);
     upstream.once('close', clear);
@@ -500,7 +589,29 @@ function capConnect(upstream, name, childPort) {
 
 // Resolves null once the response is committed (or the client is gone), or the error when nothing
 // has been written yet and the caller may still retry.
-function forward(name, req, res, childPort, headers, replayable, onUpstream) {
+const MAX_REPLAY_BODY = 1024 * 1024;
+
+// Resolves the whole body when it is small enough to keep for a retry, else null (the body then
+// streams once). A chunked body has no length up front, so it streams too.
+function readReplayBody(req) {
+  const te = req.headers['transfer-encoding'];
+  const cl = req.headers['content-length'];
+  if (te) return Promise.resolve(null);
+  if (cl === undefined) return Promise.resolve(Buffer.alloc(0));
+  const len = Number(cl);
+  if (!Number.isSafeInteger(len) || len > MAX_REPLAY_BODY) return Promise.resolve(null);
+  return new Promise((resolve) => {
+    const chunks = [];
+    req.on('data', (c) => chunks.push(c));
+    req.once('end', () => resolve(Buffer.concat(chunks)));
+    req.once('error', () => resolve(undefined));
+    req.once('close', () => {
+      if (!req.complete) resolve(undefined);
+    });
+  });
+}
+
+function forward(name, req, res, childPort, headers, body, onUpstream) {
   return new Promise((resolve) => {
     const upstream = http.request(
       { host: '127.0.0.1', port: childPort, method: req.method, path: req.url, headers, agent: proxyAgent },
@@ -520,9 +631,16 @@ function forward(name, req, res, childPort, headers, replayable, onUpstream) {
       }
       resolve(err);
     });
-    if (replayable) upstream.end();
+    if (body) upstream.end(body.length ? body : undefined);
     else req.pipe(upstream);
   });
+}
+
+// RFC 9110 §7.6.1. The client's "Connection: close" would otherwise close the pooled socket to the
+// app too. Transfer-Encoding stays: it frames the body that is piped on.
+function stripHopByHop(headers) {
+  for (const h of (headers.connection || '').split(',')) delete headers[h.trim().toLowerCase()];
+  for (const h of ['connection', 'keep-alive', 'proxy-connection', 'te', 'trailer', 'upgrade']) delete headers[h];
 }
 
 // Host is forwarded untouched so the child's hostGuard still sees what the browser sent. Origin is
@@ -536,38 +654,41 @@ function proxyHandler(name) {
     const cookie = stripCookie(headers.cookie, TOKEN_COOKIE);
     if (cookie) headers.cookie = cookie;
     else delete headers.cookie;
-    // req is consumed by the first attempt, so only a request with no body can be re-sent. Waiting
-    // for a port is not a replay — nothing has been sent yet — so every method gets the same wait.
-    const replayable = req.method === 'GET' || req.method === 'HEAD' || req.method === 'OPTIONS';
+    stripHopByHop(headers);
+    // req is consumed by the first attempt, so a request is re-sent only from its kept body. Waiting
+    // for a port is not a replay — nothing has been sent yet — so every request gets the same wait.
+    const body = await readReplayBody(req);
+    if (body === undefined) return;
     // One deadline for the whole request, not one per attempt: a retry must not re-spend the wait.
-    const deadline = Date.now() + (isNavigation(req) ? NAV_PORT_WAIT_MS : API_PORT_WAIT_MS);
+    const budget = { deadline: Date.now() + (isNavigation(req) ? NAV_PORT_WAIT_MS : API_PORT_WAIT_MS) };
     // One listener for the request, however many attempts it takes.
     let current = null;
     res.once('close', () => current?.destroy());
 
     for (let attempt = 1; !res.destroyed; attempt++) {
-      const childPort = await waitForPort(name, deadline);
+      const childPort = await waitForPort(name, budget.deadline);
       if (!childPort) {
-        sendUnavailable(req, res, name, 503, `${name} is starting`);
+        const { headline, detail } = noPortReason(name);
+        sendUnavailable(req, res, name, 503, detail, headline);
         return;
       }
       if (req.headers.origin) {
         headers.origin = rewriteOrigin(req.headers.origin, publicPorts[name], childPort);
       }
-      const err = await forward(name, req, res, childPort, headers, replayable, (u) => {
+      const err = await forward(name, req, res, childPort, headers, body, (u) => {
         current = u;
       });
       if (!err) return;
-      if (!replayable || attempt >= MAX_ATTEMPTS || !RETRYABLE.has(err.code)) {
-        // A port that ate every attempt is not coming back; anything less is a transient close.
-        if (attempt >= MAX_ATTEMPTS) replaceChild(name, childPort, err);
-        sendUnavailable(req, res, name, 502, err.message);
+      if (body === null || !RETRYABLE.has(err.code)) {
+        sendUnavailable(req, res, name, 502, err.message, 'did not respond');
         return;
       }
-      console.warn(
-        `[${name}] ${req.method} ${req.url.split('?')[0]} to 127.0.0.1:${childPort} failed (${err.code}), retrying`,
-      );
-      await delay(ATTEMPT_DELAY_MS);
+      const next = await afterConnectFailure(name, childPort, err, attempt, budget);
+      if (!next.wait) {
+        sendUnavailable(req, res, name, 503, next.detail, next.headline);
+        return;
+      }
+      await delay(next.wait);
     }
   };
 }
@@ -591,13 +712,13 @@ function proxyUpgrade(name) {
       if (header === 'cookie' && !(value = stripCookie(value, TOKEN_COOKIE))) continue;
       lines.push(`${req.rawHeaders[i]}: ${value}`);
     }
-    tunnel(name, childPort, `${lines.join('\r\n')}\r\n\r\n`, head, socket, 1);
+    const budget = { deadline: Date.now() + NAV_PORT_WAIT_MS };
+    tunnel(name, childPort, `${lines.join('\r\n')}\r\n\r\n`, head, socket, 1, budget);
   };
 }
 
-// A fresh loopback connect to a child sometimes fails at once with ETIMEDOUT on Windows (cause
-// unknown, seen only on a just-started hub), so a connect that never opened is tried once more.
-function tunnel(name, childPort, request, head, socket, retries) {
+// A connect that never opened follows the same retry rule as proxyHandler.
+function tunnel(name, childPort, request, head, socket, attempt, budget) {
   let connected = false;
   const upstream = tcp.connect(childPort, '127.0.0.1', () => {
     connected = true;
@@ -607,20 +728,25 @@ function tunnel(name, childPort, request, head, socket, retries) {
     upstream.pipe(socket);
     socket.pipe(upstream);
   });
-  const connectTimer = setTimeout(() => upstream.destroy(), CONNECT_TIMEOUT_MS);
+  const connectTimer = setTimeout(() => upstream.destroy(connectTimeoutError(name, childPort)), CONNECT_TIMEOUT_MS);
   const onSocketClose = () => upstream.destroy();
   socket.on('close', onSocketClose);
-  upstream.on('error', (err) => {
-    if (connected || socket.destroyed || retries < 1) {
-      if (!connected) console.warn(`[${name}] upgrade connect to 127.0.0.1:${childPort} failed (${err.code})`);
+  upstream.on('error', async (err) => {
+    if (connected || socket.destroyed) {
       socket.destroy();
       return;
     }
-    console.warn(`[${name}] upgrade connect to 127.0.0.1:${childPort} failed (${err.code}), retrying`);
     clearTimeout(connectTimer);
     socket.off('close', onSocketClose);
     upstream.removeAllListeners('close');
-    tunnel(name, childPort, request, head, socket, retries - 1);
+    const next = await afterConnectFailure(name, childPort, err, attempt, budget);
+    if (!next.wait || socket.destroyed) {
+      socket.destroy();
+      return;
+    }
+    await delay(next.wait);
+    if (socket.destroyed) return;
+    tunnel(name, childPort, request, head, socket, attempt + 1, budget);
   });
   upstream.on('close', () => socket.destroy());
 }
@@ -668,7 +794,7 @@ function appsConfig() {
   return Object.fromEntries(
     ENABLED_APPS.map((a) => {
       const entry = { name: a.name, url: `http://localhost:${publicPorts[a.id]}`, icon: a.icon, loading: a.loading };
-      if (a.id === 'kanban' && TERMINAL_TOKEN) entry.terminalToken = TERMINAL_TOKEN;
+      if (TERMINAL_TOKEN && a.id === TERMINAL_APP.id) entry.terminalToken = TERMINAL_TOKEN;
       return [a.id, entry];
     }),
   );
@@ -746,30 +872,35 @@ app.post('/api/config-dirs/activate', async (req, res) => {
   res.json({ apps: appsConfig() });
 });
 
-// Project list for the switcher palette, proxied from kanban — it is the only sub-app that
-// enumerates projects. The port is read per request because kanban's real port is only known
-// once its banner has been scraped (see spawnApp).
+// Project list for the switcher palette, proxied from the app that provides `projects`. The port is
+// read per request because the provider's real port is only known once its banner has been scraped
+// (see spawnApp).
 app.get('/api/projects', async (_req, res) => {
   res.setHeader('Cache-Control', 'no-store');
+  if (!PROJECTS_APP) {
+    res.status(503).json({ error: 'no enabled app provides projects' });
+    return;
+  }
+  const { id } = PROJECTS_APP;
   // Waits like the proxy does, so the palette is not the one thing that hard-fails during a restart.
-  const kanbanPort = await waitForPort('kanban', Date.now() + API_PORT_WAIT_MS);
-  if (!kanbanPort) {
-    res.status(503).json({ error: 'kanban is starting' });
+  const port = await waitForPort(id, Date.now() + API_PORT_WAIT_MS);
+  if (!port) {
+    res.status(503).json({ error: `${id} is starting` });
     return;
   }
   try {
     // 127.0.0.1, not localhost — Node's verbatim DNS ordering tries ::1 first on Windows.
-    const upstream = await fetch(`http://127.0.0.1:${kanbanPort}/api/projects`, {
+    const upstream = await fetch(`http://127.0.0.1:${port}${PROJECTS_APP.provides.projects.path}`, {
       signal: AbortSignal.timeout(4000),
     });
     if (!upstream.ok) {
-      res.status(502).json({ error: `kanban responded ${upstream.status}` });
+      res.status(502).json({ error: `${id} responded ${upstream.status}` });
       return;
     }
     res.json(await upstream.json());
   } catch (err) {
     // Soft-fail so the palette still opens and offers literal-path entry.
-    res.status(502).json({ error: `kanban unavailable: ${err.message}` });
+    res.status(502).json({ error: `${id} unavailable: ${err.message}` });
   }
 });
 

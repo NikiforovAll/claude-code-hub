@@ -3,9 +3,10 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
-const { APPS, selectApps, loadApp, manifestError, builtInManifest } = require('../lib/apps');
+const { APPS, selectApps, loadApp, manifestError } = require('../lib/apps');
 
 const COST = APPS.find((a) => a.id === 'cost');
+const KANBAN = APPS.find((a) => a.id === 'kanban');
 
 describe('selectApps', () => {
   it('keeps the default order with no entries', () => {
@@ -31,12 +32,21 @@ describe('selectApps', () => {
   });
 });
 
-describe('built-in manifests', () => {
+// The submodule when it is checked out, else the installed package: in the release run this checks
+// the packages the hub pins.
+describe('app manifests', () => {
   for (const app of APPS) {
-    it(`${app.id} is valid`, () => {
-      assert.equal(manifestError(builtInManifest(app.id), app.id, '/root'), null);
+    it(`${app.id} ships a valid hub-app.json`, () => {
+      const logs = [];
+      assert.ok(loadApp(app, { log: (line) => logs.push(line) }));
+      assert.deepEqual(logs, []);
     });
   }
+
+  it('kanban provides projects and the terminal', () => {
+    const kanban = loadApp(KANBAN, { log: () => {} });
+    assert.deepEqual(Object.keys(kanban.provides).sort(), ['projects', 'terminal']);
+  });
 });
 
 describe('manifestError', () => {
@@ -61,6 +71,18 @@ describe('manifestError', () => {
     assert.match(manifestError({ ...ok, run: { entry: '../evil.js' } }, 'cost', root), /outside/);
     assert.match(manifestError({ ...ok, run: { entry: path.resolve('/elsewhere/x.js') } }, 'cost', root), /outside/);
     assert.match(manifestError({ ...ok, run: { entry: '.' } }, 'cost', root), /outside/);
+  });
+
+  it('accepts capability paths and rejects ones that are not paths', () => {
+    const provides = { projects: { path: '/api/projects' }, terminal: { liveWork: '/api/terminals' } };
+    assert.equal(manifestError({ ...ok, provides }, 'cost', root), null);
+    assert.match(manifestError({ ...ok, provides: [] }, 'cost', root), /not an object/);
+    assert.match(manifestError({ ...ok, provides: 'x' }, 'cost', root), /not an object/);
+    assert.match(manifestError({ ...ok, provides: { projects: {} } }, 'cost', root), /provides.projects.path/);
+    assert.match(
+      manifestError({ ...ok, provides: { terminal: { liveWork: 'http://x/' } } }, 'cost', root),
+      /provides.terminal.liveWork/,
+    );
   });
 });
 
@@ -89,20 +111,36 @@ describe('loadApp', () => {
   };
   const submodule = (manifest) => makeApp(path.join(hubRoot, COST.dir), manifest);
 
-  it('uses the built-in manifest when the package ships none', () => {
-    const pkgRoot = makeApp(path.join(hubRoot, 'pkg'));
+  const COST_MANIFEST = {
+    manifest: 1,
+    id: 'cost',
+    name: 'Cost',
+    icon: 'coins',
+    run: { entry: 'server.js', defaultPort: 3543 },
+    loading: { verbs: ['Counting…'] },
+    actions: { handles: {} },
+  };
+
+  it('reads the installed package when there is no submodule', () => {
+    const pkgRoot = makeApp(path.join(hubRoot, 'pkg'), COST_MANIFEST);
     const app = loadApp(COST, { hubRoot, resolve: () => path.join(pkgRoot, 'package.json'), log });
-    const m = builtInManifest('cost');
     assert.deepEqual(app, {
       id: 'cost',
       entry: path.join(pkgRoot, 'server.js'),
-      port: m.run.defaultPort,
-      name: m.name,
-      icon: m.icon,
-      loading: m.loading,
-      actions: m.actions,
+      port: 3543,
+      name: 'Cost',
+      icon: 'coins',
+      loading: COST_MANIFEST.loading,
+      actions: COST_MANIFEST.actions,
+      provides: {},
     });
     assert.deepEqual(logs, []);
+  });
+
+  it('skips an app that ships no hub-app.json', () => {
+    submodule();
+    assert.equal(loadApp(COST, { hubRoot, resolve: noPackage, log }), null);
+    assert.match(logs[0], /hub-app.json: not found\. cost is skipped/);
   });
 
   it('prefers a checked-out submodule and reads its manifest', () => {
@@ -116,10 +154,10 @@ describe('loadApp', () => {
 
   describe('port', () => {
     const portOf = (port, flagPort) => {
-      submodule();
+      submodule(COST_MANIFEST);
       return loadApp({ ...COST, port }, { flagPort, hubRoot, resolve: noPackage, log }).port;
     };
-    const defaultPort = builtInManifest('cost').run.defaultPort;
+    const defaultPort = COST_MANIFEST.run.defaultPort;
 
     it('takes the flag, then the config entry, then the manifest', () => {
       assert.equal(portOf(4643, '4743'), 4743);
@@ -136,16 +174,16 @@ describe('loadApp', () => {
     });
   });
 
-  it('falls back to the built-in manifest when the file is invalid', () => {
+  it('skips an app whose manifest is invalid', () => {
     submodule({ manifest: 1, id: 'other', run: { entry: 'server.js' } });
-    assert.equal(loadApp(COST, { hubRoot, resolve: noPackage, log }).name, 'Cost');
-    assert.match(logs[0], /is not "cost"\. Using the built-in manifest/);
+    assert.equal(loadApp(COST, { hubRoot, resolve: noPackage, log }), null);
+    assert.match(logs[0], /is not "cost"\. cost is skipped/);
   });
 
-  it('falls back to the built-in manifest when the file is not JSON', () => {
+  it('skips an app whose manifest is not JSON', () => {
     submodule('{ nope');
-    assert.equal(loadApp(COST, { hubRoot, resolve: noPackage, log }).name, 'Cost');
-    assert.match(logs[0], /Using the built-in manifest/);
+    assert.equal(loadApp(COST, { hubRoot, resolve: noPackage, log }), null);
+    assert.match(logs[0], /cost is skipped/);
   });
 
   it('throws when neither the submodule nor the package is there', () => {
