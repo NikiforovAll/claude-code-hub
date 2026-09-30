@@ -1,0 +1,8 @@
+{
+  "name": "claude-code-hub",
+  "version": "0.1.0",
+  "description": "Claude Code Hub integration: a skill to build on the hub, with links to its docs and custom themes",
+  "author": {
+    "name": "NikiforovAll"
+  }
+}

@@ -14,7 +14,7 @@ const { stripCookie } = require('./lib/cookies');
 const { createNetGuard, KEEP_ALIVE_MS } = require('./lib/net-guard');
 const { ping } = require('./lib/ping');
 const { killChild } = require('./lib/kill-child');
-const { themeConfig } = require('./lib/themes');
+const { readRegistry, themeConfig } = require('./lib/themes');
 
 function getArg(name) {
   const idx = process.argv.findIndex((a) => a.startsWith(`--${name}`));
@@ -48,6 +48,22 @@ function activePool() {
 // be known before the first spawn, and the hub already has one localStorage key to reason about.
 const HUB_DIR = path.resolve(expandHome(getArg('hub-dir') || process.env.CLAUDE_HUB_DIR || '~/.claude-hub'));
 const HUB_CONFIG_FILE = path.join(HUB_DIR, 'config.json');
+
+if (process.argv.includes('--install') || process.argv.includes('--uninstall')) {
+  const { runInstall, runUninstall } = require('./lib/install');
+  const dir = getArg('dir') || process.env.CLAUDE_CONFIG_DIR || '~/.claude';
+  let configDir;
+  try {
+    configDir = canonicalDir(dir);
+  } catch {
+    console.error(`Config dir not found: ${dir}`);
+    process.exit(1);
+  }
+  const ok = process.argv.includes('--install')
+    ? runInstall({ hubDir: HUB_DIR, configDir })
+    : runUninstall({ configDir });
+  process.exit(ok ? 0 : 1);
+}
 
 // The dir the hub would use with no saved config. Set by loadHubConfig; the client uses it to keep
 // the default dir out of the window title.
@@ -785,7 +801,9 @@ app.use(express.json());
 // compiles into each sub-app's themes.css. Served rather than hand-copied into public/app.js so there
 // is one source of truth.
 // Read once — themes.json only changes when the generator is re-run, which restarts the hub anyway.
-const THEME_CONFIG = themeConfig();
+const THEME_REGISTRY = readRegistry();
+// Read on each /api/config, so an edit applies on the next page load.
+const USER_THEMES_FILE = path.join(HUB_DIR, 'themes.json');
 
 function appsConfig() {
   return Object.fromEntries(
@@ -805,7 +823,7 @@ function appsConfig() {
 
 app.get('/api/config', (_req, res) => {
   res.json({
-    ...THEME_CONFIG,
+    ...themeConfig(THEME_REGISTRY, { userFile: USER_THEMES_FILE }),
     apps: appsConfig(),
     actions: ACTIONS,
     activeConfigDir: hubConfig.activeConfigDir,

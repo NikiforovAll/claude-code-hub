@@ -1,0 +1,14 @@
+{
+  "name": "claude-code-hub",
+  "owner": {
+    "name": "NikiforovAll"
+  },
+  "description": "The plugin that ships with Claude Code Hub",
+  "plugins": [
+    {
+      "name": "claude-code-hub",
+      "source": "./plugins/claude-code-hub",
+      "description": "Claude Code Hub integration: a skill to build on the hub, with links to its docs and custom themes"
+    }
+  ]
+}

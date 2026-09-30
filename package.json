@@ -59,6 +59,7 @@
     "server.js",
     "public/**/*",
     "lib/**/*",
+    "plugin/**/*",
     "packages/claude-hub-sdk/src/**/*"
   ],
   "devDependencies": {

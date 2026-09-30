@@ -9,6 +9,7 @@ const { version } = require('../package.json');
 // package.json and in CHANGELOG.md, then `npm run sdk:sync` for each app.
 const RELEASED = {
   '1.0.0': '17957c297dc7',
+  '1.1.0': '0fed14faa670',
 };
 
 describe('version', () => {

@@ -25,6 +25,23 @@ npx claude-code-hub [flags]
 
 A flag takes its value after a space or after `=`: `--port 4000` and `--port=4000` are the same.
 
+### Install the hub plugin
+
+The hub ships a Claude Code plugin with the `hub-builder` skill. The skill helps an agent build on the hub: it links each task to the page of these docs that covers it, and explains custom themes.
+
+```bash
+npx claude-code-hub --install [--dir <config dir>]
+npx claude-code-hub --uninstall [--dir <config dir>]
+```
+
+| Flag | Default | Action |
+| --- | --- | --- |
+| `--install` | | Install or update the plugin in one config dir, then exit |
+| `--uninstall` | | Remove the plugin from one config dir, then exit |
+| `--dir <path>` | `CLAUDE_CONFIG_DIR`, else `~/.claude` | The config dir to install into or remove from |
+
+The install copies the plugin to `plugin/` in the hub folder and registers that copy in the config dir. Run it once for each config dir, and again after you update the hub. Start a new Claude Code session to load the skill. The uninstall keeps the copy, because other config dirs can use it.
+
 ### Ports
 
 The hub listens on its own port and on the port of each enabled tool. The tool ports forward to the tools of the active config dir, which run on free ports that the hub picks. So the tool URLs stay the same when you switch the config dir.
@@ -88,6 +105,7 @@ The paths are for the default hub folder. With `--hub-dir` or `CLAUDE_HUB_DIR`, 
 | --- | --- |
 | `~/.claude-hub/config.json` | The config-dir list, the active dir, and your `terminal` block and `apps` list |
 | `~/.claude-hub/token` | The [hub token](/claude-code-hub/reference/security/#the-hub-token) |
+| `~/.claude-hub/plugin/` | The copy of the [hub plugin](#install-the-hub-plugin) that `--install` writes |
 
 The tools write their own files. See their docs:
 

@@ -19,6 +19,7 @@
         inHub: false,
         onStatus: () => off,
         onActive: () => off,
+        onThemes: () => off,
         subscribe: () => off,
         bindTheme: () => off,
         handle() {},

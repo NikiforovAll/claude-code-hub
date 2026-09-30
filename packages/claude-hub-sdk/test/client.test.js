@@ -26,6 +26,7 @@ function fakeEnv({ framed = true, config = { enabled: true, url: HUB }, readySta
   const styleCalls = [];
   const timers = [];
   const opened = [];
+  const sheets = [];
   const win = {
     addEventListener: on,
     fetch: async () => ({ json: async () => config }),
@@ -46,6 +47,8 @@ function fakeEnv({ framed = true, config = { enabled: true, url: HUB }, readySta
     document: {
       readyState,
       addEventListener: on,
+      createElement: (tag) => ({ tag, textContent: '' }),
+      head: { appendChild: (el) => sheets.push(el) },
       body: {
         style: {
           setProperty: (k, v) => {
@@ -65,6 +68,7 @@ function fakeEnv({ framed = true, config = { enabled: true, url: HUB }, readySta
     styleCalls,
     storage,
     opened,
+    sheets,
     sent: () => parent.sent.map((s) => s.msg),
     posts: () => parent.sent,
     fromHub: (data, { source = parent, origin = HUB } = {}) => fire('message', { data, source, origin }),
@@ -286,6 +290,38 @@ describe('theme', () => {
     const b = binding();
     hub.bindTheme(b);
     assert.deepEqual(b.state, { theme: 'light', colorTheme: 'ocean' });
+  });
+
+  it('hands the picker the hub themes once, after one sheet of swatch rules', async () => {
+    const swatch = (accent) => ({ bg: '#111', accent, ink: '#eee', border: '#333' });
+    const themes = [{ id: 'mine', label: 'Mine', swatch: { dark: swatch('#f0a'), light: swatch('#0af') } }];
+    const { env, hub } = await connected();
+    const before = [];
+    hub.onThemes((list) => before.push(list));
+    env.fromHub(welcome({ themes }));
+    env.fromHub(welcome({ themes }));
+    const after = [];
+    hub.onThemes((list) => after.push(list));
+    assert.deepEqual(before, [[{ id: 'mine', label: 'Mine' }]]);
+    assert.deepEqual(after, before);
+    assert.equal(env.sheets.length, 1);
+    assert.equal(
+      env.sheets[0].textContent,
+      '.theme-swatch-mine { --sw-bg: #111; --sw-accent: #f0a; --sw-ink: #eee; --sw-border: #333; }\n' +
+        'body.light .theme-swatch-mine { --sw-bg: #111; --sw-accent: #0af; --sw-ink: #eee; --sw-border: #333; }',
+    );
+  });
+
+  it('never calls onThemes when the hub lists no themes or no welcome comes', async () => {
+    for (const end of [(env) => env.fromHub(welcome()), (env) => env.endWait()]) {
+      const { env, hub } = await connected();
+      const calls = [];
+      hub.onThemes((list) => calls.push(list));
+      end(env);
+      hub.onThemes((list) => calls.push(list));
+      assert.deepEqual(calls, []);
+      assert.equal(env.sheets.length, 0);
+    }
   });
 });
 

@@ -109,7 +109,7 @@ The hub ships the SDK and hands it to each app it spawns, so the app runs the hu
 3. **Load it first.** The page loads `/vendor/claude-hub-sdk.js` as a classic script, the first element in `<body>`, with no `defer` or `async` ([Theme](#6-theme), rule 3).
 4. **Same API.** The stub and the client have the same functions. The hub's tests check this.
 
-The app's page code calls `ClaudeHub.connect()` and uses the returned object: `subscribe`, `publish`, `bindTheme`, `onActive`, `onStatus`, `handle`, `invoke`, `can`, `forwards`, `closeGuard`, `openExternal` and `terminalToken`. It works the same with the stub and the client.
+The app's page code calls `ClaudeHub.connect()` and uses the returned object: `subscribe`, `publish`, `bindTheme`, `onThemes`, `onActive`, `onStatus`, `handle`, `invoke`, `can`, `forwards`, `closeGuard`, `openExternal` and `terminalToken`. It works the same with the stub and the client.
 
 ### HTTP
 
@@ -188,7 +188,7 @@ The hub does not theme semantic colors (`--success`, `--warning`, `--error`), ch
    - Standalone, it never applies them: a standalone tab can share the origin with the proxy.
    - When the hub sends no `vars`, or sends no `welcome` within 2 s of `hello`, the app removes the cached set from the page and from `localStorage`. Until then, it keeps the cached set.
 4. **Derive extras.** An app computes any extra variable from the core set in its own CSS, for example `--chart-fill: color-mix(in srgb, var(--accent) 32%, transparent)`, so it follows a theme it does not know. It declares the extra on `body`, not `:root`: `var()` resolves where the property is declared, and the inline `vars` are on `body`.
-5. **Picker.** Under the hub, the app's theme picker lists `welcome.themes` and paints the swatches inline. Standalone, it lists the app's own themes.
+5. **Picker.** Under the hub, the app's theme picker lists `welcome.themes`, which include the user's own themes, with the hub's swatches. The SDK's `onThemes(fn)` calls `fn` once with `[{id, label}]` after it adds a style sheet of `.theme-swatch-<id>` and `body.light .theme-swatch-<id>` rules that set `--sw-bg`, `--sw-accent`, `--sw-ink` and `--sw-border`. Standalone, it lists the app's own themes.
 6. **Report.** When the user picks a theme in the app, the app sends `hub:theme` and applies what it has: its own CSS for a theme it knows, else the swatch only. The hub stores the theme and sends it as `theme.changed` with `vars` to every live app, the sender included.
 7. **Unknown id standalone.** An app that stored a hub-only theme id shows its default theme when it runs standalone.
 8. **Subscribe.** An app that applies the theme lists `theme.changed` in `hello.subscribes`, so it gets the theme as a sticky `hub:event` after `welcome`. The SDK's `bindTheme` adds the topic. Call it right after `connect()`: the SDK sends `hello` after `load`, with the topics it has then. An app that binds after `hello` gets no theme from the hub.
