@@ -4,21 +4,19 @@
 //
 // Usage: node scripts/sdk-sync.mjs <app id | app dir> [...]
 
-import { createHash } from 'node:crypto';
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { createRequire } from 'node:module';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const root = join(dirname(fileURLToPath(import.meta.url)), '..');
-const { APPS } = createRequire(import.meta.url)(join(root, 'lib/apps.js'));
+const require = createRequire(import.meta.url);
+const { APPS } = require(join(root, 'lib/apps.js'));
 const sdkDir = join(root, 'packages/claude-hub-sdk');
 const { version } = JSON.parse(readFileSync(join(sdkDir, 'package.json'), 'utf8'));
-const stamped = (file) => {
-  const src = readFileSync(join(sdkDir, 'src', file), 'utf8');
-  const hash = createHash('sha256').update(src).digest('hex').slice(0, 12);
-  return `// claude-hub-sdk ${version} (sha256 ${hash}). Copied by npm run sdk:sync in claude-code-hub. Do not edit.\n${src}`;
-};
+const hash = require(join(sdkDir, 'src-hash.js'))();
+const stamped = (file) =>
+  `// claude-hub-sdk ${version} (sha256 ${hash}). Copied by npm run sdk:sync in claude-code-hub. Do not edit.\n${readFileSync(join(sdkDir, 'src', file), 'utf8')}`;
 const copies = [
   ['public/vendor/claude-hub-sdk.js', stamped('stub.js')],
   ['test/vendor/claude-hub-sdk.js', stamped('client.js')],

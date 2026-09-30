@@ -327,6 +327,30 @@ describe('actions', () => {
   });
 });
 
+describe('events', () => {
+  it('publishes when live, and sends only the latest payload per topic that waited for welcome', async () => {
+    const { env, hub } = await connected();
+    hub.publish('session.changed', { sessionId: 'a' });
+    hub.publish('session.changed', { sessionId: 'b' });
+    assert.equal(env.sent().length, 1);
+    env.fromHub(welcome());
+    hub.publish('session.changed', { sessionId: 'c' });
+    assert.deepEqual(env.sent().slice(1), [
+      { type: 'hub:publish', topic: 'session.changed', payload: { sessionId: 'b' } },
+      { type: 'hub:publish', topic: 'session.changed', payload: { sessionId: 'c' } },
+    ]);
+  });
+
+  it('drops a publish when no welcome comes', async () => {
+    const { env, hub } = await connected();
+    hub.publish('session.changed', { sessionId: 'a' });
+    env.endWait();
+    env.fromHub(welcome());
+    hub.publish('session.changed', null);
+    assert.deepEqual(env.sent().slice(1), [{ type: 'hub:publish', topic: 'session.changed', payload: null }]);
+  });
+});
+
 describe('keys', () => {
   it('names combos like the hub', () => {
     assert.equal(comboOf(ctrlAlt('P', 'KeyP')), 'ctrl+alt+p');

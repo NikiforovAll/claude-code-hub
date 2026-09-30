@@ -84,6 +84,14 @@ describe('manifestError', () => {
       /provides.terminal.liveWork/,
     );
   });
+
+  it("accepts published topics and rejects a bad name or the hub's own", () => {
+    assert.equal(manifestError({ ...ok, publishes: ['session.changed'] }, 'cost', root), null);
+    assert.match(manifestError({ ...ok, publishes: 'session.changed' }, 'cost', root), /not an array/);
+    assert.match(manifestError({ ...ok, publishes: ['Session'] }, 'cost', root), /does not match/);
+    assert.match(manifestError({ ...ok, publishes: ['project.changed'] }, 'cost', root), /the hub's/);
+    assert.match(manifestError({ ...ok, publishes: ['hub.trace'] }, 'cost', root), /the hub's/);
+  });
 });
 
 describe('loadApp', () => {
@@ -133,6 +141,7 @@ describe('loadApp', () => {
       loading: COST_MANIFEST.loading,
       actions: COST_MANIFEST.actions,
       provides: {},
+      publishes: [],
     });
     assert.deepEqual(logs, []);
   });

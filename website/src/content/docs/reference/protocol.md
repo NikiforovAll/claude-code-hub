@@ -19,7 +19,7 @@ An app must work with no hub. Everything in this spec turns on only when the hub
 |---|---|---|
 | Protocol | `hello.protocol`, `welcome.protocol` | A change that an app or hub of the same version cannot ignore |
 | Manifest | `hub-app.json` `manifest` | A field that the hub must read in a new way |
-| SDK | `version` in `packages/claude-hub-sdk/package.json`, also in the stamp line of each synced copy | Any change to the SDK |
+| SDK | `version` in `packages/claude-hub-sdk/package.json`, also in the stamp line of each synced copy. Semver, with each version in `CHANGELOG.md` | Any change to the SDK source. A test fails when the source changes and the version does not |
 
 1. **Additive changes keep the version.** A new message type, topic, action, optional payload field or manifest field is not a new protocol version. The hub and the app ignore a type or field they do not know ([Message rules](#4-message-rules)).
 2. **A breaking change bumps the version.** The next version is `2`. An app lists every version it speaks in `hello`, and the hub answers with the highest version that both sides speak ([Handshake](#5-handshake)).
@@ -109,7 +109,7 @@ The hub ships the SDK and hands it to each app it spawns, so the app runs the hu
 3. **Load it first.** The page loads `/vendor/claude-hub-sdk.js` as a classic script, the first element in `<body>`, with no `defer` or `async` ([Theme](#6-theme), rule 3).
 4. **Same API.** The stub and the client have the same functions. The hub's tests check this.
 
-The app's page code calls `ClaudeHub.connect()` and uses the returned object: `subscribe`, `bindTheme`, `onActive`, `onStatus`, `handle`, `invoke`, `can`, `forwards`, `closeGuard`, `openExternal` and `terminalToken`. It works the same with the stub and the client.
+The app's page code calls `ClaudeHub.connect()` and uses the returned object: `subscribe`, `publish`, `bindTheme`, `onActive`, `onStatus`, `handle`, `invoke`, `can`, `forwards`, `closeGuard`, `openExternal` and `terminalToken`. It works the same with the stub and the client.
 
 ### HTTP
 
@@ -267,6 +267,7 @@ An element that handles keys before the document sees them, such as a terminal, 
   "actions": {
     "handles": { "session.cost": { "params": { "session": "string?" }, "url": "?view=detail&session={session}", "mode": "message" } }
   },
+  "publishes": [],
   "provides": {}
 }
 ```
@@ -280,28 +281,31 @@ An element that handles keys before the document sees them, such as a terminal, 
 | `run.defaultPort` | The first choice for the proxy port ([Origin](#2-origin)). Not a reservation |
 | `loading.verbs` | Lines for the hub's loading screen while this app loads. Optional |
 | `actions.handles` | [Actions](#7-actions) |
+| `publishes` | The topics the app publishes ([Events](#10-events)). Optional |
 | `provides` | Capabilities, for example `{"projects": {"path": "/api/projects"}, "terminal": {"liveWork": "/api/terminals"}}`. The hub finds a capability's provider here |
 
 ### Rules
 
 1. **Discovery, not runtime.** The manifest holds what the hub needs before the app runs. The protocol version comes from `hello` only, because the running document may be an older bundle.
 2. **Built-in apps.** v1 runs the four built-in apps only. The hub reads each manifest from the submodule, else from the installed package, and keeps no copy. The hub's tests validate the manifest of each pinned package.
-3. **Skip.** The hub skips an app, with a log line, when its file is missing or not valid JSON, `manifest` is a version it does not know, `id` does not match the id rule ([Terms](#terms)) or is not the app's id, `run.entry` is not inside the app directory, or a `provides` path does not start with `/`. It skips one action, with a log line, when the action is not valid ([Actions](#7-actions)).
+3. **Skip.** The hub skips an app, with a log line, when its file is missing or not valid JSON, `manifest` is a version it does not know, `id` does not match the id rule ([Terms](#terms)) or is not the app's id, `run.entry` is not inside the app directory, a `provides` path does not start with `/`, or a `publishes` topic breaks the topic rule or is the hub's ([Events](#10-events)). It skips one action, with a log line, when the action is not valid ([Actions](#7-actions)).
 4. **Providers.** For each capability, the first enabled app in tab order whose `provides` declares it is the provider. `projects.path` and `terminal.liveWork` must be paths on the provider's origin. `projects.path` answers `[{path, modifiedAt}]`. `terminal.liveWork` answers `{sessions: []}`, and a pool whose provider has sessions is not evicted. With no provider, the capability is off: no terminal, and the project palette has no list.
 
 ## 10. Events
 
-An event is a fact from the hub that any number of apps can receive.
+An event is a fact that any number of apps can receive. The hub publishes some topics itself, and an app publishes the topics its manifest lists.
 
 | Direction | Type | Payload |
 |---|---|---|
 | App → hub | `hub:hello` | `subscribes: string[]`, the topics the app wants |
+| App → hub | `hub:publish` | `{topic, payload}`, a topic in the app's manifest `publishes` |
 | Hub → app | `hub:event` | `{topic, payload}` |
 
-| Topic | Sticky | Payload |
-|---|---|---|
-| `project.changed` | Yes | `{project, encoded, name}`, or `null` when there is no project |
-| `theme.changed` | Yes | `{theme, colorTheme, vars?}` |
+| Topic | From | Sticky | Payload |
+|---|---|---|---|
+| `project.changed` | Hub | Yes | `{project, encoded, name}`, or `null` when there is no project |
+| `theme.changed` | Hub | Yes | `{theme, colorTheme, vars?}` |
+| `session.changed` | `kanban` | Yes | `{sessionId, project, encoded, projectName, name, gitBranch, live, source}`, or `null` when no session is open |
 
 1. A **sticky** topic keeps its last value in the hub. After `welcome`, the hub sends the last value of each sticky topic the app subscribes to, then every change. A topic that has had no value yet sends nothing.
 2. The hub sends an event only to live apps that subscribe to its topic.
@@ -309,6 +313,18 @@ An event is a fact from the hub that any number of apps can receive.
 4. The hub starts with no project, so that each app restores its own. It sends `null` only when the user clears the project. On `null`, the app clears its project scope.
 5. A document that the hub loaded from an action URL does not get the `project.changed` replay after `welcome`, so the link keeps its project. The next change goes to it as usual.
 6. An event never carries a secret.
+
+### App topics
+
+1. **Names.** `<noun>.<verb>`, lowercase, matching `^[a-z][a-z0-9-]*(\.[a-z][a-z0-9-]*)+$`. `project.changed`, `theme.changed` and `hub.*` are the hub's, and a manifest cannot list them.
+2. **Declare.** The hub drops a `hub:publish` whose topic is not in the sender's manifest `publishes`. More than one app can publish the same topic.
+3. **Payload.** A plain object or `null`, at most 16 KB as JSON. Keep it small: ids and names, and let the receiver fetch the rest. The hub drops a payload that breaks this rule.
+4. **Project.** When the payload has a string `project`, the hub adds `encoded` and `projectName` to it, as in `project.changed`.
+5. **Delivery.** Every app topic is sticky, and its last value is cleared on a config-dir switch. The hub does not send an event back to the app that published it.
+6. **Before `welcome`.** The SDK keeps only the latest payload per topic and sends it on `welcome`. With no `welcome`, it drops them.
+7. **Hidden apps.** The hub sends an app topic only to the app on screen. A hidden app gets the last value of each topic it missed when it comes on screen, before `hub:active`. `project.changed` and `theme.changed` go to every app at once.
+
+`session.changed` fields: `sessionId`; `project` (absolute path); `name` and `gitBranch` (or `null`); `live`, true while the session works or waits on the user; `source`: `user` for a change in the Kanban page, `cli` for `claude-code-kanban session open`. Kanban publishes it once a switch settles for 150 ms, and not when the session stays the same.
 
 ## 11. Compatibility
 
@@ -350,7 +366,9 @@ These are not in v1. Each is additive ([Versioning](#versioning)).
 - A shared shortcut list: each app serves a `shortcuts.json`, named by a manifest field `shortcuts`, and the hub shows all of them in one overlay on <kbd>Ctrl+Alt+K</kbd> through the hub action `hub.shortcuts`.
 - More hub actions, such as `app.<id>` and `hub.nextApp`, with a user keymap that can bind app actions to global keys.
 - A `providers` map in the user config to pick one handler or provider among several. v1 takes the first enabled app in tab order.
-- Topics that apps emit (`hub:emit`), and the manifest fields `invokes`, `emits` and `reservedKeys`.
+- The manifest fields `invokes` and `reservedKeys`.
+- Data events from an app server, sent over its IPC channel, such as a task that moved, so that an app hears them while its page is hidden.
+- `hub.trace`: a hub topic that mirrors every message the hub sends or receives, for tools such as an inspector.
 - A `project` param type that gives a template `{project.encoded}`.
 - `run.ready` in the manifest, and a fixed prefix for the ready line.
 - Added apps: a `path` entry in the `apps` list of `~/.claude-hub/config.json`, apps from npm packages, and external apps that the hub does not spawn.

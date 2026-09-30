@@ -58,7 +58,9 @@ describe('actionTable', () => {
 describe('hub page params and url', () => {
   const src = fs.readFileSync(path.join(__dirname, '..', 'public', 'app.js'), 'utf8');
   const fn = (name) => new RegExp(`^function ${name}\\([^)]*\\) \\{[\\s\\S]*?^\\}`, 'm').exec(src)[0];
-  const { badParams, fillUrl } = vm.runInNewContext(`${fn('badParams')}\n${fn('fillUrl')}\n({ badParams, fillUrl })`);
+  const { badParams, fillUrl } = vm.runInNewContext(
+    `${fn('isPlainObject')}\n${fn('badParams')}\n${fn('fillUrl')}\n({ badParams, fillUrl })`,
+  );
   const declared = { session: 'string?', project: 'string' };
 
   it('answers bad-params for a missing required param, an extra param or a value that is not a string', () => {

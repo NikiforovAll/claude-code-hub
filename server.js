@@ -790,7 +790,13 @@ const THEME_CONFIG = themeConfig();
 function appsConfig() {
   return Object.fromEntries(
     ENABLED_APPS.map((a) => {
-      const entry = { name: a.name, url: `http://localhost:${publicPorts[a.id]}`, icon: a.icon, loading: a.loading };
+      const entry = {
+        name: a.name,
+        url: `http://localhost:${publicPorts[a.id]}`,
+        icon: a.icon,
+        loading: a.loading,
+        publishes: a.publishes,
+      };
       if (TERMINAL_TOKEN && a.id === TERMINAL_APP.id) entry.terminalToken = TERMINAL_TOKEN;
       return [a.id, entry];
     }),

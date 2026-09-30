@@ -20,6 +20,11 @@ let activeConfigDir = null;
 // hub-theme: starting unset means there is nothing to race against each sub-app's own
 // project self-restore on boot. Once set it never returns to null.
 let projectState = null;
+// Topic → {from, payload}: the last value of each topic an app published. Cleared with projectState.
+const published = new Map();
+// App id → the published topics it missed while hidden. It gets their last value when it comes on screen.
+const missed = new Map();
+const MAX_EVENT_CHARS = 16 * 1024;
 // The config dir the hub falls back to (~/.claude). Stays out of the window title.
 let defaultConfigDir = null;
 // mode: 'project' (Ctrl+Alt+P) or 'configDir' (Ctrl+Alt+W). One widget, two row sources.
@@ -156,10 +161,47 @@ function sendProject(appId) {
   sendTopic(appId, 'project.changed', projectState);
 }
 
+// Protocol §10. A payload with a string `project` gets the hub's encoded form and short name, as in project.changed.
+function onPublish(appId, { topic, payload }) {
+  if (!apps[appId].publishes.includes(topic)) return;
+  if (payload !== null && !isPlainObject(payload)) return;
+  try {
+    if (JSON.stringify(payload).length > MAX_EVENT_CHARS) return;
+  } catch {
+    return;
+  }
+  const event =
+    typeof payload?.project === 'string'
+      ? { ...payload, encoded: encodeProjectPath(payload.project), projectName: basename(payload.project) }
+      : payload;
+  published.set(topic, { from: appId, payload: event });
+  for (const id of Object.keys(iframes)) {
+    if (id === appId) continue;
+    if (id === activeApp) sendTopic(id, topic, event);
+    else if (liveApps.get(id)?.has(topic)) missed.set(id, (missed.get(id) ?? new Set()).add(topic));
+  }
+}
+
+function sendPublished(appId) {
+  missed.delete(appId);
+  for (const [topic, { from, payload }] of published) if (from !== appId) sendTopic(appId, topic, payload);
+}
+
+function sendMissed(appId) {
+  for (const topic of missed.get(appId) ?? []) {
+    const last = published.get(topic);
+    if (last && last.from !== appId) sendTopic(appId, topic, last.payload);
+  }
+  missed.delete(appId);
+}
+
 // Sub-apps can't detect this themselves: inactive iframes are display:none, and a nested
 // document's visibilityState still follows the top-level tab. Used for polling/auto-refresh.
 function postActiveTo(appId) {
-  if (liveApps.has(appId)) postTo(appId, { type: 'hub:active', active: appId === activeApp });
+  if (!liveApps.has(appId)) return;
+  const active = appId === activeApp;
+  if (active) sendMissed(appId);
+  postTo(appId, { type: 'hub:active', active });
 }
 
 async function init() {
@@ -198,8 +240,20 @@ function applyTitle(dir) {
 function reloadIframes() {
   loadedApps.clear();
   projectState = null;
-  // Assigning src navigates even when the URL is unchanged.
-  for (const id of Object.keys(iframes)) loadApp(id, appSrc(id));
+  published.clear();
+  missed.clear();
+  // A new element, because assigning src is only a fragment navigation when the app's URL
+  // differs from the new one by the #t= fragment alone, and the old dir's document stays.
+  for (const [id, old] of Object.entries(iframes)) {
+    liveApps.delete(id);
+    linkLoads.delete(id);
+    const fresh = makeIframe(id);
+    fresh.className = old.className;
+    const focused = document.activeElement === old;
+    old.replaceWith(fresh);
+    iframes[id] = fresh;
+    if (focused) fresh.focus();
+  }
 }
 
 // The old document stays live until the new one fires load, and a hub:action sent to it in between is lost.
@@ -244,17 +298,21 @@ function hideLoading() {
   document.getElementById('loading-overlay').classList.add('fade-out');
 }
 
+function makeIframe(id) {
+  const iframe = document.createElement('iframe');
+  iframe.id = `iframe-${id}`;
+  iframe.src = appSrc(id);
+  iframe.className = 'hidden';
+  iframe.allow = 'clipboard-write; microphone';
+  iframe.addEventListener('load', () => onIframeLoad(id));
+  return iframe;
+}
+
 function buildIframes() {
   const container = document.getElementById('iframe-container');
   for (const id of Object.keys(apps)) {
-    const iframe = document.createElement('iframe');
-    iframe.id = `iframe-${id}`;
-    iframe.src = appSrc(id);
-    iframe.className = 'hidden';
-    iframe.allow = 'clipboard-write; microphone';
-    iframe.addEventListener('load', () => onIframeLoad(id));
-    container.appendChild(iframe);
-    iframes[id] = iframe;
+    iframes[id] = makeIframe(id);
+    container.appendChild(iframes[id]);
   }
 }
 
@@ -295,6 +353,7 @@ function onHello(appId, data) {
   // A document the hub loaded from an action URL got its project from that URL. The hub's own
   // project would undo the link, so it goes out only with the next change.
   if (!linkLoads.delete(appId)) sendProject(appId);
+  sendPublished(appId);
   postActiveTo(appId);
 }
 
@@ -305,8 +364,12 @@ function navigateApp(appId, url) {
   loadApp(appId, src, { link: true });
 }
 
+function isPlainObject(v) {
+  return typeof v === 'object' && v !== null && !Array.isArray(v);
+}
+
 function badParams(declared, params) {
-  if (typeof params !== 'object' || params === null || Array.isArray(params)) return true;
+  if (!isPlainObject(params)) return true;
   const given = Object.entries(params);
   if (given.some(([name, value]) => !Object.hasOwn(declared, name) || typeof value !== 'string')) return true;
   return Object.entries(declared).some(([name, type]) => type === 'string' && !Object.hasOwn(params, name));
@@ -350,6 +413,8 @@ function listenMessages() {
       onHello(appId, data);
     } else if (data.type === 'hub:invoke') {
       onInvoke(appId, data);
+    } else if (data.type === 'hub:publish') {
+      onPublish(appId, data);
     } else if (data.type === 'hub:keydown') {
       handleForwardedKey(data);
     } else if (data.type === 'hub:closeGuard') {

@@ -76,6 +76,8 @@
       const pending = new Map();
       const tokenWaiters = new Set();
       const queued = [];
+      // Topic → payload: the latest publish before welcome.
+      const outbox = new Map();
       let status = 'connecting';
       let origin = null;
       let welcome = null;
@@ -98,7 +100,10 @@
       function setStatus(next) {
         status = next;
         for (const fn of statusFns) fn(next);
-        if (!waiting()) for (const run of queued.splice(0)) run();
+        if (waiting()) return;
+        for (const run of queued.splice(0)) run();
+        for (const [topic, payload] of outbox) hub.publish(topic, payload);
+        outbox.clear();
       }
 
       function emit(topic, payload) {
@@ -275,6 +280,11 @@
         },
         handle(action, fn) {
           handlers.set(action, fn);
+        },
+        // The topic must be in the app's manifest `publishes`. Before welcome, only the latest payload per topic waits.
+        publish(topic, payload) {
+          if (status === 'live') post({ type: 'hub:publish', topic, payload });
+          else if (waiting()) outbox.set(topic, payload);
         },
         invoke(action, params = {}) {
           return new Promise((resolve) => {

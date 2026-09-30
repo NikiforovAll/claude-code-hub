@@ -22,6 +22,7 @@
         subscribe: () => off,
         bindTheme: () => off,
         handle() {},
+        publish() {},
         invoke(action, params = {}) {
           const target = standaloneFn(action)?.(params);
           if (!target) return Promise.resolve({ ok: false, reason: 'unhandled' });
