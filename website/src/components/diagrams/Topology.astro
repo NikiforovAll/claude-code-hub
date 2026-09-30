@@ -1,0 +1,57 @@
+---
+import Diagram from './Diagram.astro';
+
+const tools = [
+  { id: 'kanban', name: 'Kanban', port: 3541 },
+  { id: 'marketplace', name: 'Marketplace', port: 3542 },
+  { id: 'cost', name: 'Cost', port: 3543 },
+  { id: 'memory', name: 'Memory', port: 3544 },
+];
+---
+
+<Diagram title="The hub page, the hub server and the pools of tool processes" viewBox="0 0 760 440">
+  <rect x="10" y="10" width="740" height="126" rx="10" class="d-group d-group-active" />
+  <text x="26" y="34" class="d-title d-start">Browser: the hub page</text>
+  <text x="734" y="34" class="d-note d-end">one iframe per tool · postMessage to the page</text>
+  {
+    tools.map((t, i) => {
+      const cx = 110 + i * 180;
+      return (
+        <g>
+          <rect x={cx - 80} y="50" width="160" height="66" rx="8" class="d-box" />
+          <text x={cx} y="78" class="d-title">{t.name}</text>
+          <text x={cx} y="100" class="d-detail">{`localhost:${t.port}`}</text>
+          <line x1={cx} y1="116" x2={cx} y2="184" class="d-link" />
+        </g>
+      );
+    })
+  }
+  <text x="118" y="158" class="d-note d-start">HTTP and WebSocket</text>
+
+  <rect x="90" y="190" width="580" height="70" rx="10" class="d-box d-box-hub" />
+  <text x="380" y="218" class="d-title">Hub server</text>
+  <text x="380" y="242" class="d-detail">3540: the page and /api/*  ·  3541–3544: forward to the active pool</text>
+
+  <line x1="235" y1="260" x2="235" y2="304" class="d-link d-link-accent" />
+  <text x="245" y="287" class="d-note d-start">HTTP, WebSocket and IPC</text>
+  <line x1="580" y1="260" x2="615" y2="304" class="d-link d-link-dashed" />
+
+  <rect x="10" y="310" width="450" height="118" rx="10" class="d-group d-group-active" />
+  <text x="26" y="334" class="d-title d-start">Pool: config dir A (active)</text>
+  {
+    tools.map((t, i) => (
+      <g>
+        <rect x={23 + i * 108} y="350" width="100" height="60" rx="8" class="d-box" />
+        <text x={73 + i * 108} y="377" class="d-label">{t.id}</text>
+        <text x={73 + i * 108} y="397" class="d-note">process</text>
+      </g>
+    ))
+  }
+
+  <g class="d-dim">
+    <rect x="480" y="310" width="270" height="118" rx="10" class="d-group" />
+    <text x="496" y="334" class="d-title d-start">Pool: config dir B</text>
+    <text x="615" y="375" class="d-note">kept alive after a switch</text>
+    <text x="615" y="395" class="d-note">up to 3 pools (--pool-size)</text>
+  </g>
+</Diagram>

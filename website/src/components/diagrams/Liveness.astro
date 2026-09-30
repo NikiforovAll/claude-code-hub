@@ -1,0 +1,32 @@
+---
+import Diagram from './Diagram.astro';
+---
+
+<Diagram title="What the hub does when connections to a tool fail" viewBox="0 0 760 200">
+  <rect x="10" y="40" width="150" height="56" rx="8" class="d-box" />
+  <text x="85" y="64" class="d-title">3 failed connects</text>
+  <text x="85" y="84" class="d-note">HTTP or WebSocket</text>
+
+  <rect x="200" y="40" width="150" height="56" rx="8" class="d-box d-box-hub" />
+  <text x="275" y="64" class="d-label">hub:ping</text>
+  <text x="275" y="84" class="d-note">over IPC, not TCP</text>
+
+  <rect x="390" y="40" width="130" height="56" rx="28" class="d-box" />
+  <text x="455" y="73" class="d-title">Pong in 3 s?</text>
+
+  <rect x="580" y="40" width="170" height="56" rx="8" class="d-box" />
+  <text x="665" y="64" class="d-title">Keep the tool</text>
+  <text x="665" y="84" class="d-note">retry for up to 30 s</text>
+
+  <rect x="390" y="140" width="130" height="46" rx="8" class="d-box" />
+  <text x="455" y="168" class="d-title">Replace the tool</text>
+
+  <line x1="160" y1="68" x2="198" y2="68" class="d-link" />
+  <line x1="350" y1="68" x2="388" y2="68" class="d-link" />
+  <line x1="520" y1="68" x2="578" y2="68" class="d-link" />
+  <text x="549" y="60" class="d-note d-yes">yes</text>
+  <line x1="455" y1="96" x2="455" y2="138" class="d-link" />
+  <text x="463" y="122" class="d-note d-start d-no">no</text>
+  <path d="M665 96 V163 H522" class="d-link d-link-dashed" />
+  <text x="673" y="134" class="d-note d-start">still failing</text>
+</Diagram>

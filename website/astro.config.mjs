@@ -25,7 +25,7 @@ export default defineConfig({
 			sidebar: [
 				{ label: 'Start here', items: [{ label: 'Getting started', slug: 'getting-started' }] },
 				{ label: 'Guides', items: [{ label: 'Move between the tools', slug: 'guides/navigate' }, { label: 'Pick a project', slug: 'guides/projects' }, { label: 'Use more than one config dir', slug: 'guides/config-dirs' }, { label: 'Embedded terminal', slug: 'guides/terminal' }] },
-				{ label: 'Reference', items: [{ label: 'Keyboard shortcuts', slug: 'reference/shortcuts' }, { label: 'CLI and configuration', slug: 'reference/configuration' }, { label: 'Security and the hub token', slug: 'reference/security' }, { label: 'How the hub works', slug: 'reference/architecture' }, { label: 'Troubleshooting', slug: 'reference/troubleshooting' }] },
+				{ label: 'Reference', items: [{ label: 'Keyboard shortcuts', slug: 'reference/shortcuts' }, { label: 'CLI and configuration', slug: 'reference/configuration' }, { label: 'Security and the hub token', slug: 'reference/security' }, { label: 'Architecture', slug: 'reference/architecture' }, { label: 'Hub protocol v1', slug: 'reference/protocol' },{ label: 'Troubleshooting', slug: 'reference/troubleshooting' }] },
 			],
 		}),
 	],

@@ -1,0 +1,138 @@
+---
+title: Architecture
+description: The hub's processes, ports, SDK and messages, and how a tool joins the hub. Read this if you build a tool for the hub or debug one.
+---
+
+import Topology from '../../../components/diagrams/Topology.astro';
+import Liveness from '../../../components/diagrams/Liveness.astro';
+import Sequence from '../../../components/diagrams/Sequence.astro';
+
+The hub is one Node.js server and one page. The server starts the tools and forwards their traffic. The page shows each tool in an iframe and passes messages between them. The full contract is [Hub protocol v1](/claude-code-hub/reference/protocol/).
+
+<Topology />
+
+The four tool ports are the ones the browser sees. They stay the same for every config dir: the hub server forwards them to the pool of the active config dir.
+
+## Tools and manifests
+
+The hub has four built-in tools, in this default tab order: Kanban, Marketplace, Cost and Memory Diagnoser. Each tool describes itself in a `hub-app.json` manifest: its name, icon, server script, default port, the actions it handles and the capabilities it provides. The hub reads the manifest from the submodule, else from the installed npm package. A tool whose manifest is missing or not valid is skipped, with a log line.
+
+The `apps` list in `~/.claude-hub/config.json` changes the tab order, turns a tool off and sets its port. A tool that is off does not start and gets no tab. See [CLI and configuration](/claude-code-hub/reference/configuration/).
+
+**Capabilities.** A tool can provide the project list and the embedded terminal. For each one, the first enabled tool in tab order that declares it in `provides` is the provider. Today this is Kanban for both. With no provider, the capability is off: the project palette has no list and there is no terminal.
+
+## Processes
+
+For each config dir that it uses, the hub starts a set of tool processes, one per enabled tool. This set is a pool. Each tool gets these environment variables:
+
+| Variable | Value |
+| --- | --- |
+| `CLAUDE_HUB` | `1`. Turns on hub integration in the tool. |
+| `HUB_URL` | The hub address, for example `http://localhost:3540` |
+| `CLAUDE_CONFIG_DIR` | The config dir of this pool |
+| `PORT` | `0`, so the tool picks a free port |
+| `HOST`, `ALLOWED_HOSTS` | The hub's own network settings |
+| `HUB_SDK_SERVER` | The path of the hub's server SDK. See [SDK](#sdk). |
+
+The provider of the terminal also gets the terminal settings and token.
+
+The hub reads each tool's startup line to learn its port. If a tool exits, the hub starts it again, up to 5 times in 60 seconds.
+
+**Pools.** Pools stay alive after you switch the config dir, so a switch back is instant. The hub keeps up to 3 pools (`--pool-size`) and stops the one used least recently. It does not stop a pool whose terminal provider has running terminal sessions. See [Use more than one config dir](/claude-code-hub/guides/config-dirs/).
+
+## Liveness
+
+The hub starts each tool with an IPC channel. On some Windows machines, new loopback connections fail in bursts while the tool is fine. After 3 failed connections, the hub asks the tool over IPC, which does not use TCP:
+
+- If the tool answers in 3 seconds, the hub keeps it and retries the request for up to 30 seconds more.
+- If the tool does not answer, or the connections still fail after 30 seconds, the hub replaces the tool.
+
+<Liveness />
+
+The error page names the real cause: the tool is starting, restarting, or stopped after too many restarts.
+
+## Ports
+
+The hub listens on its own port, 3540 by default, and on one port for each tool, 3541 to 3544 by default. A tool port forwards HTTP and WebSocket traffic to that tool in the active pool. So the tool URLs in the page stay the same when you switch the config dir, and only the target of the forward changes.
+
+The tool port is the tool's origin in the browser, so it keys the tool's `localStorage`. If a port is taken, the hub uses a random free port for that run, and the tool starts with empty `localStorage`.
+
+`GET /api/config` returns the tool URLs, the theme palettes, and the active config dir.
+
+## SDK
+
+The hub ships the hub SDK and gives it to each tool that it starts, so every tool runs the hub's version:
+
+- **Server.** The tool loads the file that `HUB_SDK_SERVER` names and calls `mount(app)`. This serves `GET /hub-config` and the client script, and answers the hub's IPC checks.
+- **Client.** The page loads `/vendor/claude-hub-sdk.js` first in `<body>`. Under the hub this is the hub's client. It does the handshake, forwards the hub keys, applies the theme, and runs actions.
+- **Stub.** A tool that runs alone serves its own copy of a stub with the same API. The stub talks to no hub and opens standalone links in a new tab.
+
+The page code is the same in both modes. It calls `ClaudeHub.connect()` and uses the returned object. Under the hub, the tool page starts like this:
+
+<Sequence
+  title="How a tool page connects to the hub"
+  actors={['Tool server', 'Tool page', 'Hub page']}
+  hub={2}
+  steps={[
+    { from: 1, to: 0, label: 'GET /vendor/claude-hub-sdk.js', detail: "the hub's client, served by mount()" },
+    { from: 1, to: 0, label: 'GET /hub-config', detail: '{enabled: true, url: HUB_URL}' },
+    { from: 1, to: 2, label: 'hub:hello', detail: '{protocol: [1], subscribes}, after load' },
+    { from: 2, to: 1, label: 'hub:welcome', detail: '{protocol: 1, forward, themes, actions}' },
+    { from: 2, to: 1, label: 'hub:event', detail: 'last theme.changed and project.changed' },
+    { from: 2, to: 1, label: 'hub:active', detail: '{active}: is this tool on screen' },
+  ]}
+/>
+
+Standalone, the tool serves the stub, and nothing on this chart happens.
+
+## The page
+
+The hub page makes one iframe for each tool and shows one at a time. The other iframes stay loaded but hidden, so a tool keeps its state when you switch away. The hub page and the API need the hub token. See [Security and the hub token](/claude-code-hub/reference/security/).
+
+## Messages
+
+The page and the tools talk with `postMessage`. The hub accepts a message only from a tool iframe at that tool's origin. Each tool accepts a message only from its parent window at the hub origin.
+
+| Message | Direction | Content |
+| --- | --- | --- |
+| `hub:hello` | Tool to hub | The protocol versions and the topics the tool subscribes to |
+| `hub:welcome` | Hub to tool | The key combos the hub binds (for example `ctrl+alt+p` and `alt+1`), the color themes, and the actions that the tools handle |
+| `hub:event` | Hub to tool | A subscribed topic: `theme.changed` (mode, color theme and colors) or `project.changed` (the project picked in the palette) |
+| `hub:invoke` | Tool to hub | Run an action, for example open a session in Cost |
+| `hub:result` | Hub to tool | The result of a `hub:invoke` |
+| `hub:action` | Hub to tool | An action for this tool to run |
+| `hub:keydown` | Tool to hub | A hub key pressed inside the tool |
+| `hub:theme` | Tool to hub | The user changed the theme in the tool |
+| `hub:active` | Hub to tool | Whether the tool is on screen. A hidden iframe cannot tell by itself. Cost uses it to pause auto-refresh. |
+| `hub:closeGuard` | Tool to hub | Ask before the window closes. Kanban sets it while a terminal is attached. |
+| `hub:terminalToken` | Both | Kanban asks for the current terminal token after a hub restart, and the hub answers |
+| `hub:openExternal` | Tool to hub | Open an external link from the top window |
+
+## Actions
+
+A tool calls an action by name and does not know which tool handles it. The hub finds the handler in the manifests, switches to its tab and hands it the action. For example, <kbd>$</kbd> in Kanban opens the session in Cost:
+
+<Sequence
+  title="How the hub routes an action from Kanban to Cost"
+  actors={['Kanban', 'Hub page', 'Cost']}
+  hub={1}
+  steps={[
+    { from: 0, to: 1, label: 'hub:invoke', detail: "{action: 'session.cost', params: {session}}" },
+    { from: 1, to: 2, label: 'hub:action', detail: 'message mode: Cost is live, so it gets the call' },
+    { from: 1, to: 2, label: 'or: load the action URL', detail: 'url mode, or Cost is not live: ?view=detail&session=…', alt: true },
+    { from: 1, to: 0, label: 'hub:result', detail: "{ok: true, handledBy: 'cost'}" },
+  ]}
+/>
+
+## Build a tool for the hub
+
+A tool that runs in the hub:
+
+1. Has a `hub-app.json` manifest with a fixed default port that no other tool uses.
+2. Prints a `<Name> running at http://localhost:<port>` line when it listens.
+3. Calls `require(process.env.HUB_SDK_SERVER).mount(app)` when that variable is set, before it serves its static files.
+4. Serves the SDK stub as `public/vendor/claude-hub-sdk.js`, and loads it as the first element in `<body>`. `npm run sdk:sync -- <tool dir>` in the hub repo copies it.
+5. Calls `ClaudeHub.connect()`, binds the theme, and subscribes to the topics it uses.
+6. Allows framing from the hub origin.
+
+The four built-in tools are on GitHub. Each has a `HUB_INTEGRATION` block in its `public/app.js`.
