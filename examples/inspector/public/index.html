@@ -12,6 +12,7 @@
 <link rel="icon" type="image/svg+xml" href="/icon.svg">
 <meta name="theme-color" content="#101114" media="(prefers-color-scheme: dark)">
 <meta name="theme-color" content="#e8e6e3" media="(prefers-color-scheme: light)">
+<script defer src="/markdown.js"></script>
 <script defer src="/app.js"></script>
 </head>
 <body>
@@ -26,6 +27,12 @@
       <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
       <span id="sessionName">No session</span>
     </button>
+    <label class="topbar-btn topbar-check" id="errorsOnlyBox" title="Show only the turns with failed tool calls" hidden>
+      <input type="checkbox" id="errorsOnly"><span>Errors only</span>
+    </label>
+    <label class="topbar-btn topbar-check" id="newestFirstBox" title="Show the newest turn first" hidden>
+      <input type="checkbox" id="newestFirst"><span>Newest first</span>
+    </label>
     <button class="topbar-btn" id="costBtn" title="Show the cost of this session" data-act="cost" hidden>
       <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 000 7h5a3.5 3.5 0 010 7H6"/></svg>
       <span>Cost</span>
@@ -51,6 +58,7 @@
 
   <div class="layout">
     <main class="main" id="main" tabindex="-1"></main>
+    <aside class="usage" id="usage" hidden></aside>
     <aside class="detail" id="detail" aria-label="Tool call" hidden></aside>
   </div>
 
@@ -63,6 +71,7 @@
     </div>
     <div class="modal-body">
       <p class="modal-desc">The Inspector reads a Claude Code session transcript from disk and shows each prompt with the tool calls, the tokens and the context size that followed it. Under the hub it follows the session that you open in Kanban. It is read-only.</p>
+      <p class="modal-desc"><b>Errors only</b> shows only the turns and the tool calls that failed, and <kbd>j</kbd> <kbd>k</kbd> <kbd>g</kbd> <kbd>G</kbd> move through those turns. <b>Newest first</b> puts the last turn at the top of the list. The context chart stays the same with both.</p>
       <h4 class="shortcut-section">Keyboard shortcuts</h4>
       <dl class="shortcuts" id="helpShortcuts"></dl>
     </div>

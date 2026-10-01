@@ -5,7 +5,7 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
-const { parse, overview, toolDetail } = require('../lib/transcript');
+const { parse, overview, toolDetail, replyOf } = require('../lib/transcript');
 
 const raw = fs.readFileSync(path.join(__dirname, 'fixture.jsonl'), 'utf8');
 const ID = '11111111-2222-4333-8444-555555555555';
@@ -95,6 +95,92 @@ test('reads slash commands, bash input, pasted markup and images as prompts, and
     parse(lines.join('\n')).turns.map((t) => t.prompt),
     ['/review the cart', '! npm test', '<div>why is this red?</div>', '[Image]'],
   );
+});
+
+test('reads the /compact that Claude Code writes again after a compaction as part of the first one', () => {
+  const user = (content, extra = {}) => JSON.stringify({ type: 'user', message: { role: 'user', content }, ...extra });
+  const compact =
+    '<command-name>/compact</command-name>\n<command-message>compact</command-message>\n<command-args></command-args>';
+  const { turns } = parse(
+    [
+      user('Fix the cart'),
+      user(compact),
+      JSON.stringify({ type: 'system', subtype: 'compact_boundary' }),
+      user('This session is being continued from a previous conversation.', { isCompactSummary: true }),
+      user('<local-command-caveat>Caveat</local-command-caveat>', { isMeta: true }),
+      user(compact),
+      user('<local-command-stdout>Compacted</local-command-stdout>'),
+      user('Now the tests'),
+      user(compact),
+    ].join('\n'),
+  );
+  assert.deepEqual(
+    turns.map((t) => [t.prompt, t.compactedBefore]),
+    [
+      ['Fix the cart', false],
+      ['/compact', false],
+      ['Now the tests', true],
+      ['/compact', false],
+    ],
+  );
+});
+
+test('clips a long reply in the overview and keeps it whole for replyOf', () => {
+  const long = `${'word '.repeat(200)}end`;
+  const p = parse(
+    [
+      JSON.stringify({ type: 'user', message: { content: 'go' } }),
+      JSON.stringify({
+        type: 'assistant',
+        message: { id: 'm', role: 'assistant', content: [{ type: 'text', text: long }] },
+      }),
+    ].join('\n'),
+  );
+  const [t] = overview(p).turns;
+  assert.equal(t.replyLong, true);
+  assert.ok(t.reply.length <= 400);
+  assert.equal(replyOf(p, 1).reply, long);
+  assert.equal(replyOf(p, 2), null);
+});
+
+test('overview counts skills and MCP tools by server, with failures, most used first', () => {
+  const lines = [JSON.stringify({ type: 'user', message: { content: 'go' } })];
+  const call = (id, name, input, isError) =>
+    lines.push(
+      JSON.stringify({
+        type: 'assistant',
+        message: { id, role: 'assistant', content: [{ type: 'tool_use', id, name, input }] },
+      }),
+      JSON.stringify({
+        type: 'user',
+        message: { content: [{ type: 'tool_result', tool_use_id: id, content: 'x', is_error: isError }] },
+      }),
+    );
+  call('a', 'Skill', { skill: 'tmux' });
+  call('b', 'Skill', { skill: 'simplify' });
+  call('c', 'Skill', { skill: 'simplify' }, true);
+  call('d', 'mcp__claude-in-chrome__navigate', {});
+  call('e', 'mcp__claude-in-chrome__navigate', {}, true);
+  call('f', 'mcp__claude-in-chrome__computer', {});
+  call('g', 'mcp__plugin_redline_redline__get_review', {});
+  call('h', 'Bash', { command: 'ls' });
+  assert.deepEqual(overview(parse(lines.join('\n'))).usage, {
+    skills: [
+      { name: 'simplify', count: 2, failed: 1 },
+      { name: 'tmux', count: 1, failed: 0 },
+    ],
+    mcp: [
+      {
+        name: 'claude-in-chrome',
+        count: 3,
+        tools: [
+          { name: 'navigate', count: 2, failed: 1 },
+          { name: 'computer', count: 1, failed: 0 },
+        ],
+      },
+      { name: 'plugin_redline_redline', count: 1, tools: [{ name: 'get_review', count: 1, failed: 0 }] },
+    ],
+  });
 });
 
 test('clips a large tool input and keeps a small one as an object', () => {

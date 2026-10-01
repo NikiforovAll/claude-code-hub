@@ -4,7 +4,7 @@
 const path = require('node:path');
 const express = require('express');
 const sessions = require('./lib/sessions');
-const { overview, toolDetail } = require('./lib/transcript');
+const { overview, toolDetail, replyOf } = require('./lib/transcript');
 
 const HOST = process.env.HOST || '127.0.0.1';
 const PORT = Number(process.env.PORT ?? 3545);
@@ -55,6 +55,17 @@ app.get(
     const detail = toolDetail((await sessions.load(file)).parsed, req.params.toolId);
     if (!detail) return res.status(404).json({ error: `no tool call ${req.params.toolId}` });
     res.json(detail);
+  }),
+);
+
+app.get(
+  '/api/sessions/:id/turns/:n/reply',
+  route(async (req, res) => {
+    const file = sessionFile(req, res);
+    if (!file) return;
+    const reply = replyOf((await sessions.load(file)).parsed, Number(req.params.n));
+    if (!reply) return res.status(404).json({ error: `no turn ${req.params.n}` });
+    res.json(reply);
   }),
 );
 

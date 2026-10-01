@@ -77,6 +77,7 @@ function createParser() {
   const meta = { title: null, cwd: null, gitBranch: null, model: null, version: null, started: null, updated: null };
   const turns = [];
   const tools = new Map();
+  const replies = new Map();
   const seen = new Set();
   let turn = null;
   let customTitle = null;
@@ -93,6 +94,7 @@ function createParser() {
       durationMs: null,
       tools: [],
       reply: '',
+      replyLong: false,
       tokens: { input: 0, cacheRead: 0, cacheWrite: 0, output: 0 },
       context: 0,
       compactedBefore: compactPending,
@@ -131,7 +133,15 @@ function createParser() {
       turn.context = contextOf(m.usage);
     }
     for (const b of m.content || []) {
-      if (b.type === 'text' && b.text.trim()) turn.reply = cut(b.text.trim(), REPLY_MAX);
+      if (b.type === 'text' && b.text.trim()) {
+        const text = b.text.trim();
+        turn.reply = cut(text, REPLY_MAX);
+        turn.replyLong = text.length > REPLY_MAX;
+        const full = turn.replyLong ? cutDetail(text) : null;
+        kept += (full?.length ?? 0) - (replies.get(turn.n)?.length ?? 0);
+        if (full) replies.set(turn.n, full);
+        else replies.delete(turn.n);
+      }
       if (b.type !== 'tool_use' || tools.has(b.id)) continue;
       const json = JSON.stringify(b.input ?? null);
       const { input, size } = keptInput(b.input, json);
@@ -178,13 +188,15 @@ function createParser() {
     if (o.type === 'system' && o.subtype === 'compact_boundary') compactPending = true;
     else if (o.type === 'system' && o.subtype === 'turn_duration' && turn)
       turn.durationMs = (turn.durationMs || 0) + (o.durationMs || 0);
+    // After a compaction Claude Code writes the /compact command again at the start of the new context.
+    else if (prompt != null && compactPending && /^\/compact\b/.test(prompt)) return;
     else if (prompt != null) open(o, prompt);
     else if (!turn) return;
     else if (o.type === 'user') results(o);
     else if (o.type === 'assistant') reply(o);
   }
 
-  return { line, result: () => ({ meta, turns, tools }), kept: () => kept };
+  return { line, result: () => ({ meta, turns, tools, replies }), kept: () => kept };
 }
 
 function parse(raw) {
@@ -214,7 +226,36 @@ function overview({ meta, turns }) {
     totals.peak = Math.max(totals.peak, t.context);
     return { ...t, failed, tools: t.tools.map(({ input, result, turn, ...rest }) => rest) };
   });
-  return { meta: { ...meta }, totals, turns: list };
+  return { meta: { ...meta }, totals, usage: usage(turns), turns: list };
+}
+
+function usage(turns) {
+  const skills = new Map();
+  const servers = new Map();
+  const count = (map, name, ok) => {
+    const u = map.get(name) ?? { name, count: 0, failed: 0 };
+    u.count++;
+    if (ok === false) u.failed++;
+    map.set(name, u);
+  };
+  for (const turn of turns)
+    for (const t of turn.tools) {
+      if (t.name === 'Skill' && typeof t.input?.skill === 'string') count(skills, t.input.skill, t.ok);
+      const mcp = /^mcp__(.+?)__(.+)$/.exec(t.name);
+      if (!mcp) continue;
+      if (!servers.has(mcp[1])) servers.set(mcp[1], new Map());
+      count(servers.get(mcp[1]), mcp[2], t.ok);
+    }
+  const ranked = (list) => list.sort((a, b) => b.count - a.count || a.name.localeCompare(b.name));
+  return {
+    skills: ranked([...skills.values()]),
+    mcp: ranked(
+      [...servers].map(([name, tools]) => {
+        const list = ranked([...tools.values()]);
+        return { name, count: list.reduce((n, x) => n + x.count, 0), tools: list };
+      }),
+    ),
+  };
 }
 
 function toolDetail({ tools }, id) {
@@ -224,4 +265,9 @@ function toolDetail({ tools }, id) {
   return detail;
 }
 
-module.exports = { createParser, parse, overview, toolDetail };
+function replyOf({ turns, replies }, n) {
+  const t = turns[n - 1];
+  return t ? { n, reply: replies.get(n) ?? t.reply } : null;
+}
+
+module.exports = { createParser, parse, overview, toolDetail, replyOf };

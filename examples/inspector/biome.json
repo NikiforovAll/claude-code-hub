@@ -22,7 +22,7 @@
     "formatter": {
       "quoteStyle": "single"
     },
-    "globals": ["ClaudeHub"]
+    "globals": ["ClaudeHub", "markdown"]
   },
   "css": {
     "formatter": {
@@ -30,6 +30,13 @@
     }
   },
   "files": {
-    "includes": ["public/app.js", "public/style.css", "server.js", "lib/**/*.js", "test/*.test.js"]
+    "includes": [
+      "public/app.js",
+      "public/markdown.js",
+      "public/style.css",
+      "server.js",
+      "lib/**/*.js",
+      "test/*.test.js"
+    ]
   }
 }

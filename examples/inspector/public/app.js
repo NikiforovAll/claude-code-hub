@@ -4,6 +4,7 @@
 const $ = (id) => document.getElementById(id);
 const main = $('main');
 const detail = $('detail');
+const usageBox = $('usage');
 const picker = $('picker');
 const helpModal = $('helpModal');
 
@@ -22,16 +23,18 @@ const state = {
   turn: null,
   tool: null,
   open: new Set(),
+  replyOpen: new Set(),
+  replies: new Map(),
+  replyHtml: new Map(),
   range: null,
+  usageOpen: true,
+  errorsOnly: false,
+  newestFirst: false,
 };
 // #endregion STATE
 
 // #region FORMAT
-const esc = (s) =>
-  String(s ?? '').replace(
-    /[&<>"']/g,
-    (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c],
-  );
+const { esc } = markdown;
 
 function tokens(n) {
   if (n < 1000) return String(n);
@@ -166,6 +169,7 @@ function toggleTheme() {
 
 if (stored('theme') === 'light') document.body.classList.add('light');
 if (stored('color-theme')) document.body.dataset.colorTheme = stored('color-theme');
+state.newestFirst = stored('newest-first') === '1';
 buildThemeMenu();
 // #endregion THEME
 
@@ -224,8 +228,16 @@ async function load({ manual = false } = {}) {
     if (data) {
       const stale = state.tool && toolStatus(state.data, state.tool) !== toolStatus(data, state.tool);
       if (!state.data) touch(data);
+      // Only the last turn can still grow, so only its full reply is read again, and only when it changed.
+      // An open reply keeps its old text until the new one arrives.
+      const last = data.turns.length;
+      const was = state.data?.turns[last - 1];
+      const now = data.turns[last - 1];
+      const changed = !was || was.reply !== now?.reply || was.replyLong !== now?.replyLong;
       state.encoded = data.encoded;
       state.data = data;
+      if (changed && state.replyOpen.has(last)) loadReply(last, { again: true });
+      else if (changed) state.replies.delete(last);
       render();
       if (stale) openTool(state.tool, { keepFocus: true });
     }
@@ -243,11 +255,30 @@ async function load({ manual = false } = {}) {
   }
 }
 
+async function loadReply(n, { again = false } = {}) {
+  const id = state.id;
+  const turn = state.data?.turns[n - 1];
+  if (!turn?.replyLong) return state.replies.delete(n);
+  if (state.replies.has(n) && !again) return;
+  try {
+    const { reply } = await getJson(`/api/sessions/${encodeURIComponent(id)}/turns/${n}/reply${query()}`);
+    if (id !== state.id) return;
+    state.replies.set(n, reply);
+  } catch (err) {
+    if (id === state.id) toast(`Could not read the reply: ${err.message}`, 'error');
+    return;
+  }
+  if (state.replyOpen.has(n)) renderView();
+}
+
 function openSession(id, encoded = null) {
   if (picker.open) picker.close();
   if (!id || (id === state.id && (state.data || !state.error))) return;
   Object.assign(state, { id, encoded, data: null, error: null, turn: null, range: null });
   state.open.clear();
+  state.replyOpen.clear();
+  state.replies.clear();
+  state.replyHtml.clear();
   closeDetail();
   const url = new URL(location.href);
   url.searchParams.set('session', id);
@@ -323,25 +354,35 @@ hub.onStatus((status) => {
 });
 settleAlone(hub.status);
 
-document.getElementById('githubLink').addEventListener('click', (e) => {
-  if (!hub.inHub) return;
+document.addEventListener('click', (e) => {
+  const link = e.target.closest('a[target="_blank"]');
+  if (!link || !hub.inHub) return;
   e.preventDefault();
-  hub.openExternal(e.currentTarget.href);
+  hub.openExternal(link.href);
 });
 // #endregion HUB_INTEGRATION
 
 // #region RENDER
+function titleOf() {
+  if (state.data) return state.data.meta.title || 'Untitled session';
+  if (!state.id) return 'No session';
+  return state.error ? 'Not found' : 'Loading…';
+}
+
 function renderTopbar() {
   const btn = $('sessionBtn');
-  const title = state.data?.meta.title || (state.id ? (state.error ? 'Not found' : 'Loading…') : 'No session');
-  $('sessionName').textContent = title;
+  $('sessionName').textContent = titleOf();
   btn.classList.toggle('is-live', !!state.data && isLive());
   btn.title = state.data && isLive() ? 'Live session. Open another session (o)' : 'Open a session (o)';
   $('costBtn').hidden = !(state.id && hub.can('session.cost'));
+  $('errorsOnlyBox').hidden = $('newestFirstBox').hidden = !state.data;
+  $('errorsOnly').checked = state.errorsOnly;
+  $('newestFirst').checked = state.newestFirst;
 }
 
 function render() {
   renderTopbar();
+  if (!state.data) usageBox.hidden = true;
   if (!state.id) return renderEmpty();
   if (state.error) return renderError();
   if (!state.data) {
@@ -439,9 +480,30 @@ function call(t) {
   </button></li>`;
 }
 
+const listed = (turns) => (state.errorsOnly ? turns.filter((t) => t.failed) : turns.slice());
+
+// Each poll renders the ledger again, so the same reply text is parsed once per session.
+function markdownOnce(text) {
+  if (!state.replyHtml.has(text)) state.replyHtml.set(text, markdown(text));
+  return state.replyHtml.get(text);
+}
+
+function replyHtml(t) {
+  const open = state.replyOpen.has(t.n);
+  const full = t.replyLong ? state.replies.get(t.n) : t.reply;
+  const waiting = open && full == null;
+  const label = waiting ? 'Reading the full reply…' : open ? 'Show less' : 'Show the full reply';
+  return `<div class="reply${open ? ' is-open' : ''}">
+    <div class="reply-who">Claude</div>
+    <div class="reply-body md${!open && t.replyLong ? ' is-cut' : ''}">${markdownOnce(open && full != null ? full : t.reply)}</div>
+    <button class="more reply-toggle" data-reply="${t.n}"${t.replyLong ? ' data-long' : ''} aria-expanded="${open}">${label}</button>
+  </div>`;
+}
+
 function turnHtml(t) {
   const open = state.open.has(t.n);
-  const shown = open || t.tools.length <= CALLS_SHOWN + 2 ? t.tools : t.tools.slice(0, CALLS_SHOWN);
+  const base = state.errorsOnly && !open ? t.tools.filter((x) => x.ok === false) : t.tools;
+  const shown = open || base.length <= CALLS_SHOWN + 2 ? base : base.slice(0, CALLS_SHOWN);
   const more = t.tools.length - shown.length;
   const clamped = t.prompt.length > PROMPT_CLAMP && !open;
   const meta = [
@@ -454,23 +516,26 @@ function turnHtml(t) {
     t.interrupted ? '<span class="warn">interrupted</span>' : '',
   ].join('');
   const expand = more > 0 ? `Show ${plural(more, 'more tool call')}` : clamped ? 'Show the full prompt' : '';
-  return `${t.compactedBefore ? '<p class="compact">Context compacted here</p>' : ''}
-  <article class="turn${state.turn === t.n ? ' is-sel' : ''}" id="turn-${t.n}" data-turn-row="${t.n}">
+  const cut = t.compactedBefore
+    ? `<p class="compact${state.newestFirst ? ' is-below' : ''}">Context compacted here</p>`
+    : '';
+  const row = `<article class="turn${state.turn === t.n ? ' is-sel' : ''}" id="turn-${t.n}" data-turn-row="${t.n}">
     <a class="turn-n" href="#turn-${t.n}" data-turn="${t.n}" aria-label="Turn ${t.n}">${t.n}</a>
     <div class="turn-body">
       <div class="turn-meta">${meta}</div>
       <p class="prompt${clamped ? ' is-clamped' : ''}">${esc(t.prompt)}</p>
       ${shown.length ? `<ol class="calls">${shown.map(call).join('')}</ol>` : ''}
       ${expand ? `<button class="more" data-expand="${t.n}">${expand}</button>` : ''}
-      ${t.reply ? `<div class="reply"><div class="reply-who">Claude</div><p>${esc(t.reply)}</p></div>` : ''}
+      ${t.reply ? replyHtml(t) : ''}
     </div>
   </article>`;
+  return state.newestFirst ? row + cut : cut + row;
 }
 
 function renderSession() {
   const d = state.data;
   const atEnd = main.scrollHeight - main.scrollTop - main.clientHeight < 80 && main.scrollTop > 0;
-  const focused = main.contains(document.activeElement) ? focusKey(document.activeElement) : null;
+  const focused = focusInMain();
   windowFor(d.turns.length);
   dragging = false;
   main.innerHTML = `<header class="head">
@@ -488,12 +553,12 @@ function renderSession() {
     }
     <div class="ledger"></div>`;
   initBrush(d.turns, d.totals.peak);
-  renderView();
-  if (atEnd && isLive()) main.scrollTop = main.scrollHeight;
-  if (focused) main.querySelector(focused)?.focus({ preventScroll: true });
+  renderView(focused);
+  renderUsage();
+  if (atEnd && isLive() && !state.newestFirst) main.scrollTop = main.scrollHeight;
 }
 
-function renderView() {
+function renderView(focused = focusInMain()) {
   const d = state.data;
   const { start, end, total } = state.range;
   const turns = d.turns.slice(start, end);
@@ -507,14 +572,81 @@ function renderView() {
   layoutBrush();
   fitTide();
   if (dragging) return;
-  ledger.innerHTML = `${start > 0 ? `<button class="more page" data-act="earlier">Show ${plural(Math.min(start, end - start), 'earlier turn')}</button>` : ''}
-    ${turns.map(turnHtml).join('')}
-    ${end < total ? `<button class="more page" data-act="later">Show ${plural(Math.min(total - end, end - start), 'later turn')}</button>` : ''}`;
+  const page = (act, n) =>
+    n > 0
+      ? `<button class="more page" data-act="${act}">Show ${plural(Math.min(n, end - start), `${act} turn`)}</button>`
+      : '';
+  const earlier = page('earlier', start);
+  const later = page('later', total - end);
+  const rows = listed(turns);
+  if (state.newestFirst) rows.reverse();
+  const body = rows.length
+    ? rows.map(turnHtml).join('')
+    : `<p class="quiet">No failed tool calls in turns ${start + 1} to ${end}.</p>`;
+  ledger.innerHTML = state.newestFirst ? later + body + earlier : earlier + body + later;
+  fitReplies();
   watchView();
+  if (focused) main.querySelector(focused)?.focus({ preventScroll: true });
 }
 
+// A short reply can still run past the clamp, so the toggle shows only when the text is cut.
+function fitReplies() {
+  const btns = [...main.querySelectorAll('.reply:not(.is-open) .reply-toggle:not([data-long])')];
+  const cut = btns.map((btn) => btn.previousElementSibling.scrollHeight > btn.previousElementSibling.clientHeight + 1);
+  btns.forEach((btn, i) => {
+    btn.hidden = !cut[i];
+    btn.previousElementSibling.classList.toggle('is-cut', cut[i]);
+  });
+}
+
+let usageHtml = '';
+function renderUsage() {
+  const { skills, mcp } = state.data.usage;
+  const tools = mcp.reduce((n, s) => n + s.tools.length, 0);
+  usageBox.hidden = !skills.length && !tools;
+  if (usageBox.hidden) return;
+  const label = [skills.length ? plural(skills.length, 'skill') : '', tools ? plural(tools, 'MCP tool') : '']
+    .filter(Boolean)
+    .join(', ');
+  let html;
+  if (!state.usageOpen) {
+    html = `<button class="usage-chip" data-act="usage" aria-expanded="false">${esc(label)}</button>`;
+  } else {
+    const top = Math.max(...skills.map((u) => u.count), ...mcp.flatMap((s) => s.tools.map((u) => u.count)));
+    const rows = (list) =>
+      `<ul class="uses">${list
+        .map(
+          (u) => `<li class="use" title="${esc(u.name)}">
+        <span class="use-bar" style="--w:${Math.round((u.count / top) * 100)}%"></span>
+        <span class="use-name">${esc(u.name)}</span>
+        <span class="use-n">${u.count}</span>
+        <span class="use-fail">${u.failed ? `${u.failed} failed` : ''}</span>
+      </li>`,
+        )
+        .join('')}</ul>`;
+    html = `<section class="usage-card" aria-label="Skills and MCP tools">
+      <header class="detail-head usage-head"><h2>${esc(label)}</h2><button class="iconbtn" data-act="usage" aria-expanded="true" aria-label="Close the usage card">✕</button></header>
+      <div class="usage-body">
+        ${skills.length ? `<h3>Skills</h3>${rows(skills)}` : ''}
+        ${mcp.map((s) => `<h3>MCP: ${esc(s.name)}</h3>${rows(s.tools)}`).join('')}
+      </div>
+    </section>`;
+  }
+  if (html === usageHtml) return;
+  const focused = usageBox.contains(document.activeElement);
+  usageBox.innerHTML = usageHtml = html;
+  if (focused) usageBox.querySelector('[data-act="usage"]').focus({ preventScroll: true });
+}
+
+function toggleUsage(open = !state.usageOpen) {
+  state.usageOpen = open;
+  renderUsage();
+}
+
+const focusInMain = () => (main.contains(document.activeElement) ? focusKey(document.activeElement) : null);
+
 function focusKey(el) {
-  for (const key of ['tool', 'expand', 'turn']) {
+  for (const key of ['tool', 'expand', 'reply', 'turn']) {
     const hit = el.closest(`[data-${key}]`);
     if (hit) return `[data-${key}="${CSS.escape(hit.dataset[key])}"]`;
   }
@@ -863,7 +995,7 @@ function selectTurn(n) {
 document.addEventListener('click', (e) => {
   if (!e.target.closest('#themePickerBtn')) toggleThemeMenu(false);
   const el = e.target.closest(
-    '[data-turn],[data-tool],[data-expand],[data-open],[data-act],[data-color-theme-id],#themePickerBtn',
+    '[data-turn],[data-tool],[data-expand],[data-reply],[data-open],[data-act],[data-color-theme-id],#themePickerBtn',
   );
   if (!el) return;
   if (el.dataset.colorThemeId) {
@@ -880,12 +1012,27 @@ document.addEventListener('click', (e) => {
   } else if (el.dataset.expand) {
     state.open.add(Number(el.dataset.expand));
     renderSession();
+  } else if (el.dataset.reply) {
+    const n = Number(el.dataset.reply);
+    const opening = !state.replyOpen.delete(n);
+    if (opening) state.replyOpen.add(n);
+    renderView();
+    if (opening) loadReply(n);
   } else if (el.dataset.turn) {
     e.preventDefault();
     selectTurn(Number(el.dataset.turn));
   } else {
     act(el.dataset.act);
   }
+});
+
+document.addEventListener('change', (e) => {
+  if (e.target.id === 'errorsOnly') state.errorsOnly = e.target.checked;
+  else if (e.target.id === 'newestFirst') {
+    state.newestFirst = e.target.checked;
+    store('newest-first', state.newestFirst ? '1' : null);
+  } else return;
+  if (state.data) renderView();
 });
 
 async function act(name) {
@@ -895,6 +1042,7 @@ async function act(name) {
   else if (name === 'close') closeDetail();
   else if (name === 'help') showHelp();
   else if (name === 'theme') toggleTheme();
+  else if (name === 'usage') toggleUsage();
   else if (name === 'refresh') load({ manual: true });
   else if (name === 'earlier' || name === 'later') {
     const r = state.range;
@@ -910,10 +1058,11 @@ async function act(name) {
 document.addEventListener('keydown', (e) => {
   if (e.ctrlKey || e.metaKey || e.altKey || e.defaultPrevented) return;
   if (picker.open || helpModal.open) return;
-  if (e.target.closest('input, textarea, [contenteditable]')) return;
+  if (e.target.closest('input:not([type=checkbox]), textarea, [contenteditable]')) return;
   if (e.key === 'Escape') {
     if ($('themeMenu').classList.contains('open')) return toggleThemeMenu(false);
     if (state.tool) return closeDetail();
+    if (state.usageOpen && !usageBox.hidden) return toggleUsage(false);
     return;
   }
   if (e.key === 'Enter' && e.target.id === 'themePickerBtn') return toggleThemeMenu();
@@ -922,11 +1071,16 @@ document.addEventListener('keydown', (e) => {
     e.preventDefault();
     return act(keys[e.key]);
   }
-  const turns = state.data?.turns;
-  if (!turns?.length) return;
-  const n = turns.length;
-  const at = state.turn;
-  const next = { j: Math.min(n, (at ?? 0) + 1), k: Math.max(1, (at ?? n + 1) - 1), g: 1, G: n }[e.key];
+  if (!state.data) return;
+  const turns = listed(state.data.turns);
+  if (!turns.length) return;
+  const at = state.turn ?? 0;
+  const next = {
+    j: (turns.find((t) => t.n > at) ?? turns.at(-1)).n,
+    k: (turns.findLast((t) => t.n < (state.turn ?? Infinity)) ?? turns[0]).n,
+    g: turns[0].n,
+    G: turns.at(-1).n,
+  }[e.key];
   if (next == null) return;
   e.preventDefault();
   selectTurn(next);
