@@ -1,0 +1,395 @@
+---
+import SiteLayout from '../kit/SiteLayout.astro';
+import Shot from '../kit/Shot.astro';
+import Keys from '../kit/Keys.astro';
+import ModeToggle from '../kit/ModeToggle.astro';
+import ThemeDial from '../kit/ThemeDial.astro';
+import Lightbox from '../kit/Lightbox.astro';
+import FamilyFooter from '../kit/FamilyFooter.astro';
+import { family, url } from '../kit/family';
+
+const SOURCE = 'https://github.com/NikiforovAll/claude-code-hub/tree/master/examples/inspector';
+const DOCS = url('extensibility/examples/inspector/');
+
+const read = [
+  {
+    title: 'Find the call that failed',
+    body: 'Errors only keeps the turns with a failed tool call. Click a call to see its input and its output in the panel at the right.',
+    shot: 'inspector-errors',
+    alt: 'The Inspector with Errors only on: the turns with a failed tool call, and the detail panel with one failed call and its output',
+  },
+  {
+    title: 'Read the whole reply',
+    body: 'Each turn shows the start of the prompt and of the reply, as markdown. Show the full reply opens all of it, with its tables and code.',
+    shot: 'inspector-reply',
+    alt: 'A turn with its tool calls and its full reply open, with headings, a list, and code',
+  },
+  {
+    title: 'Keep your hands on the keyboard',
+    body: '[j] and [k] go to the next or the previous turn, [g] and [G] to the first or the last. [o] opens a different session and [r] reads the transcript again. Press [?] for the full list.',
+    shot: 'inspector-shortcuts',
+    alt: 'The Inspector help dialog with its keys and the hub keys',
+  },
+];
+
+const setup = [
+  {
+    title: 'Install it',
+    cmd: 'npm install --prefix examples/inspector',
+    body: 'Run it in a clone of the hub repository. The Inspector has no npm package of its own.',
+  },
+  {
+    title: 'Add it to the apps list',
+    cmd: '{ "id": "inspector", "path": "<clone>/examples/inspector" }',
+    body: 'Put it in apps in ~/.claude-hub/config.json, after the four built-in tools, and restart the hub. The Inspector is the fifth tab: press [Alt+5] to go to it.',
+  },
+];
+---
+
+<SiteLayout
+  title="Claude Code Inspector: one Claude Code session, turn by turn"
+  description="See the turns, tool calls, and token use of one Claude Code session, next to the other tools in Claude Code Hub."
+  image="og.png"
+>
+  <div class="page">
+    <header class="nav">
+      <a class="mark" href={url('inspector/')}>Claude Code Inspector</a>
+      <nav aria-label="Site">
+        <a href={DOCS}>Docs</a>
+        <a href={SOURCE}>GitHub</a>
+        <details class="family">
+          <summary>Apps</summary>
+          <ul>
+            {family.map((s) => <li><a href={s.href} aria-current={s.id === 'inspector' ? 'page' : undefined}>{s.name}</a></li>)}
+          </ul>
+        </details>
+        <ModeToggle />
+      </nav>
+    </header>
+
+    <main>
+      <section class="hero">
+        <h1>One Claude Code session, turn by turn.</h1>
+        <p class="lede">
+          The Inspector reads a session transcript from disk and shows each prompt, the tool calls that followed it, and
+          the tokens they used. See where the context grew, where it was compacted, and which call failed.
+        </p>
+        <div class="actions">
+          <a class="button" href="#setup">Add it to the hub</a>
+          <a class="button ghost" href={SOURCE}>Read the source</a>
+        </div>
+
+        <figure class="hero-shot">
+          <Shot
+            themed="inspector"
+            alt="The Inspector: a chart of the context size per turn with the compactions, the first turns with their tool calls, and the skills and tools that the session used"
+            eager
+          />
+          <figcaption>
+            <ThemeDial />
+            <p>The Inspector follows the hub theme, in all 17 themes, light and dark. Pick one here and the page follows.</p>
+          </figcaption>
+        </figure>
+      </section>
+
+      <section class="half" aria-labelledby="read">
+        <div class="half-head">
+          <h2 id="read">Read</h2>
+          <p>
+            Open a session in Kanban and the Inspector opens it too. A live session updates as Claude Code writes to it.
+          </p>
+          <p class="aside">
+            An example app: it shows how a new tool connects to the hub. The <a href={DOCS}>docs page</a> walks through its
+            code.
+          </p>
+        </div>
+        <div class="items">
+          {
+            read.map((it) => (
+              <article class="item">
+                <div class="item-text">
+                  <h3>{it.title}</h3>
+                  <p><Keys text={it.body} /></p>
+                </div>
+                <Shot themed={it.shot} alt={it.alt} />
+              </article>
+            ))
+          }
+        </div>
+      </section>
+
+      <section class="setup" aria-labelledby="setup">
+        <h2 id="setup">Set up in two steps</h2>
+        <ol>
+          {
+            setup.map((s) => (
+              <li>
+                <h3>{s.title}</h3>
+                {s.cmd && <code class="step-cmd">{s.cmd}</code>}
+                {s.body && <p><Keys text={s.body} /></p>}
+              </li>
+            ))
+          }
+        </ol>
+      </section>
+    </main>
+
+    <FamilyFooter
+      current="inspector"
+      links={[
+        { label: 'Docs', href: DOCS },
+        { label: 'GitHub', href: SOURCE },
+      ]}
+    />
+  </div>
+  <Lightbox />
+</SiteLayout>
+
+<style>
+  .page {
+    width: min(100% - 2rem, 78rem);
+    margin-inline: auto;
+  }
+
+  .nav {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1rem;
+    padding-block: 1.25rem;
+  }
+  .mark {
+    font: 600 1.25rem/1 var(--font-display);
+    color: var(--c-ink1);
+    text-decoration: none;
+  }
+  .nav nav {
+    display: flex;
+    align-items: center;
+    gap: 1.25rem;
+    font: 500 0.875rem var(--font-mono);
+  }
+  .nav nav a,
+  .family summary {
+    color: var(--c-ink2);
+    text-decoration: none;
+    cursor: pointer;
+  }
+  .nav nav a:hover,
+  .family summary:hover {
+    color: var(--c-ink1);
+  }
+  .family {
+    position: relative;
+  }
+  .family summary {
+    list-style: none;
+  }
+  .family summary::-webkit-details-marker {
+    display: none;
+  }
+  .family summary::after {
+    content: ' ▾';
+  }
+  .family ul {
+    position: absolute;
+    right: 0;
+    top: calc(100% + 0.5rem);
+    z-index: 10;
+    margin: 0;
+    padding: 0.375rem;
+    list-style: none;
+    min-width: 11rem;
+    background: var(--c-elevated);
+    border: 1px solid var(--c-border);
+    border-radius: 0.5rem;
+  }
+  .family li a {
+    display: block;
+    padding: 0.5rem 0.75rem;
+    border-radius: 0.375rem;
+  }
+  .family li a:hover {
+    background: var(--c-hover);
+  }
+  .family li a[aria-current='page'] {
+    color: var(--c-accent-ink);
+  }
+
+  .hero {
+    padding-block: clamp(2.5rem, 7vw, 6rem) 0;
+  }
+  h1 {
+    margin: 0;
+    font: 600 clamp(2.5rem, 6.4vw, 5.75rem) / 0.98 var(--font-display);
+    letter-spacing: -0.025em;
+    max-width: 22ch;
+  }
+  .lede {
+    margin: 1.75rem 0 0;
+    max-width: 38rem;
+    font-size: 1.1875rem;
+    color: var(--c-ink2);
+  }
+  .actions {
+    margin-top: 2rem;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.75rem;
+  }
+  .button {
+    display: inline-flex;
+    align-items: center;
+    font: 500 0.875rem/1 var(--font-mono);
+    padding: 0.75rem 1rem;
+    border-radius: 0.375rem;
+    text-decoration: none;
+    color: var(--c-field);
+    background: var(--c-ink1);
+    border: 1px solid var(--c-ink1);
+  }
+  .button:hover {
+    background: var(--c-accent-ink);
+    border-color: var(--c-accent-ink);
+  }
+  .button.ghost {
+    color: var(--c-ink1);
+    background: transparent;
+    border-color: var(--c-border);
+  }
+  .button.ghost:hover {
+    background: var(--c-hover);
+    border-color: var(--c-border);
+  }
+  .button:focus-visible,
+  .nav a:focus-visible,
+  .family summary:focus-visible,
+  .aside a:focus-visible {
+    outline: 2px solid var(--c-accent);
+    outline-offset: 2px;
+  }
+
+  .hero-shot {
+    margin: clamp(2.5rem, 5vw, 4rem) 0 0;
+  }
+  .hero-shot figcaption {
+    margin-top: 1.25rem;
+    display: grid;
+    gap: 0.75rem;
+  }
+  .hero-shot figcaption p {
+    margin: 0;
+    font-size: 0.9375rem;
+    color: var(--c-ink3);
+  }
+
+  .half {
+    margin-top: clamp(5rem, 10vw, 9rem);
+    display: grid;
+    grid-template-columns: minmax(14rem, 18rem) 1fr;
+    gap: 2rem clamp(2rem, 5vw, 4.5rem);
+    align-items: start;
+  }
+  .half-head {
+    position: sticky;
+    top: 2rem;
+  }
+  .half-head h2 {
+    margin: 0 0 1rem;
+    font: 600 clamp(3.5rem, 8vw, 6rem) / 0.9 var(--font-display);
+    letter-spacing: -0.03em;
+    color: var(--c-accent-ink);
+  }
+  .half-head p {
+    margin: 0 0 1rem;
+    color: var(--c-ink2);
+  }
+  .aside {
+    font-size: 0.9375rem;
+    color: var(--c-ink3);
+  }
+  .aside a {
+    color: inherit;
+  }
+  .items {
+    display: grid;
+    gap: clamp(3.5rem, 6vw, 5.5rem);
+  }
+  .item {
+    display: grid;
+    gap: 1.25rem;
+  }
+  .item-text {
+    max-width: 40rem;
+  }
+  .item h3,
+  .setup h3 {
+    margin: 0 0 0.5rem;
+    font: 600 1.625rem/1.2 var(--font-display);
+    letter-spacing: -0.01em;
+  }
+  .item p {
+    margin: 0;
+    color: var(--c-ink2);
+  }
+  h2 {
+    margin: 0 0 1rem;
+    font: 600 clamp(2rem, 4vw, 2.75rem) / 1.08 var(--font-display);
+    letter-spacing: -0.02em;
+  }
+
+  .setup {
+    margin-block: clamp(5rem, 10vw, 9rem) clamp(4rem, 8vw, 6rem);
+    scroll-margin-top: 2rem;
+  }
+  .setup ol {
+    margin: 2rem 0;
+    padding: 0;
+    list-style: none;
+    counter-reset: step;
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(16rem, 1fr));
+    gap: 1.5rem;
+  }
+  .setup li {
+    counter-increment: step;
+    padding-top: 1.25rem;
+    border-top: 2px solid var(--c-ink1);
+    min-width: 0;
+  }
+  .setup li::before {
+    content: counter(step);
+    display: block;
+    font: 600 1rem var(--font-mono);
+    color: var(--c-accent-ink);
+    margin-bottom: 0.5rem;
+  }
+  .step-cmd {
+    display: block;
+    margin: 0.75rem 0;
+    padding: 0.625rem 0.875rem;
+    background: var(--c-elevated);
+    border: 1px solid var(--c-border);
+    border-radius: 0.375rem;
+    font-size: 0.875rem;
+    white-space: pre-wrap;
+    overflow-wrap: anywhere;
+  }
+  .setup li p {
+    margin: 0;
+    color: var(--c-ink2);
+    font-size: 0.9375rem;
+  }
+
+  @media (max-width: 52rem) {
+    .half {
+      grid-template-columns: 1fr;
+    }
+    .half-head {
+      position: static;
+    }
+    .nav nav {
+      gap: 0.875rem;
+    }
+  }
+</style>

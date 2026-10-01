@@ -42,6 +42,14 @@ const tools = [
     alt: 'Memory Diagnoser with the memory tree and the project CLAUDE.md open',
     docs: 'https://nikiforovall.blog/claude-code-memory/',
   },
+  {
+    title: 'Inspector',
+    body: 'The turns, tool calls, and token use of one session, with the failed calls and the context size after each turn. It follows the session you open in Kanban. An example app in the hub repo: you add it to the hub yourself.',
+    shot: 'inspector',
+    alt: 'The Inspector with a chart of the context size per turn, the first turns with their tool calls, and the tools that the session used',
+    docs: url('inspector/'),
+    more: 'See the Inspector',
+  },
 ];
 
 const drive = [
@@ -151,7 +159,7 @@ const setup = [
               <article class="item">
                 <div class="item-text">
                   <h3>{it.title}</h3>
-                  <p><Keys text={it.body} /> <a href={it.docs}>Read the docs</a>.</p>
+                  <p><Keys text={it.body} /> <a href={it.docs}>{it.more ?? 'Read the docs'}</a>.</p>
                 </div>
                 <Shot themed={it.shot} alt={it.alt} />
               </article>
