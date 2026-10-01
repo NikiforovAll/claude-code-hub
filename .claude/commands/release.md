@@ -42,7 +42,7 @@ A version with `-` is a **prerelease**. Its GitHub release gets `--prerelease`, 
 
 4. **Bump and commit.**
    - Run `npm version <version> --no-git-tag-version`.
-   - Set the `^x.y.z` ranges for `claude-code-cost`, `claude-code-kanban`, `claude-code-marketplace` and `claude-code-memory-explorer` in `package.json` to each submodule's `package.json` version.
+   - Set the exact versions (no `^`) of `claude-code-cost`, `claude-code-kanban`, `claude-code-marketplace` and `claude-code-memory-explorer` in `package.json` to each submodule's `package.json` version. The hub hands every app its SDK, so it must run only the app versions it was tested with. Older hubs pinned `^` ranges and still pick up any new minor, so an app change that needs the new hub SDK ships as a major.
    - Run `npm install`, so `package-lock.json` records those versions. `npm ci` fails on a lock that does not match `package.json`.
    - Commit and push:
      ```
@@ -51,7 +51,7 @@ A version with `-` is a **prerelease**. Its GitHub release gets `--prerelease`, 
      git push origin HEAD
      ```
 
-   Done when `npm ls claude-code-cost claude-code-kanban claude-code-marketplace claude-code-memory-explorer` shows the gate's versions and the push succeeded.
+   Done when `npm ls claude-code-cost claude-code-kanban claude-code-marketplace claude-code-memory-explorer` shows the gate's versions, `npm pack --dry-run` lists `packages/claude-hub-sdk/src/client.js`, `server.js` and `stub.js`, and the push succeeded.
 
 5. **Tag.** Run `git tag v<version> && git push origin v<version>`. This starts the release run.
 
