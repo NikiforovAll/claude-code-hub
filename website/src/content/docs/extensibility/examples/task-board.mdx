@@ -1,0 +1,236 @@
+---
+title: Task board
+description: A worked fork example. Keep the Kanban server, replace its page with a new board, and run the board in the hub next to the original Kanban.
+---
+
+import Shot from '../../../../kit/Shot.astro';
+import Lightbox from '../../../../kit/Lightbox.astro';
+
+This example forks Kanban and replaces its page with a new design: a session list on the left, and one board for the open session on the right. The server stays the same, so the new page gets its data from the same API. It follows the steps in [Fork a tool](/claude-code-hub/extensibility/fork/).
+
+<Shot src="shots/extensibility/task-board-board.webp" alt="The Task Board in the hub: a session list with status dots, branches, task counts and context bars, and a board with Pending, In progress and Completed columns" width={2880} height={1620} />
+
+## The two pages
+
+The fork runs next to the original Kanban. The board is the first tab (<kbd>Alt+1</kbd>), and the original Kanban is the second (<kbd>Alt+2</kbd>). Both read the same sessions and tasks.
+
+<Shot src="shots/extensibility/task-board-classic.webp" alt="The original Kanban with the same session open: session cards in the sidebar and the same tasks in three columns" width={2880} height={1620} />
+
+The board shows:
+
+- The sessions, grouped by project, with a filter for the sessions that need input and the sessions that work.
+- For each session: a status dot, the name, the time of the last change, the branch, the task count and the context use.
+- For the open session: the task and context bars, and a column for each task status. You can move a card to a different column, and add, edit and delete a task.
+- The 5-hour and weekly limits at the bottom of the list.
+
+When a session waits for a permission, the board shows the request with **Deny** and **Approve**:
+
+<Shot src="shots/extensibility/task-board-waiting.webp" alt="The board with a session that waits: a bar says Needs input, Approve Bash npm run build, with Deny and Approve buttons" width={2880} height={1620} />
+
+The board follows the hub theme in light and dark mode. Its theme button changes the theme of all the tools:
+
+<Shot src="shots/extensibility/task-board-dark.webp" alt="The Task Board in dark mode" width={2880} height={1620} />
+
+## What changes in the fork
+
+The fork starts from tag `v4.31.1` of claude-code-kanban. Four files change, and the server does not change:
+
+```text
+kanban-fork/
+├── hub-app.json          changed: new id, name, icon and port
+├── server.js             not changed
+├── lib/                  not changed
+└── public/
+    ├── index.html        replaced: the shell of the new page
+    ├── board.js          new: the page (about 820 lines)
+    └── board.css         new: the styles (about 260 lines)
+```
+
+The old `public/app.js` and `public/style.css` stay in the fork, but the new `index.html` does not load them. This keeps a merge of a new Kanban version simple.
+
+### `hub-app.json`
+
+```json
+{
+  "manifest": 1,
+  "id": "kanban-next",
+  "name": "Task Board",
+  "icon": "layout-dashboard",
+  "run": { "entry": "server.js", "defaultPort": 4545 },
+  "provides": { "terminal": { "liveWork": "/api/terminals" } },
+  "loading": {
+    "verbs": ["Laying out the board…", "Reading sessions…", "Sorting cards…"]
+  }
+}
+```
+
+The board has the embedded terminal, so it keeps `provides.terminal`. It does not declare `provides.projects` or `publishes`: the original Kanban runs next to it and keeps the project list and `session.changed`.
+
+### `public/index.html`
+
+The new page loads the SDK first, then the board:
+
+<details>
+<summary>The body of `index.html`, with the icons left out</summary>
+
+```html
+<body>
+<script src="/vendor/claude-hub-sdk.js"></script>
+
+<div class="app" id="app">
+  <aside class="side" id="side" aria-label="Sessions"></aside>
+  <div class="scrim" id="scrim"></div>
+  <main class="main" id="main">
+    <div class="view" id="view"></div>
+    <section class="term" id="term" aria-label="Terminal" hidden>
+      <div class="term-bar">
+        <span class="term-title" id="term-title">Terminal</span>
+        <span class="term-status" id="term-status"></span>
+        <button class="iconbtn" id="term-end" title="End the terminal session">End</button>
+        <button class="iconbtn" id="term-hide" aria-label="Hide terminal">×</button>
+      </div>
+      <div class="term-prompt" id="term-prompt" hidden></div>
+      <div class="term-host" id="term-host"></div>
+    </section>
+  </main>
+</div>
+<div class="toast" id="toast" role="status" aria-live="polite" hidden></div>
+<script src="/board.js"></script>
+</body>
+```
+
+</details>
+
+### The server API
+
+The board uses only routes that Kanban already has:
+
+| Route | The board uses it to |
+| --- | --- |
+| `GET /api/sessions` | List the sessions. `project` limits the list to one project |
+| `GET /api/sessions/:id` | Get the tasks of a session |
+| `GET /api/sessions/:id/agents` | Get the permission request of a session that waits |
+| `POST /api/sessions/:id/waiting/respond` | Approve or deny the request |
+| `GET /api/context-status` | Get the context use and the limits |
+| `GET`, `POST /api/session/pins`, `/api/session/pin` | Read and change the pins |
+| `POST /api/tasks/:sessionId` | Add a task |
+| `PUT`, `DELETE /api/tasks/:sessionId/:taskId` | Move or delete a task |
+| `GET /api/events` | Get a server event when a task or a session changes |
+| `GET /api/config` | Find out if the terminal is on |
+| `/api/terminal/ws` | Connect the terminal (WebSocket) |
+
+A small helper sends each request:
+
+<details>
+<summary>`api()` and `loadSessions()` in `board.js`</summary>
+
+```js
+async function api(url, opts = {}) {
+  const r = await fetch(url, {
+    ...opts,
+    headers: opts.body ? { 'Content-Type': 'application/json' } : undefined,
+    body: opts.body ? JSON.stringify(opts.body) : undefined,
+  });
+  const data = await r.json().catch(() => ({}));
+  if (!r.ok) throw new Error(data.error || `HTTP ${r.status}`);
+  return data;
+}
+
+async function loadSessions() {
+  pins = (await api('/api/session/pins').catch(() => ({ pins: {} }))).pins || {};
+  const q = new URLSearchParams({ limit: '50' });
+  const pinned = Object.keys(pins);
+  if (pinned.length) q.set('pinned', pinned.join(','));
+  if (state.sel) q.set('include', state.sel);
+  if (project) q.set('project', project);
+  sessions = (await api(`/api/sessions?${q}`)).filter((s) => s.hasMessages || totalOf(s));
+  await Promise.all(
+    sessions.map(async (s) => {
+      if (!s.hasWaitingForUser) return waitingBy.delete(s.id);
+      const a = await api(`/api/sessions/${s.id}/agents`).catch(() => null);
+      if (a?.waitingForUser) waitingBy.set(s.id, a.waitingForUser);
+    }),
+  );
+  if (!cur()) state.sel = sessions[0]?.id ?? null;
+  if (state.sel) await loadTasks(state.sel);
+  render();
+}
+```
+
+</details>
+
+### The hub connection
+
+The board connects to the hub with the SDK. It follows the theme, the project that you pick with <kbd>Ctrl+Alt+P</kbd>, and the session that you open in the original Kanban:
+
+<details>
+<summary>The `HUB_INTEGRATION` region of `board.js`</summary>
+
+```js
+const hub = ClaudeHub.connect();
+
+let colorTheme = 'ember';
+const reportTheme = hub.bindTheme({
+  get: () => ({ theme: isDark() ? 'dark' : 'light', colorTheme }),
+  set: ({ theme, colorTheme: next }) => {
+    colorTheme = next;
+    document.documentElement.dataset.theme = theme;
+    renderMain();
+    themeTerminal();
+  },
+});
+
+hub.subscribe('theme.changed', (p) => {
+  document.body.classList.toggle('hub-vars', !!p?.vars);
+  themeTerminal();
+});
+
+hub.subscribe('project.changed', (p) => {
+  const next = typeof p?.project === 'string' && p.project ? p.project : null;
+  if (next === project) return;
+  project = next;
+  loadSessions();
+});
+
+hub.subscribe('session.changed', (p) => {
+  if (p?.sessionId && p.sessionId !== state.sel) selectSession(p.sessionId).then(loadSessions);
+});
+```
+
+</details>
+
+- `bindTheme` applies the hub theme, and `reportTheme()` sends a change from the board's theme button to the hub. The hub then sends the new theme to every tool.
+- The original Kanban publishes `session.changed`. When you open a session there and press <kbd>Alt+1</kbd>, the board shows the same session.
+- The terminal reads its token from the `#t=` part of the iframe URL. When the server refuses a token from an earlier hub run, the board asks for the new one with `hub.terminalToken()`.
+
+Under the hub, the hub serves `/vendor/claude-hub-sdk.js`. The server already calls `mount()` for it, because the fork keeps Kanban's `server.js`.
+
+## Run it in the hub
+
+Add the fork before the original Kanban in `config.json`:
+
+```json
+{
+  "apps": [
+    { "id": "kanban-next", "path": "C:/dev/kanban-fork" },
+    { "id": "kanban" }
+  ]
+}
+```
+
+Restart the hub. The startup log shows the fork and the terminal conflict:
+
+```text
+kanban-next runs from C:\dev\kanban-fork
+kanban and kanban-next both declare capability "terminal"; kanban-next has it. Disable one of them.
+```
+
+The board comes first, so it gets the terminal. The original Kanban runs without one. The project list stays with the original Kanban, because the board does not declare it.
+
+## What the fork leaves out
+
+- **Links to other tools.** The board has no buttons for Cost, Marketplace and Memory Diagnoser. To add them, call `hub.invoke('session.cost', { session })` and the other [actions](/claude-code-hub/extensibility/reference/connect/#actions).
+- **Replacing Kanban.** To run the board alone, change the `id` to `kanban`, and add `"publishes": ["session.changed"]` and `provides.projects` to the manifest. The board must then publish `session.changed` itself.
+- **The rest of the original page.** The board has no message log, no live feed and no team view. The fork keeps that code, so you can add parts of it back.
+
+<Lightbox />

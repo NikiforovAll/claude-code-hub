@@ -1,0 +1,53 @@
+---
+title: Overview
+description: Change how a hub tool looks or works. Start with a small patch, go to a fork when the patch grows, and write a new app when nothing fits.
+---
+
+The hub runs each tool from a folder. An entry in `config.json` can point a tool at your own folder, so you can change a tool and keep the hub as it is. There are three ways to do it, from the smallest change to the largest:
+
+| Way | What you change | You maintain |
+| --- | --- | --- |
+| [Patch](/claude-code-hub/extensibility/patch/) | A few lines in the published package | One patch file per version |
+| [Fork](/claude-code-hub/extensibility/fork/) | Any part of the tool's source | A copy of the tool |
+| [New app](/claude-code-hub/extensibility/new-app/) | Nothing in the existing tools | A complete app |
+
+Start with a patch. When the patch gets large or breaks on each upgrade, go to a fork. When the tool you want does a different job, write a new app.
+
+## Point the hub at your folder
+
+Each way ends with an entry in the `apps` list of `config.json`:
+
+```json
+{
+  "apps": [
+    { "id": "kanban-patched", "path": "C:/dev/kanban-patched" },
+    { "id": "kanban", "enabled": false }
+  ]
+}
+```
+
+- `path` is the folder of your tool. It can be any folder on the machine. A relative `path` starts from the folder of `config.json`. The hub does not expand `~`, so write the full path.
+- `id` must be the same as the `id` in the folder's `hub-app.json`.
+- To replace a built-in tool, use its id, for example `kanban`. To run your tool next to the original, give it a new id.
+
+Restart the hub after you edit the file. See [The config file](/claude-code-hub/reference/configuration/#the-config-file) for the other keys.
+
+## One tool per capability
+
+Only one tool gets the embedded terminal and the project list: the first enabled tool in tab order that declares it in `provides`. If your tool and the original both declare them, the hub logs a message at startup. Turn one off, or put the one you want first.
+
+<kbd>Alt+1</kbd> to <kbd>Alt+9</kbd> follow the tab order, so the tool you put first is also <kbd>Alt+1</kbd>.
+
+## Reference
+
+- [The apps entry and the launch](/claude-code-hub/extensibility/reference/apps-entry/)
+- [The app manifest](/claude-code-hub/extensibility/reference/manifest/)
+- [The SDK](/claude-code-hub/extensibility/reference/sdk/)
+- [Connect to other tools](/claude-code-hub/extensibility/reference/connect/)
+- [Hub protocol v1](/claude-code-hub/reference/protocol/), the full contract
+
+## Examples
+
+- [Compact session rows](/claude-code-hub/extensibility/examples/compact-rows/): a patch that changes the Kanban session list to two-line rows.
+- [Task board](/claude-code-hub/extensibility/examples/task-board/): a fork that keeps the Kanban server and replaces its page with a new board.
+- [Inspector](/claude-code-hub/extensibility/examples/inspector/): a new app that shows the turns, tool calls and token use of one session.

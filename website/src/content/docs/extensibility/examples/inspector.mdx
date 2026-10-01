@@ -1,0 +1,90 @@
+---
+title: Inspector
+description: A worked new-app example. A separate tab that shows the turns, tool calls and token use of one Claude Code session, and follows the session that you open in Kanban.
+---
+
+import Shot from '../../../../kit/Shot.astro';
+import Lightbox from '../../../../kit/Lightbox.astro';
+
+The Inspector is a new app. It does not change a built-in tool: it runs in its own tab and reads the session transcripts from disk. It follows the steps in [Write a new app](/claude-code-hub/extensibility/new-app/). Its source is in [`examples/inspector`](https://github.com/NikiforovAll/claude-code-hub/tree/master/examples/inspector) in the hub repository.
+
+<Shot src="shots/extensibility/inspector-hub.webp" alt="The Inspector in the hub: the session Rate limit for the orders API, a chart of the context size per turn with a compaction line, the first turns with their tool calls, and a card with the skills and MCP tools that the session used" width={2880} height={1620} />
+
+## What it shows
+
+For the open session, the Inspector shows:
+
+- The title, the branch, the model, and the counts of turns, tool calls and failed calls.
+- A chart of the context size after each turn. A line marks each compaction.
+- Each turn: the prompt, the tool calls that followed it, the tokens and the time. The reply of the turn shows as markdown.
+- A card with the skills and the MCP tools that the session used, grouped by MCP server, with a count and the failed calls for each. The card shows only when the session used one. Close it with <kbd>Esc</kbd> or ✕, and open it again from its chip.
+
+Click a tool call to see its input and its result in a panel at the right. **Errors only** shows only the turns and the tool calls that failed:
+
+<Shot src="shots/extensibility/inspector-errors.webp" alt="The Inspector with Errors only on: the turns with a failed tool call, and the detail panel with the failed Bash call npm test and its output" width={2880} height={1620} />
+
+**Newest first** puts the last turn at the top. The chart does not change with either option.
+
+| Key | Action |
+| --- | --- |
+| <kbd>j</kbd>, <kbd>k</kbd> | The next or the previous turn |
+| <kbd>g</kbd>, <kbd>G</kbd> | The first or the last turn |
+| <kbd>o</kbd> | Open a different session |
+| <kbd>r</kbd> | Read the transcript again |
+| <kbd>t</kbd> | Change between light and dark |
+| <kbd>?</kbd> | Show the help |
+
+The Inspector follows the hub theme in light and dark mode:
+
+<Shot src="shots/extensibility/inspector-dark.webp" alt="The Inspector in dark mode" width={2880} height={1620} />
+
+## How it connects to the other tools
+
+| With | How |
+| --- | --- |
+| Kanban | Kanban publishes `session.changed` when you open a session. The Inspector subscribes to it and opens the same session |
+| Any tool | The manifest declares the action `session.inspect`. A tool calls `hub.invoke('session.inspect', { session })` to open a session in the Inspector |
+| Cost | The **Cost** button calls `hub.invoke('session.cost', { session })`. It shows only when `hub.can('session.cost')` is true |
+| The hub | `bindTheme` and `onThemes` for the theme, `onActive` to reload when the tab comes on screen, `openExternal` for links |
+
+See step 4 of [Write a new app](/claude-code-hub/extensibility/new-app/#4-connect-the-page) for the code.
+
+## The server API
+
+The page uses three routes. Each reads the transcript from `<CLAUDE_CONFIG_DIR>/projects`:
+
+| Route | Returns |
+| --- | --- |
+| `GET /api/sessions/:id` | The session overview: the turns, the tool calls and the token use. It sends an `ETag`, so a reload of a session that did not change gets `304` |
+| `GET /api/sessions/:id/tools/:toolId` | The input and the result of one tool call |
+| `GET /api/sessions/:id/turns/:n/reply` | The full reply of one turn |
+
+`?encoded=` with the project folder name finds the file faster. Without it, the server looks in each project folder.
+
+## Run it in the hub
+
+In a clone of the hub, install the app:
+
+```sh
+npm install --prefix examples/inspector
+```
+
+Add it to the `apps` list in `~/.claude-hub/config.json`, after the built-in tools:
+
+```json
+{
+  "apps": [
+    { "id": "kanban" },
+    { "id": "marketplace" },
+    { "id": "cost" },
+    { "id": "memory" },
+    { "id": "inspector", "path": "C:/dev/claude-code-hub/examples/inspector" }
+  ]
+}
+```
+
+Restart the hub. The Inspector is the fifth tab, <kbd>Alt+5</kbd>.
+
+To run it alone, run `npm start` in `examples/inspector` and open `http://localhost:3545`.
+
+<Lightbox />

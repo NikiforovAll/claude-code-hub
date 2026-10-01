@@ -1,0 +1,274 @@
+---
+title: Compact session rows
+description: A worked patch example. Change the Kanban session list from tall cards to two-line rows, and run the patched Kanban in the hub in place of the original.
+---
+
+import Shot from '../../../../kit/Shot.astro';
+import Lightbox from '../../../../kit/Lightbox.astro';
+
+This example patches Kanban so that each session in the sidebar takes two lines instead of a tall card. It follows the steps in [Patch a tool](/claude-code-hub/extensibility/patch/), with all the files in full.
+
+<Shot src="shots/extensibility/compact-rows-after-full.webp" alt="The hub with the patched Kanban: the sidebar shows three sessions as two-line rows" width={2880} height={1620} />
+
+## Before and after
+
+<div class="example-pair">
+  <figure>
+    <Shot src="shots/extensibility/compact-rows-before.webp" alt="The original Kanban sidebar: each session is a tall card with the project, branch, task bar, context bar and time" width={830} height={1040} />
+    <figcaption>Before: one card for each session.</figcaption>
+  </figure>
+  <figure>
+    <Shot src="shots/extensibility/compact-rows-after.webp" alt="The patched Kanban sidebar: each session is a row with the name and time, then the branch, tasks and context use, and a context bar" width={830} height={1040} />
+    <figcaption>After: two lines and a context bar.</figcaption>
+  </figure>
+</div>
+
+Each row shows:
+
+- A status dot: green when the session is active, amber when it waits for you, an outline when it is idle.
+- The session name and the time of the last change.
+- The git branch, the task count and the context use. The context use has the same color as in the original card.
+- A thin bar for the context use.
+
+## The wrapper
+
+The finished wrapper has these files:
+
+```text
+kanban-patched/
+├── package.json
+├── hub-app.json
+└── patches/
+    └── claude-code-kanban+4.31.1.patch
+```
+
+<details>
+<summary>`package.json`</summary>
+
+```json
+{
+  "name": "kanban-patched",
+  "private": true,
+  "scripts": { "postinstall": "patch-package" },
+  "dependencies": { "claude-code-kanban": "4.31.1" },
+  "devDependencies": { "patch-package": "8.0.1" }
+}
+```
+
+</details>
+
+<details>
+<summary>`hub-app.json`</summary>
+
+```json
+{
+  "manifest": 1,
+  "id": "kanban-patched",
+  "name": "Kanban (patched)",
+  "icon": "columns",
+  "run": { "entry": "node_modules/claude-code-kanban/server.js", "defaultPort": 4546 },
+  "publishes": ["session.changed"],
+  "provides": {
+    "projects": { "path": "/api/projects" },
+    "terminal": { "liveWork": "/api/terminals" }
+  }
+}
+```
+
+</details>
+
+The manifest keeps what the original Kanban declares: it publishes `session.changed`, and it gives the project list and the terminal. Without `provides`, the hub has no terminal and no project list. Without `publishes`, the hub drops the `session.changed` messages, so an app that subscribes to the topic gets nothing.
+
+Run `npm install` in the folder.
+
+## The change
+
+### `public/app.js`
+
+In `node_modules/claude-code-kanban/public/app.js`, find `renderSessionCard` in `renderSessions`. Add two lines before the `return`, and replace the markup inside the `<button>`:
+
+<details>
+<summary>The new end of `renderSessionCard` (18 lines)</summary>
+
+```js
+    const ctx = showCtx ? getCtx(session.contextStatus) : null;
+    const ctxColor = ctx ? getContextColor(ctx.usedTokens, ctx.modelName) : '';
+    return `
+          <button onclick="openSession('${sid}')" draggable="true" data-session-id="${escapeHtml(session.id)}" class="session-item ${isActive ? 'active' : ''} ${session.hasWaitingForUser ? 'permission-pending' : ''} ${tempClass} ${showCtx ? 'has-context' : ''}" title="${escapeHtml(tooltip)}">
+            <span class="srow-dot ${session.hasWaitingForUser ? 'waiting' : isLive || session.hasRunningAgents || session.hasRecentLog ? 'active' : 'idle'}"></span>
+            <div class="srow-line">
+              <span class="session-pin-btn${pinClass}" onclick="event.stopPropagation();toggleSessionPin('${sid}')" title="${pinTitle} session">${pinState === 'sticky' ? SESSION_STAR_SVG : SESSION_PIN_SVG}</span>
+              <span class="session-name">${escapeHtml(sessionName)}</span>
+              <span class="srow-when">${formatDate(session.modifiedAt)}</span>
+            </div>
+            <div class="srow-line srow-meta">
+              <span class="srow-branch">${gitBranch || '—'}</span>
+              <span class="srow-tasks">${total ? `${session.completed}/${total} tasks` : 'no tasks'}</span>
+              ${ctx ? `<span class="srow-ctx" style="color:${ctxColor}">${Math.round(ctx.pct)}% ctx</span>` : ''}
+            </div>
+            ${ctx ? `<div class="srow-bar"><i style="width: ${ctx.pct}%; background: ${ctxColor}"></i></div>` : ''}
+          </button>
+        `;
+```
+
+</details>
+
+The new markup uses Kanban's own functions: `getCtx` reads the context use, `getContextColor` gives its color, and `formatDate` writes the time. The button and its attributes stay the same, so a click, drag and drop and the keyboard still work.
+
+### `public/style.css`
+
+In `node_modules/claude-code-kanban/public/style.css`, add these rules before `.context-bar`:
+
+<details>
+<summary>The new rules (94 lines)</summary>
+
+```css
+.session-item:has(> .srow-dot) {
+  display: grid;
+  grid-template-columns: 8px minmax(0, 1fr);
+  column-gap: 10px;
+  row-gap: 4px;
+  padding: 9px 10px;
+  margin-bottom: 2px;
+  border-color: transparent;
+  background: transparent;
+}
+.session-item:has(> .srow-dot):hover {
+  background: var(--bg-hover);
+}
+.session-item.active:has(> .srow-dot) {
+  background: var(--accent-dim);
+  border-color: color-mix(in srgb, var(--accent) 35%, transparent);
+}
+.srow-dot {
+  width: 8px;
+  height: 8px;
+  margin-top: 5px;
+  border-radius: 50%;
+  grid-row: 1 / 4;
+  border: 1.5px solid var(--text-muted);
+}
+.srow-dot.active {
+  border: none;
+  background: var(--success);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--success) 20%, transparent);
+}
+.srow-dot.waiting {
+  border: none;
+  background: var(--warning);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--warning) 20%, transparent);
+}
+.srow-line {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+.srow-line .session-name {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-weight: 500;
+}
+.srow-line .session-pin-btn {
+  position: static;
+  order: 0;
+}
+.srow-line .session-pin-btn:not(.pinned):not(.sticky) {
+  display: none;
+}
+.srow-when,
+.srow-meta {
+  font-size: 11.5px;
+  color: var(--text-tertiary);
+  font-variant-numeric: tabular-nums;
+}
+.srow-when {
+  flex: none;
+}
+.srow-branch {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-family: var(--font-mono);
+}
+.srow-tasks,
+.srow-ctx {
+  flex: none;
+}
+.srow-ctx::before {
+  content: "·";
+  margin-right: 6px;
+  color: var(--text-muted);
+}
+.srow-bar {
+  height: 3px;
+  border-radius: 2px;
+  background: var(--border);
+  overflow: hidden;
+}
+.srow-bar i {
+  display: block;
+  height: 100%;
+  background: var(--success);
+}
+```
+
+</details>
+
+The rules use Kanban's theme variables, such as `--accent`, `--success` and `--text-tertiary`. The rows follow each hub theme, in light and dark mode.
+
+### Save the patch
+
+```bash
+npx patch-package claude-code-kanban
+```
+
+This writes `patches/claude-code-kanban+4.31.1.patch`. To check it, delete `node_modules` and run `npm install`. The output shows `claude-code-kanban@4.31.1 ✔`.
+
+## Run it in the hub
+
+Add the wrapper to `config.json`, before the other tools, and turn the original Kanban off:
+
+```json
+{
+  "apps": [
+    { "id": "kanban-patched", "path": "C:/dev/kanban-patched" },
+    { "id": "kanban", "enabled": false }
+  ]
+}
+```
+
+Restart the hub. The startup log shows where the tool runs from:
+
+```text
+kanban-patched runs from C:\dev\kanban-patched
+```
+
+The patched Kanban is the first tab (<kbd>Alt+1</kbd>). It has the embedded terminal and the project list, and its links to Cost, Marketplace and Memory Diagnoser work as before.
+
+## What the patch removes
+
+The new row has no place for the small badges of the original card: team, plan, bookmarks, linked documents, scratchpad, loop, workflow and terminal. Add the ones you use to the second line, or keep the patch small and accept the loss. If you want to change more of the card, think about a [fork](/claude-code-hub/extensibility/fork/).
+
+<Lightbox />
+
+<style>{`
+  .example-pair {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(14rem, 1fr));
+    gap: 1rem;
+  }
+  .example-pair figure {
+    margin: 0;
+  }
+  .example-pair figcaption {
+    margin-top: 0.5rem;
+    font-size: var(--sl-text-sm);
+    color: var(--sl-color-gray-3);
+  }
+`}</style>

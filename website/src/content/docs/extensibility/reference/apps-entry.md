@@ -1,0 +1,104 @@
+---
+title: The apps entry and the launch
+description: How the hub selects, starts and serves an app from an entry in config.json, and what the app server must do.
+---
+
+This page covers the hub side of an app: the entry in `config.json`, how the hub starts the app, and what the app server must do. For the full contract, see [Hub protocol v1](/claude-code-hub/reference/protocol/).
+
+## The `apps` list
+
+The `apps` list in `config.json` (in the hub folder, `~/.claude-hub` by default) sets which apps run and in which order.
+
+```json
+{
+  "apps": [
+    { "id": "board", "path": "C:/dev/board" },
+    { "id": "kanban", "enabled": false },
+    { "id": "cost", "port": 4600 }
+  ]
+}
+```
+
+| Field | Type | Meaning |
+| --- | --- | --- |
+| `id` | string | The app id. A built-in id (`kanban`, `marketplace`, `cost`, `memory`) or a new id that matches `^[a-z][a-z0-9-]{0,31}$` |
+| `path` | string | Optional. The app folder, the one with `hub-app.json`. Absolute, or relative to the folder of `config.json`. The hub does not expand `~` |
+| `enabled` | boolean | Optional. `false` turns the app off: no process, no tab, no port, and its actions and capabilities go to no one |
+| `port` | integer | Optional. The proxy port, 1 to 65535. See [Ports](#ports) |
+
+### Rules
+
+1. **Order.** The listed apps come first, in list order. The built-in apps that are not listed follow, in the default order: `kanban`, `marketplace`, `cost`, `memory`. The tab order is also the order of <kbd>Alt+1</kbd> to <kbd>Alt+9</kbd>.
+2. **Replace.** An entry with a built-in id and a `path` runs that folder in place of the built-in app.
+3. **Add.** An entry with a new id must have a `path`. Without one, the hub logs `Unknown app "<id>" ... has no "path", ignored`.
+4. **Id match.** The `id` in the folder's `hub-app.json` must be the entry's `id`. Otherwise the hub skips the app.
+5. **First wins.** When two enabled apps declare the same capability, action or port, the first in tab order gets it. The hub logs each case at startup, for example: `kanban-next and kanban both declare capability "terminal"; kanban-next has it. Disable one of them.`
+6. **Restart.** The hub reads the list at startup only.
+
+### Startup log lines
+
+| Line | Cause |
+| --- | --- |
+| `<id> runs from <folder>` | The entry has a `path`. Shows the resolved folder |
+| `<folder>/hub-app.json: not found. <id> is skipped` | No manifest in the folder |
+| `<folder>/hub-app.json: <reason>. <id> is skipped` | The manifest is not valid. See [Manifest rules](/claude-code-hub/extensibility/reference/manifest/#validation) |
+| `<id>: action "<name>" <reason>, skipped` | One action is not valid. The rest of the app runs |
+| `... both declare ...` | A conflict. See rule 5 |
+| `Every app is disabled ...` | Every entry has `"enabled": false`. The hub stops |
+
+## Launch
+
+For each config dir, the hub starts each enabled app once:
+
+- It runs `run.entry` from the manifest with the hub's own Node, with `--max-http-header-size=65536`.
+- The working directory is the hub's folder, not the app's. Resolve your files from `__dirname`.
+- It gives the app an IPC channel.
+- When the app exits, the hub starts it again, up to 5 times in 60 seconds.
+
+### Environment
+
+| Variable | Value |
+| --- | --- |
+| `CLAUDE_HUB` | `1` |
+| `HUB_URL` | The hub origin, `http://localhost:<hub port>` |
+| `CLAUDE_CONFIG_DIR` | The Claude config dir of this set of apps. Read it once at start |
+| `PORT` | `0`: listen on any free port |
+| `HOST`, `ALLOWED_HOSTS` | The hub's bind address and extra host names. Bind to `HOST` and accept the `Host` headers that the hub accepts |
+| `HUB_SDK_SERVER` | The absolute path of the hub's server SDK |
+| `CCK_TERMINAL`, `CCK_TERMINAL_TOKEN` | Only for the `terminal` provider, when the terminal is on. The terminal config as JSON, and the token that the terminal WebSocket must check |
+
+The app gets the rest of the hub's environment too.
+
+### What the app server must do
+
+1. **Mount the SDK first.** Before it serves static files:
+
+   ```js
+   if (process.env.HUB_SDK_SERVER) require(process.env.HUB_SDK_SERVER).mount(app);
+   ```
+
+   `mount(app)` takes an Express app. It adds `GET /hub-config` and `GET /vendor/claude-hub-sdk.js`, answers the hub's ping on the IPC channel, and exits the process when the hub goes away.
+
+2. **Print the ready line.** When the server listens, print one stdout line with the real port, then a newline:
+
+   ```text
+   Board running at http://localhost:52814
+   ```
+
+   The hub matches `/running at http:\/\/localhost:(\d+)/i`. Print no other line that matches. The hub waits up to 20 s for the ready lines.
+
+3. **Allow framing.** Do not send `X-Frame-Options` or a `frame-ancestors` rule that blocks the hub origin.
+
+4. **Work alone.** The app must run with no hub. Everything in the SDK turns on only under the hub.
+
+## Ports
+
+The browser sees each app on a proxy port, not on the port the app listens on. The proxy port is the app's origin, so it keys the app's `localStorage`. The hub takes the first value that is set:
+
+1. The `--<id>-port` flag.
+2. The entry's `port`.
+3. `run.defaultPort` from the manifest.
+
+When that port is busy, the hub uses a random port for this run, and the app starts with empty `localStorage`. Give each app a `defaultPort` that no other app uses.
+
+The proxy removes the hub's `hub_token` cookie from each request before it forwards it.
