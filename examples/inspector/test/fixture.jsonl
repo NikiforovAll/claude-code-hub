@@ -1,0 +1,19 @@
+{"type":"permission-mode","permissionMode":"default","sessionId":"11111111-2222-4333-8444-555555555555"}
+{"type":"user","uuid":"u1","timestamp":"2026-09-01T10:00:00.000Z","cwd":"C:/dev/shop","gitBranch":"main","version":"2.1.0","message":{"role":"user","content":"Add a test for the cart total"},"promptSource":"typed"}
+{"type":"assistant","uuid":"a1","timestamp":"2026-09-01T10:00:02.000Z","message":{"id":"msg_1","model":"claude-opus-5-5","role":"assistant","content":[{"type":"text","text":"I will read the cart first."}],"usage":{"input_tokens":10,"cache_read_input_tokens":1000,"cache_creation_input_tokens":200,"output_tokens":30}}}
+{"type":"assistant","uuid":"a2","timestamp":"2026-09-01T10:00:02.500Z","message":{"id":"msg_1","model":"claude-opus-5-5","role":"assistant","content":[{"type":"tool_use","id":"toolu_read","name":"Read","input":{"file_path":"C:/dev/shop/cart.js"}}],"usage":{"input_tokens":10,"cache_read_input_tokens":1000,"cache_creation_input_tokens":200,"output_tokens":30}}}
+{"type":"user","uuid":"r1","timestamp":"2026-09-01T10:00:03.000Z","message":{"role":"user","content":[{"type":"tool_result","tool_use_id":"toolu_read","content":"export const total = () => 0;"}]}}
+{"type":"assistant","uuid":"a3","timestamp":"2026-09-01T10:00:05.000Z","message":{"id":"msg_2","model":"claude-opus-5-5","role":"assistant","content":[{"type":"tool_use","id":"toolu_test","name":"Bash","input":{"command":"npm test","description":"Run the tests"}}],"usage":{"input_tokens":5,"cache_read_input_tokens":1400,"cache_creation_input_tokens":100,"output_tokens":20}}}
+{"type":"user","uuid":"r2","timestamp":"2026-09-01T10:00:09.000Z","message":{"role":"user","content":[{"type":"tool_result","tool_use_id":"toolu_test","is_error":true,"content":"1 failing"}]}}
+{"type":"assistant","uuid":"a4","timestamp":"2026-09-01T10:00:12.000Z","message":{"id":"msg_3","model":"claude-opus-5-5","role":"assistant","content":[{"type":"text","text":"The test fails because total() returns 0."}],"usage":{"input_tokens":3,"cache_read_input_tokens":1500,"cache_creation_input_tokens":50,"output_tokens":15}}}
+{"type":"system","subtype":"turn_duration","durationMs":12000,"uuid":"s1","timestamp":"2026-09-01T10:00:12.100Z"}
+{"type":"ai-title","aiTitle":"Cart total test","sessionId":"11111111-2222-4333-8444-555555555555"}
+{"type":"user","uuid":"m1","timestamp":"2026-09-01T10:01:00.000Z","isMeta":true,"message":{"role":"user","content":"<system-reminder>ignore me</system-reminder>"}}
+{"type":"system","subtype":"compact_boundary","uuid":"c1","timestamp":"2026-09-01T10:02:00.000Z"}
+{"type":"user","uuid":"cs","timestamp":"2026-09-01T10:02:00.100Z","isCompactSummary":true,"message":{"role":"user","content":"This session is being continued from a previous conversation."}}
+{"type":"user","uuid":"u2","timestamp":"2026-09-01T10:03:00.000Z","cwd":"C:/dev/shop/src","message":{"role":"user","content":"Fix it"},"promptSource":"queued"}
+{"type":"assistant","uuid":"a5","timestamp":"2026-09-01T10:03:02.000Z","message":{"id":"msg_4","model":"claude-opus-5-5","role":"assistant","content":[{"type":"tool_use","id":"toolu_edit","name":"Edit","input":{"file_path":"C:/dev/shop/cart.js","old_string":"0","new_string":"sum"}}],"usage":{"input_tokens":4,"cache_read_input_tokens":300,"cache_creation_input_tokens":40,"output_tokens":12}}}
+{"type":"user","uuid":"x1","timestamp":"2026-09-01T10:03:04.000Z","message":{"role":"user","content":[{"type":"text","text":"[Request interrupted by user]"}]}}
+{"type":"assistant","uuid":"side","timestamp":"2026-09-01T10:03:05.000Z","isSidechain":true,"message":{"id":"msg_side","role":"assistant","content":[{"type":"tool_use","id":"toolu_side","name":"Grep","input":{"pattern":"x"}}],"usage":{"input_tokens":999,"output_tokens":999}}}
+{"type":"custom-title","customTitle":"cart-tests","sessionId":"11111111-2222-4333-8444-555555555555"}
+not json

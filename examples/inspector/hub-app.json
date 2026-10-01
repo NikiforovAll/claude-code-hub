@@ -1,0 +1,15 @@
+{
+  "manifest": 1,
+  "id": "inspector",
+  "name": "Inspector",
+  "icon": "scan-search",
+  "run": { "entry": "server.js", "defaultPort": 3545 },
+  "loading": {
+    "verbs": ["Reading the transcript…", "Counting tokens per turn…", "Matching tool calls to results…"]
+  },
+  "actions": {
+    "handles": {
+      "session.inspect": { "params": { "session": "string?" }, "url": "?session={session}", "mode": "message" }
+    }
+  }
+}

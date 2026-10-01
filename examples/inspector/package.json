@@ -1,0 +1,24 @@
+{
+  "name": "claude-code-hub-inspector",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Example Claude Code Hub app: inspect the turns, tool calls and token use of a Claude Code session",
+  "main": "server.js",
+  "type": "commonjs",
+  "scripts": {
+    "start": "node server.js",
+    "test": "node --test test/*.test.js",
+    "lint": "biome check .",
+    "lint:fix": "biome check --write ."
+  },
+  "engines": {
+    "node": ">=20.0.0"
+  },
+  "dependencies": {
+    "express": "^4.21.2"
+  },
+  "devDependencies": {
+    "@biomejs/biome": "2.4.10"
+  },
+  "license": "MIT"
+}
