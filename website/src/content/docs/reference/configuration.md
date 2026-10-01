@@ -107,6 +107,8 @@ The paths are for the default hub folder. With `--hub-dir` or `CLAUDE_HUB_DIR`, 
 | `~/.claude-hub/token` | The [hub token](/claude-code-hub/reference/security/#the-hub-token) |
 | `~/.claude-hub/plugin/` | The copy of the [hub plugin](#install-the-hub-plugin) that `--install` writes |
 
+The hub also reads `~/.claude-hub/themes.json`, which you write. It holds your [custom color themes](/claude-code-hub/guides/themes/).
+
 The tools write their own files. See their docs:
 
 - [Kanban](https://nikiforovall.blog/claude-code-kanban/reference/configuration/)
