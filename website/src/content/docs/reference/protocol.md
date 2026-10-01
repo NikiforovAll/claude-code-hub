@@ -245,7 +245,7 @@ A key press inside an iframe does not reach the hub page, so the app forwards th
 |---|---|---|
 | App → hub | `hub:keydown` | `{key, code, ctrl, alt, shift, meta}` |
 
-1. `welcome.forward` lists the combos by name, for example `ctrl+alt+p`, `ctrl+alt+ArrowLeft`, `alt+1`.
+1. `welcome.forward` lists the combos by name. Today they are `ctrl+alt+p`, `ctrl+alt+w`, `ctrl+alt+a`, `ctrl+alt+ArrowLeft`, `ctrl+alt+ArrowRight` and `alt+1` to `alt+N` for the first nine tabs. An app takes the list from `welcome`, not from this page.
 2. **Combo name.** The modifiers that are down, in the order `ctrl`, `alt`, `shift`, `meta`, joined by `+`, then the key. The key is `e.key` lowercased when that is `a`–`z` or `1`–`9`. Else, when `e.code` is `Key<A-Z>` or `Digit<1-9>`, it is that letter or digit lowercased, because macOS turns `Option+<key>` into another character. Else it is `e.key` as it is.
 3. The app forwards a press only when its combo name is in the list, and then prevents its default action. Every other key stays in the app.
 4. The hub runs the binding for that combo.
@@ -287,7 +287,7 @@ An element that handles keys before the document sees them, such as a terminal, 
 ### Rules
 
 1. **Discovery, not runtime.** The manifest holds what the hub needs before the app runs. The protocol version comes from `hello` only, because the running document may be an older bundle.
-2. **Built-in apps.** v1 runs the four built-in apps only. The hub reads each manifest from the submodule, else from the installed package, and keeps no copy. The hub's tests validate the manifest of each pinned package.
+2. **Where the hub reads it.** For an `apps` entry with a `path`, the hub reads the manifest from that folder. For a built-in app, it reads it from the submodule, else from the installed package, and keeps no copy. The hub's tests validate the manifest of each pinned package. See [The apps entry and the launch](/claude-code-hub/extensibility/reference/apps-entry/).
 3. **Skip.** The hub skips an app, with a log line, when its file is missing or not valid JSON, `manifest` is a version it does not know, `id` does not match the id rule ([Terms](#terms)) or is not the app's id, `run.entry` is not inside the app directory, a `provides` path does not start with `/`, or a `publishes` topic breaks the topic rule or is the hub's ([Events](#10-events)). It skips one action, with a log line, when the action is not valid ([Actions](#7-actions)).
 4. **Providers.** For each capability, the first enabled app in tab order whose `provides` declares it is the provider. `projects.path` and `terminal.liveWork` must be paths on the provider's origin. `projects.path` answers `[{path, modifiedAt}]`. `terminal.liveWork` answers `{sessions: []}`, and a pool whose provider has sessions is not evicted. With no provider, the capability is off: no terminal, and the project palette has no list.
 
@@ -371,4 +371,4 @@ These are not in v1. Each is additive ([Versioning](#versioning)).
 - `hub.trace`: a hub topic that mirrors every message the hub sends or receives, for tools such as an inspector.
 - A `project` param type that gives a template `{project.encoded}`.
 - `run.ready` in the manifest, and a fixed prefix for the ready line.
-- Added apps: a `path` entry in the `apps` list of `~/.claude-hub/config.json`, apps from npm packages, and external apps that the hub does not spawn.
+- Added apps from npm packages, and external apps that the hub does not spawn.

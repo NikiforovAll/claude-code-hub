@@ -9,7 +9,7 @@ const tcp = require('net');
 const os = require('os');
 const path = require('path');
 const { actionTable } = require('./lib/actions');
-const { selectApps, loadApp } = require('./lib/apps');
+const { selectApps, loadApp, conflicts } = require('./lib/apps');
 const { stripCookie } = require('./lib/cookies');
 const { createNetGuard, KEEP_ALIVE_MS } = require('./lib/net-guard');
 const { ping } = require('./lib/ping');
@@ -126,9 +126,11 @@ function saveHubConfig() {
 
 const hubConfig = loadHubConfig();
 
-const { apps: selectedApps, unknown: unknownApps } = selectApps(hubConfig.apps);
+const { apps: selectedApps, unknown: unknownApps } = selectApps(hubConfig.apps, path.dirname(HUB_CONFIG_FILE));
 const ENABLED_APPS = selectedApps.map((a) => loadApp(a, { flagPort: getArg(`${a.id}-port`) })).filter(Boolean);
-for (const id of unknownApps) console.log(`Unknown app "${id}" in ${HUB_CONFIG_FILE}, ignored`);
+for (const id of unknownApps) console.log(`Unknown app "${id}" in ${HUB_CONFIG_FILE} has no "path", ignored`);
+for (const a of selectedApps) if (a.path) console.log(`${a.id} runs from ${a.path}`);
+for (const line of conflicts(ENABLED_APPS)) console.log(line);
 if (!selectedApps.length) {
   console.error(`Every app is disabled in ${HUB_CONFIG_FILE}. Enable at least one.`);
   process.exit(1);
@@ -264,8 +266,9 @@ function spawnApp(pool, name, cmd, args) {
   child.stderr.on('data', (d) => process.stderr.write(`[${name}] ${d}`));
   child.on('exit', (code) => {
     console.log(`[${name}] exited (code ${code})`);
-    // The port dies with the child and the OS may hand it to a stranger, so stop dialing it.
-    delete pool.ports[name];
+    // The port dies with the child and the OS may hand it to a stranger, so stop dialing it. A child
+    // that restartApp replaced can exit after its successor printed a port.
+    if (pool.children.get(name) === child) delete pool.ports[name];
     markReady();
     if (pool.retired || pool.children.get(name) !== child) return;
     // Nothing else would ever bring this app back: a pool is only rebuilt when its dir is
@@ -287,6 +290,20 @@ function spawnApp(pool, name, cmd, args) {
 
   pool.children.set(name, child);
   return child;
+}
+
+// Asked for by the user, so it does not count toward MAX_RESTARTS and it brings back an app that gave up.
+async function restartApp(pool, app) {
+  const { id } = app;
+  const old = pool.children.get(id);
+  pool.children.delete(id);
+  delete pool.ports[id];
+  pool.restarts[id] = [];
+  if (old) await killChild(old);
+  if (pool.retired) return false;
+  const child = spawnOne(pool, app);
+  await withTimeout(child.ready, 20000);
+  return !!pool.ports[id];
 }
 
 function killPool(pool) {
@@ -402,8 +419,12 @@ const NODE_HDR = `--max-http-header-size=${HDR_BYTES}`;
 // Children bind ephemeral ports; the public ports below belong to the hub's proxies. Browser
 // localStorage is keyed by origin, so the sub-app origin has to stay put across switches or the
 // user loses pins and filters every time the active set changes.
+function spawnOne(pool, app) {
+  return spawnApp(pool, app.id, process.execPath, [NODE_HDR, app.entry]);
+}
+
 function spawnChildren(pool) {
-  for (const a of ENABLED_APPS) spawnApp(pool, a.id, process.execPath, [NODE_HDR, a.entry]);
+  for (const a of ENABLED_APPS) spawnOne(pool, a);
 }
 
 const publicPorts = Object.fromEntries(ENABLED_APPS.map((a) => [a.id, a.port]));
@@ -891,6 +912,38 @@ app.post('/api/config-dirs/activate', async (req, res) => {
     saveHubConfig();
   }
   res.json({ apps: appsConfig() });
+});
+
+// Restarting the terminal provider ends its live terminals, so that takes force: true.
+const restarting = new Set();
+app.post('/api/apps/:id/restart', async (req, res) => {
+  const pool = activePool();
+  const { id } = req.params;
+  const target = ENABLED_APPS.find((a) => a.id === id);
+  if (!pool || !target) {
+    res.status(404).json({ error: 'Unknown app' });
+    return;
+  }
+  const key = `${pool.dir}\n${id}`;
+  if (restarting.has(key)) {
+    res.status(409).json({ error: `${target.name} is already restarting` });
+    return;
+  }
+  restarting.add(key);
+  try {
+    if (TERMINAL.enabled && id === TERMINAL_APP.id && req.body?.force !== true) {
+      const terminals = await terminalCount(pool);
+      if (terminals) {
+        res.status(409).json({ error: `${target.name} has live terminals`, terminals });
+        return;
+      }
+    }
+    console.log(`[${id}] restart asked for by the hub page`);
+    if (await restartApp(pool, target)) res.json({ ok: true });
+    else res.status(503).json({ error: `${target.name} did not start` });
+  } finally {
+    restarting.delete(key);
+  }
 });
 
 // Project list for the switcher palette, proxied from the app that provides `projects`. The port is

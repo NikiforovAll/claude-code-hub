@@ -17,6 +17,7 @@ The hub has no visible controls. These keys drive it. They work while focus is i
 | <kbd>Alt+4</kbd> | Memory Diagnoser |
 | <kbd>Ctrl+Alt+P</kbd> | Open or close the project palette |
 | <kbd>Ctrl+Alt+W</kbd> | Open or close the config-dir palette |
+| <kbd>Ctrl+Alt+A</kbd> | Open or close the app launcher |
 
 The <kbd>Alt</kbd>+number keys follow the tab order. The table shows the default order. The `apps` list in the [config file](/claude-code-hub/reference/configuration/#the-config-file) changes it, and a tool that is off has no number.
 
@@ -30,9 +31,12 @@ On macOS, use <kbd>Control+Option</kbd> for <kbd>Ctrl+Alt</kbd> and <kbd>Option<
 | <kbd>↑</kbd> or <kbd>Shift+Tab</kbd> | Previous row |
 | <kbd>Enter</kbd> | Pick the selected row |
 | <kbd>Ctrl+D</kbd> | Config-dir palette: remove the selected dir from the list |
+| <kbd>Ctrl+R</kbd> | App launcher: restart the selected tool |
 | <kbd>Esc</kbd> | Close the palette |
 
 While a palette is open, the tool keys do nothing, so you can type a path that has digits in it.
+
+The app launcher lists the tools in tab order. When it opens, the tool you used before the current one is selected, so <kbd>Ctrl+Alt+A</kbd> then <kbd>Enter</kbd> goes back to it. A restart stops the tool's process and starts it again, then reloads its tab. A Kanban restart ends its embedded terminals, so when terminals are open the launcher asks you to press <kbd>Ctrl+R</kbd> a second time.
 
 ## From a Kanban session
 

@@ -3,7 +3,7 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
-const { APPS, selectApps, loadApp, manifestError } = require('../lib/apps');
+const { APPS, selectApps, loadApp, manifestError, conflicts } = require('../lib/apps');
 
 const COST = APPS.find((a) => a.id === 'cost');
 const KANBAN = APPS.find((a) => a.id === 'kanban');
@@ -29,6 +29,52 @@ describe('selectApps', () => {
     const { apps } = selectApps([{ id: 'cost', port: 4643 }]);
     assert.equal(apps.find((a) => a.id === 'cost').port, 4643);
     assert.equal(apps.find((a) => a.id === 'memory').port, undefined);
+  });
+
+  it('adds an unknown id that has a path, resolved against the base', () => {
+    const base = path.resolve('/hub');
+    const { apps, unknown } = selectApps([{ id: 'kanban' }, { id: 'board', path: 'forks/board', port: 4545 }], base);
+    assert.deepEqual(
+      apps.map((a) => a.id),
+      ['kanban', 'board', 'marketplace', 'cost', 'memory'],
+    );
+    assert.deepEqual(apps[1], { id: 'board', port: 4545, path: path.join(base, 'forks', 'board') });
+    assert.deepEqual(unknown, []);
+  });
+
+  it('runs a built-in app from its path and keeps an absolute path as is', () => {
+    const fork = path.resolve('/forks/cck');
+    const { apps } = selectApps([{ id: 'kanban', path: fork }], path.resolve('/hub'));
+    assert.equal(apps[0].path, fork);
+    assert.equal(apps[0].dir, 'cck');
+    assert.equal(apps.find((a) => a.id === 'cost').path, undefined);
+  });
+
+  it('drops a disabled app with a path and ignores a path that is not a string', () => {
+    const { apps, unknown } = selectApps([
+      { id: 'board', path: '/x', enabled: false },
+      { id: 'other', path: 42 },
+    ]);
+    assert.ok(!apps.some((a) => a.id === 'board'));
+    assert.deepEqual(unknown, ['other']);
+  });
+});
+
+describe('conflicts', () => {
+  const app = (id, { provides = {}, handles = {}, port = 0 } = {}) => ({ id, provides, actions: { handles }, port });
+
+  it('is empty when no two apps claim the same thing', () => {
+    assert.deepEqual(conflicts([app('a', { provides: { projects: {} }, port: 1 }), app('b', { port: 2 })]), []);
+  });
+
+  it('names the winner of each shared capability, action and port', () => {
+    const kanban = app('kanban', { provides: { terminal: {} }, handles: { 'session.open': {} }, port: 3541 });
+    const fork = app('kanban-next', { provides: { terminal: {} }, handles: { 'session.open': {} }, port: 3541 });
+    const lines = conflicts([kanban, fork]);
+    assert.equal(lines.length, 3);
+    assert.match(lines[0], /kanban-next and kanban both declare capability "terminal"; kanban has it/);
+    assert.match(lines[1], /action "session.open"/);
+    assert.match(lines[2], /port "3541"/);
   });
 });
 
@@ -193,6 +239,27 @@ describe('loadApp', () => {
     submodule('{ nope');
     assert.equal(loadApp(COST, { hubRoot, resolve: noPackage, log }), null);
     assert.match(logs[0], /cost is skipped/);
+  });
+
+  it('prefers the entry path over the submodule and the package', () => {
+    submodule(COST_MANIFEST);
+    const fork = makeApp(path.join(hubRoot, 'fork'), { ...COST_MANIFEST, name: 'Fork' });
+    const app = loadApp({ ...COST, path: fork }, { hubRoot, resolve: noPackage, log });
+    assert.equal(app.entry, path.join(fork, 'server.js'));
+    assert.equal(app.name, 'Fork');
+  });
+
+  it('loads a new app from its path', () => {
+    const root = makeApp(path.join(hubRoot, 'board'), { manifest: 1, id: 'board', run: { entry: 'server.js' } });
+    const app = loadApp({ id: 'board', path: root }, { hubRoot, resolve: noPackage, log });
+    assert.equal(app.entry, path.join(root, 'server.js'));
+    assert.equal(app.name, 'board');
+  });
+
+  it('skips an app whose path has no manifest', () => {
+    const root = makeApp(path.join(hubRoot, 'empty'));
+    assert.equal(loadApp({ id: 'board', path: root }, { hubRoot, resolve: noPackage, log }), null);
+    assert.match(logs[0], /not found\. board is skipped/);
   });
 
   it('throws when neither the submodule nor the package is there', () => {

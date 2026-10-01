@@ -1,5 +1,7 @@
 let apps = {};
 let activeApp = null;
+// The app launcher's cursor starts here, so Ctrl+Alt+A then Enter goes back to the last tab.
+let previousApp = null;
 const iframes = {};
 const loadedApps = new Set();
 const guardedApps = new Set();
@@ -27,7 +29,7 @@ const missed = new Map();
 const MAX_EVENT_CHARS = 16 * 1024;
 // The config dir the hub falls back to (~/.claude). Stays out of the window title.
 let defaultConfigDir = null;
-// mode: 'project' (Ctrl+Alt+P) or 'configDir' (Ctrl+Alt+W). One widget, two row sources.
+// mode: 'project' (Ctrl+Alt+P), 'configDir' (Ctrl+Alt+W) or 'app' (Ctrl+Alt+A). One widget, three row sources.
 const palette = {
   open: false,
   mode: 'project',
@@ -36,6 +38,7 @@ const palette = {
   rows: [],
   sel: 0,
   query: '',
+  confirmRestart: null,
 };
 
 function loadThemeState() {
@@ -220,7 +223,8 @@ async function init() {
   actions = config.actions ?? {};
   applyHubTheme();
   buildIframes();
-  switchTab(Object.keys(apps)[0]);
+  const saved = storedTab();
+  switchTab(apps[saved] ? saved : Object.keys(apps)[0]);
   listenMessages();
   listenKeys();
   bindPalette();
@@ -244,16 +248,21 @@ function reloadIframes() {
   missed.clear();
   // A new element, because assigning src is only a fragment navigation when the app's URL
   // differs from the new one by the #t= fragment alone, and the old dir's document stays.
-  for (const [id, old] of Object.entries(iframes)) {
-    liveApps.delete(id);
-    linkLoads.delete(id);
-    const fresh = makeIframe(id);
-    fresh.className = old.className;
-    const focused = document.activeElement === old;
-    old.replaceWith(fresh);
-    iframes[id] = fresh;
-    if (focused) fresh.focus();
-  }
+  for (const id of Object.keys(iframes)) replaceIframe(id);
+}
+
+function replaceIframe(id) {
+  const old = iframes[id];
+  liveApps.delete(id);
+  linkLoads.delete(id);
+  loadedApps.delete(id);
+  const fresh = makeIframe(id);
+  fresh.className = old.className;
+  fresh.inert = old.inert;
+  const focused = document.activeElement === old;
+  old.replaceWith(fresh);
+  iframes[id] = fresh;
+  if (focused) fresh.focus();
 }
 
 // The old document stays live until the new one fires load, and a hub:action sent to it in between is lost.
@@ -316,9 +325,23 @@ function buildIframes() {
   }
 }
 
+const TAB_KEY = 'hub-tab';
+
+function storedTab() {
+  try {
+    return localStorage.getItem(TAB_KEY);
+  } catch {
+    return null;
+  }
+}
+
 function switchTab(appId) {
   if (!apps[appId]) return;
+  if (appId !== activeApp) previousApp = activeApp;
   activeApp = appId;
+  try {
+    localStorage.setItem(TAB_KEY, appId);
+  } catch {}
 
   for (const [id, iframe] of Object.entries(iframes)) {
     iframe.classList.toggle('hidden', id !== appId);
@@ -478,6 +501,7 @@ function bindings() {
   const map = {
     'ctrl+alt+p': { run: () => togglePalette('project'), inPalette: true },
     'ctrl+alt+w': { run: () => togglePalette('configDir'), inPalette: true },
+    'ctrl+alt+a': { run: () => togglePalette('app'), inPalette: true },
     'ctrl+alt+ArrowLeft': { run: () => cycleTab(-1) },
     'ctrl+alt+ArrowRight': { run: () => cycleTab(1) },
   };
@@ -666,6 +690,114 @@ async function removeConfigDir(dirPath) {
   if (palette.open && palette.mode === 'configDir') renderPalette();
 }
 
+// Lucide icons (ISC license) for the names the built-in apps and the Inspector use. Any other
+// manifest icon shows the app's first letter.
+const APP_ICONS = {
+  columns: [
+    ['rect', { width: 18, height: 18, x: 3, y: 3, rx: 2 }],
+    ['path', { d: 'M12 3v18' }],
+  ],
+  store: [
+    ['path', { d: 'm2 7 4.41-4.41A2 2 0 0 1 7.83 2h8.34a2 2 0 0 1 1.42.59L22 7' }],
+    ['path', { d: 'M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8' }],
+    ['path', { d: 'M15 22v-4a2 2 0 0 0-2-2h-2a2 2 0 0 0-2 2v4' }],
+    ['path', { d: 'M2 7h20' }],
+    [
+      'path',
+      {
+        d: 'M22 7v3a2 2 0 0 1-2 2a2.7 2.7 0 0 1-1.59-.63.7.7 0 0 0-.82 0A2.7 2.7 0 0 1 16 12a2.7 2.7 0 0 1-1.59-.63.7.7 0 0 0-.82 0A2.7 2.7 0 0 1 12 12a2.7 2.7 0 0 1-1.59-.63.7.7 0 0 0-.82 0A2.7 2.7 0 0 1 8 12a2.7 2.7 0 0 1-1.59-.63.7.7 0 0 0-.82 0A2.7 2.7 0 0 1 4 12a2 2 0 0 1-2-2V7',
+      },
+    ],
+  ],
+  'dollar-sign': [
+    ['line', { x1: 12, x2: 12, y1: 2, y2: 22 }],
+    ['path', { d: 'M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6' }],
+  ],
+  database: [
+    ['ellipse', { cx: 12, cy: 5, rx: 9, ry: 3 }],
+    ['path', { d: 'M3 5V19A9 3 0 0 0 21 19V5' }],
+    ['path', { d: 'M3 12A9 3 0 0 0 21 12' }],
+  ],
+  'scan-search': [
+    ['path', { d: 'M3 7V5a2 2 0 0 1 2-2h2' }],
+    ['path', { d: 'M17 3h2a2 2 0 0 1 2 2v2' }],
+    ['path', { d: 'M21 17v2a2 2 0 0 1-2 2h-2' }],
+    ['path', { d: 'M7 21H5a2 2 0 0 1-2-2v-2' }],
+    ['circle', { cx: 12, cy: 12, r: 3 }],
+    ['path', { d: 'm16 16-1.9-1.9' }],
+  ],
+};
+
+const SVG_NS = 'http://www.w3.org/2000/svg';
+
+function svgNode(tag, attrs) {
+  const node = document.createElementNS(SVG_NS, tag);
+  for (const [k, v] of Object.entries(attrs)) node.setAttribute(k, String(v));
+  return node;
+}
+
+function appIcon(app) {
+  const shapes = APP_ICONS[app.icon];
+  if (!shapes) return el('span', 'palette-icon letter', (app.name || '?').slice(0, 1).toUpperCase());
+  const svg = svgNode('svg', {
+    viewBox: '0 0 24 24',
+    fill: 'none',
+    stroke: 'currentColor',
+    'stroke-width': 2,
+    'stroke-linecap': 'round',
+    'stroke-linejoin': 'round',
+    'aria-hidden': 'true',
+  });
+  svg.append(...shapes.map(([tag, attrs]) => svgNode(tag, attrs)));
+  const box = el('span', 'palette-icon');
+  box.append(svg);
+  return box;
+}
+
+function appRows(q) {
+  const list = Object.entries(apps).map(([id, a], i) => ({ kind: 'app', id, app: a, index: i }));
+  if (!q) return list;
+  const hit = list.filter((r) => r.app.name.toLowerCase().includes(q) || r.id.includes(q));
+  return hit.length ? hit : list.filter((r) => subseq(r.app.name.toLowerCase(), q));
+}
+
+// A click on the button runs the mode's rowKeys entry for `key`, the same as Ctrl+<key>.
+function rowButton(className, glyph, key, title, label) {
+  const btn = el('button', className, glyph);
+  btn.type = 'button';
+  btn.title = title;
+  btn.setAttribute('aria-label', label);
+  btn.dataset.rowKey = key;
+  return btn;
+}
+
+function setPaletteHint(text) {
+  document.getElementById('palette-hint').textContent = text;
+}
+
+// The terminal provider answers 409 with a terminal count; the second Ctrl+R on the same app sends force.
+async function restartFromPalette(id) {
+  const name = apps[id]?.name ?? id;
+  const force = palette.confirmRestart === id;
+  palette.confirmRestart = null;
+  setPaletteHint(`Restarting ${name}…`);
+  try {
+    await withPaletteBusy(() => sendJson('POST', `/api/apps/${encodeURIComponent(id)}/restart`, { force }));
+  } catch (err) {
+    if (err.status === 409 && err.data?.terminals) {
+      palette.confirmRestart = id;
+      const n = err.data.terminals;
+      setPaletteHint(
+        `${name} has ${n} live terminal${n === 1 ? '' : 's'}. A restart ends ${n === 1 ? 'it' : 'them'}. Press Ctrl+R again to restart.`,
+      );
+    } else setPaletteHint(`${name} did not restart: ${err.message}`);
+    return;
+  }
+  closePalette();
+  replaceIframe(id);
+  switchTab(id);
+}
+
 // `typed` is the trimmed query, `q` its lowercase form for matching.
 const PALETTE_MODES = {
   project: {
@@ -723,13 +855,32 @@ const PALETTE_MODES = {
         li.append(el('span', 'age', 'active'));
         return;
       }
-      const remove = el('button', 'palette-remove', '×');
-      remove.type = 'button';
-      remove.title = 'Remove from list (Ctrl+D)';
-      remove.dataset.remove = row.path;
-      li.append(remove);
+      li.append(rowButton('palette-remove', '×', 'd', 'Remove from list (Ctrl+D)', `Remove ${row.path}`));
     },
+    rowKeys: { d: (row) => removeConfigDir(row.path) },
     commit: commitConfigDir,
+  },
+  app: {
+    placeholder: 'Search apps...',
+    label: 'Switch app',
+    hint: 'Enter switch · Ctrl+R restart the app',
+    empty: 'No matching app',
+    rows: (_typed, q) => appRows(q),
+    initialSel(rows) {
+      const prev = rows.findIndex((r) => r.id === previousApp);
+      return prev < 0 ? 0 : prev;
+    },
+    fillRow(li, row, q) {
+      li.append(appIcon(row.app), markedSpan('name', row.app.name, q));
+      const key = row.id === activeApp ? 'active' : row.index < 9 ? `Alt+${row.index + 1}` : '';
+      li.append(el('span', 'age', key));
+      li.append(rowButton('palette-restart', '↻', 'r', 'Restart the app (Ctrl+R)', `Restart ${row.app.name}`));
+    },
+    rowKeys: { r: (row) => restartFromPalette(row.id) },
+    commit(row) {
+      closePalette();
+      switchTab(row.id);
+    },
   },
 };
 
@@ -783,10 +934,11 @@ function openPalette(mode) {
   palette.mode = mode;
   palette.query = '';
   palette.sel = null;
+  palette.confirmRestart = null;
   input.value = '';
   input.placeholder = spec.placeholder;
   document.querySelector('#palette .palette-box').setAttribute('aria-label', spec.label);
-  document.getElementById('palette-hint').textContent = spec.hint ?? '';
+  setPaletteHint(spec.hint ?? '');
   document.getElementById('palette').hidden = false;
   // Ctrl+Alt+P usually arrives forwarded from a focused iframe. Without inert the sub-app can keep
   // or take focus back, and then Escape is handled inside it — the palette stays open and only the
@@ -795,8 +947,7 @@ function openPalette(mode) {
   renderPalette();
   input.focus();
   // Stale-while-revalidate: the cached list renders instantly, recency refreshes when this lands.
-  spec
-    .load()
+  Promise.resolve(spec.load?.())
     .then(() => {
       if (palette.open && palette.mode === mode) renderPalette();
     })
@@ -842,7 +993,7 @@ async function sendJson(method, url, body) {
     body: body === undefined ? undefined : JSON.stringify(body),
   });
   const data = await res.json().catch(() => ({}));
-  if (!res.ok) throw new Error(data.error || `HTTP ${res.status}`);
+  if (!res.ok) throw Object.assign(new Error(data.error || `HTTP ${res.status}`), { status: res.status, data });
   return data;
 }
 
@@ -920,22 +1071,24 @@ function bindPalette() {
     } else if (e.key === 'ArrowUp' || (e.key === 'Tab' && e.shiftKey)) {
       e.preventDefault();
       movePaletteSel(-1);
-    } else if (e.ctrlKey && !e.altKey && !e.shiftKey && !e.metaKey && e.key.toLowerCase() === 'd') {
+    } else if (e.ctrlKey && !e.altKey && !e.shiftKey && !e.metaKey && ['d', 'r'].includes(e.key.toLowerCase())) {
       // Ctrl+D would otherwise bookmark the page in Chrome and Firefox.
+      // Ctrl+R would otherwise reload the hub page.
       e.preventDefault();
+      const run = PALETTE_MODES[palette.mode].rowKeys?.[e.key.toLowerCase()];
       const row = palette.rows[palette.sel];
-      if (row?.kind === 'dir') removeConfigDir(row.path);
+      if (run && row && row.kind !== 'literal') run(row);
     }
   });
   document.getElementById('palette-list').addEventListener('click', (e) => {
-    const remove = e.target.closest('.palette-remove');
-    if (remove) {
+    const btn = e.target.closest('[data-row-key]');
+    const li = e.target.closest('.palette-row');
+    if (btn) {
       e.stopPropagation();
-      removeConfigDir(remove.dataset.remove);
+      PALETTE_MODES[palette.mode].rowKeys[btn.dataset.rowKey](palette.rows[Number(li.dataset.idx)]);
       document.getElementById('palette-input').focus();
       return;
     }
-    const li = e.target.closest('.palette-row');
     if (!li) return;
     palette.sel = Number(li.dataset.idx);
     commitPalette();

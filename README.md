@@ -150,6 +150,7 @@ The hub has no visible UI of its own. Use these shortcuts:
 | <kbd>Alt</kbd>+<kbd>4</kbd> | Memory Diagnoser |
 | <kbd>Ctrl</kbd>+<kbd>Alt</kbd>+<kbd>P</kbd> | Project palette: set the project for all tools |
 | <kbd>Ctrl</kbd>+<kbd>Alt</kbd>+<kbd>W</kbd> | Config-dir palette: switch, add, or remove a config dir |
+| <kbd>Ctrl</kbd>+<kbd>Alt</kbd>+<kbd>A</kbd> | App launcher: switch to a tool, or restart it with <kbd>Ctrl</kbd>+<kbd>R</kbd> |
 
 <kbd>Alt</kbd>+<kbd>1</kbd> to <kbd>Alt</kbd>+<kbd>4</kbd> follow the tab order, so they change when you [choose the tools](#choose-the-tools).
 
