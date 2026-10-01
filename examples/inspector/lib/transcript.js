@@ -77,7 +77,7 @@ function createParser() {
   const meta = { title: null, cwd: null, gitBranch: null, model: null, version: null, started: null, updated: null };
   const turns = [];
   const tools = new Map();
-  const replies = new Map();
+  const full = { reply: new Map(), prompt: new Map() };
   const seen = new Set();
   let turn = null;
   let customTitle = null;
@@ -90,6 +90,7 @@ function createParser() {
       n: turns.length + 1,
       at: o.timestamp,
       prompt: cut(text, PROMPT_MAX),
+      promptLong: text.length > PROMPT_MAX,
       queued: o.promptSource === 'queued',
       durationMs: null,
       tools: [],
@@ -102,6 +103,15 @@ function createParser() {
     };
     compactPending = false;
     turns.push(turn);
+    keepFull('prompt', turn.n, text, turn.promptLong);
+  }
+
+  function keepFull(part, n, text, long) {
+    const map = full[part];
+    const saved = long ? cutDetail(text) : null;
+    kept += (saved?.length ?? 0) - (map.get(n)?.length ?? 0);
+    if (saved) map.set(n, saved);
+    else map.delete(n);
   }
 
   function results(o) {
@@ -137,10 +147,7 @@ function createParser() {
         const text = b.text.trim();
         turn.reply = cut(text, REPLY_MAX);
         turn.replyLong = text.length > REPLY_MAX;
-        const full = turn.replyLong ? cutDetail(text) : null;
-        kept += (full?.length ?? 0) - (replies.get(turn.n)?.length ?? 0);
-        if (full) replies.set(turn.n, full);
-        else replies.delete(turn.n);
+        keepFull('reply', turn.n, text, turn.replyLong);
       }
       if (b.type !== 'tool_use' || tools.has(b.id)) continue;
       const json = JSON.stringify(b.input ?? null);
@@ -196,7 +203,7 @@ function createParser() {
     else if (o.type === 'assistant') reply(o);
   }
 
-  return { line, result: () => ({ meta, turns, tools, replies }), kept: () => kept };
+  return { line, result: () => ({ meta, turns, tools, full }), kept: () => kept };
 }
 
 function parse(raw) {
@@ -231,6 +238,7 @@ function overview({ meta, turns }) {
 
 function usage(turns) {
   const skills = new Map();
+  const builtin = new Map();
   const servers = new Map();
   const count = (map, name, ok) => {
     const u = map.get(name) ?? { name, count: 0, failed: 0 };
@@ -240,15 +248,22 @@ function usage(turns) {
   };
   for (const turn of turns)
     for (const t of turn.tools) {
-      if (t.name === 'Skill' && typeof t.input?.skill === 'string') count(skills, t.input.skill, t.ok);
+      if (t.name === 'Skill') {
+        if (typeof t.input?.skill === 'string') count(skills, t.input.skill, t.ok);
+        continue;
+      }
       const mcp = /^mcp__(.+?)__(.+)$/.exec(t.name);
-      if (!mcp) continue;
+      if (!mcp) {
+        count(builtin, t.name, t.ok);
+        continue;
+      }
       if (!servers.has(mcp[1])) servers.set(mcp[1], new Map());
       count(servers.get(mcp[1]), mcp[2], t.ok);
     }
   const ranked = (list) => list.sort((a, b) => b.count - a.count || a.name.localeCompare(b.name));
   return {
     skills: ranked([...skills.values()]),
+    builtin: ranked([...builtin.values()]),
     mcp: ranked(
       [...servers].map(([name, tools]) => {
         const list = ranked([...tools.values()]);
@@ -265,9 +280,9 @@ function toolDetail({ tools }, id) {
   return detail;
 }
 
-function replyOf({ turns, replies }, n) {
+function fullTextOf({ turns, full }, part, n) {
   const t = turns[n - 1];
-  return t ? { n, reply: replies.get(n) ?? t.reply } : null;
+  return t ? { n, [part]: full[part].get(n) ?? t[part] } : null;
 }
 
-module.exports = { createParser, parse, overview, toolDetail, replyOf };
+module.exports = { createParser, parse, overview, toolDetail, fullTextOf };

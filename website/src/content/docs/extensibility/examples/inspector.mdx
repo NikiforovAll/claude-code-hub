@@ -16,8 +16,8 @@ For the open session, the Inspector shows:
 
 - The title, the branch, the model, and the counts of turns, tool calls and failed calls.
 - A chart of the context size after each turn. A line marks each compaction.
-- Each turn: the prompt, the tool calls that followed it, the tokens and the time. The reply of the turn shows as markdown.
-- A card with the skills and the MCP tools that the session used, grouped by MCP server, with a count and the failed calls for each. The card shows only when the session used one. Close it with <kbd>Esc</kbd> or ✕, and open it again from its chip.
+- Each turn: the prompt, the tool calls that followed it, the tokens and the time. The reply of the turn shows as markdown. A long prompt or reply shows only its start; **Show the full prompt** and **Show the full reply** open all of it.
+- A card with the tools that the session used, with a count and the failed calls for each: the skills, the built-in tools (such as Bash or Artifact) and the MCP tools, grouped by MCP server. The card shows only when the session used one. Close it with <kbd>Esc</kbd> or ✕, and open it again from its chip.
 
 Click a tool call to see its input and its result in a panel at the right. **Errors only** shows only the turns and the tool calls that failed:
 
@@ -51,13 +51,13 @@ See step 4 of [Write a new app](/claude-code-hub/extensibility/new-app/#4-connec
 
 ## The server API
 
-The page uses three routes. Each reads the transcript from `<CLAUDE_CONFIG_DIR>/projects`:
+The page uses these routes. Each reads the transcript from `<CLAUDE_CONFIG_DIR>/projects`:
 
 | Route | Returns |
 | --- | --- |
 | `GET /api/sessions/:id` | The session overview: the turns, the tool calls and the token use. It sends an `ETag`, so a reload of a session that did not change gets `304` |
 | `GET /api/sessions/:id/tools/:toolId` | The input and the result of one tool call |
-| `GET /api/sessions/:id/turns/:n/reply` | The full reply of one turn |
+| `GET /api/sessions/:id/turns/:n/reply`, `/prompt` | The full reply or the full prompt of one turn |
 
 `?encoded=` with the project folder name finds the file faster. Without it, the server looks in each project folder.
 

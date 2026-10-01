@@ -12,7 +12,6 @@ const POLL_MS = 4000;
 const LIVE_WINDOW_MS = 2 * 60 * 1000;
 const IDLE_POLL_EVERY = 4;
 const CALLS_SHOWN = 6;
-const PROMPT_CLAMP = 600;
 
 const state = {
   id: null,
@@ -23,8 +22,10 @@ const state = {
   turn: null,
   tool: null,
   open: new Set(),
-  replyOpen: new Set(),
-  replies: new Map(),
+  full: {
+    reply: { texts: new Map(), opened: new Set() },
+    prompt: { texts: new Map(), opened: new Set() },
+  },
   replyHtml: new Map(),
   range: null,
   usageOpen: true,
@@ -236,8 +237,8 @@ async function load({ manual = false } = {}) {
       const changed = !was || was.reply !== now?.reply || was.replyLong !== now?.replyLong;
       state.encoded = data.encoded;
       state.data = data;
-      if (changed && state.replyOpen.has(last)) loadReply(last, { again: true });
-      else if (changed) state.replies.delete(last);
+      if (changed && state.full.reply.opened.has(last)) loadFull('reply', last, { again: true });
+      else if (changed) state.full.reply.texts.delete(last);
       render();
       if (stale) openTool(state.tool, { keepFocus: true });
     }
@@ -255,20 +256,20 @@ async function load({ manual = false } = {}) {
   }
 }
 
-async function loadReply(n, { again = false } = {}) {
+async function loadFull(part, n, { again = false } = {}) {
   const id = state.id;
-  const turn = state.data?.turns[n - 1];
-  if (!turn?.replyLong) return state.replies.delete(n);
-  if (state.replies.has(n) && !again) return;
+  const { texts, opened } = state.full[part];
+  if (!state.data?.turns[n - 1]?.[`${part}Long`]) return texts.delete(n);
+  if (texts.has(n) && !again) return;
   try {
-    const { reply } = await getJson(`/api/sessions/${encodeURIComponent(id)}/turns/${n}/reply${query()}`);
+    const body = await getJson(`/api/sessions/${encodeURIComponent(id)}/turns/${n}/${part}${query()}`);
     if (id !== state.id) return;
-    state.replies.set(n, reply);
+    texts.set(n, body[part]);
   } catch (err) {
-    if (id === state.id) toast(`Could not read the reply: ${err.message}`, 'error');
+    if (id === state.id) toast(`Could not read the ${part}: ${err.message}`, 'error');
     return;
   }
-  if (state.replyOpen.has(n)) renderView();
+  if (opened.has(n)) renderView();
 }
 
 function openSession(id, encoded = null) {
@@ -276,8 +277,10 @@ function openSession(id, encoded = null) {
   if (!id || (id === state.id && (state.data || !state.error))) return;
   Object.assign(state, { id, encoded, data: null, error: null, turn: null, range: null });
   state.open.clear();
-  state.replyOpen.clear();
-  state.replies.clear();
+  for (const { texts, opened } of Object.values(state.full)) {
+    texts.clear();
+    opened.clear();
+  }
   state.replyHtml.clear();
   closeDetail();
   const url = new URL(location.href);
@@ -488,16 +491,28 @@ function markdownOnce(text) {
   return state.replyHtml.get(text);
 }
 
+function fullView(part, t) {
+  const open = state.full[part].opened.has(t.n);
+  const long = t[`${part}Long`];
+  const full = long ? state.full[part].texts.get(t.n) : t[part];
+  const label = open && full == null ? `Reading the full ${part}…` : open ? 'Show less' : `Show the full ${part}`;
+  const toggle = `<button class="more ${part}-toggle" data-full="${part}" data-n="${t.n}"${long ? ' data-long' : ''} aria-expanded="${open}">${label}</button>`;
+  return { open, text: open && full != null ? full : t[part], toggle };
+}
+
 function replyHtml(t) {
-  const open = state.replyOpen.has(t.n);
-  const full = t.replyLong ? state.replies.get(t.n) : t.reply;
-  const waiting = open && full == null;
-  const label = waiting ? 'Reading the full reply…' : open ? 'Show less' : 'Show the full reply';
+  const { open, text, toggle } = fullView('reply', t);
   return `<div class="reply${open ? ' is-open' : ''}">
     <div class="reply-who">Claude</div>
-    <div class="reply-body md${!open && t.replyLong ? ' is-cut' : ''}">${markdownOnce(open && full != null ? full : t.reply)}</div>
-    <button class="more reply-toggle" data-reply="${t.n}"${t.replyLong ? ' data-long' : ''} aria-expanded="${open}">${label}</button>
+    <div class="reply-body md${!open && t.replyLong ? ' is-cut' : ''}">${markdownOnce(text)}</div>
+    ${toggle}
   </div>`;
+}
+
+function promptHtml(t) {
+  const { open, text, toggle } = fullView('prompt', t);
+  return `<p class="prompt"><span${open ? '' : ' class="prompt-clamp"'}>${esc(text)}</span></p>
+      ${toggle}`;
 }
 
 function turnHtml(t) {
@@ -505,7 +520,6 @@ function turnHtml(t) {
   const base = state.errorsOnly && !open ? t.tools.filter((x) => x.ok === false) : t.tools;
   const shown = open || base.length <= CALLS_SHOWN + 2 ? base : base.slice(0, CALLS_SHOWN);
   const more = t.tools.length - shown.length;
-  const clamped = t.prompt.length > PROMPT_CLAMP && !open;
   const meta = [
     `<time datetime="${esc(t.at)}">${esc(clock(t.at))}</time>`,
     t.durationMs ? `<span>${esc(duration(t.durationMs))}</span>` : '',
@@ -515,7 +529,7 @@ function turnHtml(t) {
     t.queued ? '<span>queued</span>' : '',
     t.interrupted ? '<span class="warn">interrupted</span>' : '',
   ].join('');
-  const expand = more > 0 ? `Show ${plural(more, 'more tool call')}` : clamped ? 'Show the full prompt' : '';
+  const expand = more > 0 ? `Show ${plural(more, 'more tool call')}` : '';
   const cut = t.compactedBefore
     ? `<p class="compact${state.newestFirst ? ' is-below' : ''}">Context compacted here</p>`
     : '';
@@ -523,7 +537,7 @@ function turnHtml(t) {
     <a class="turn-n" href="#turn-${t.n}" data-turn="${t.n}" aria-label="Turn ${t.n}">${t.n}</a>
     <div class="turn-body">
       <div class="turn-meta">${meta}</div>
-      <p class="prompt${clamped ? ' is-clamped' : ''}">${esc(t.prompt)}</p>
+      ${promptHtml(t)}
       ${shown.length ? `<ol class="calls">${shown.map(call).join('')}</ol>` : ''}
       ${expand ? `<button class="more" data-expand="${t.n}">${expand}</button>` : ''}
       ${t.reply ? replyHtml(t) : ''}
@@ -584,35 +598,45 @@ function renderView(focused = focusInMain()) {
     ? rows.map(turnHtml).join('')
     : `<p class="quiet">No failed tool calls in turns ${start + 1} to ${end}.</p>`;
   ledger.innerHTML = state.newestFirst ? later + body + earlier : earlier + body + later;
-  fitReplies();
+  fitClamps();
   watchView();
   if (focused) main.querySelector(focused)?.focus({ preventScroll: true });
 }
 
-// A short reply can still run past the clamp, so the toggle shows only when the text is cut.
-function fitReplies() {
-  const btns = [...main.querySelectorAll('.reply:not(.is-open) .reply-toggle:not([data-long])')];
-  const cut = btns.map((btn) => btn.previousElementSibling.scrollHeight > btn.previousElementSibling.clientHeight + 1);
+// A short reply or prompt can still run past the clamp, so the toggle shows only when the text is cut.
+function fitClamps() {
+  const btns = [...main.querySelectorAll('.more[data-full][aria-expanded="false"]:not([data-long])')];
+  const boxes = btns.map(
+    (btn) => btn.previousElementSibling.querySelector('.prompt-clamp') ?? btn.previousElementSibling,
+  );
+  const cut = boxes.map((box) => box.scrollHeight > box.clientHeight + 1);
   btns.forEach((btn, i) => {
     btn.hidden = !cut[i];
-    btn.previousElementSibling.classList.toggle('is-cut', cut[i]);
+    boxes[i].classList.toggle('is-cut', cut[i]);
   });
 }
 
 let usageHtml = '';
 function renderUsage() {
-  const { skills, mcp } = state.data.usage;
-  const tools = mcp.reduce((n, s) => n + s.tools.length, 0);
-  usageBox.hidden = !skills.length && !tools;
-  if (usageBox.hidden) return;
-  const label = [skills.length ? plural(skills.length, 'skill') : '', tools ? plural(tools, 'MCP tool') : '']
-    .filter(Boolean)
+  const { skills, builtin, mcp } = state.data.usage;
+  const kinds = [
+    { noun: 'skill', groups: [{ title: 'Skills', list: skills }] },
+    { noun: 'built-in tool', groups: [{ title: 'Built-in tools', list: builtin }] },
+    { noun: 'MCP tool', groups: mcp.map((s) => ({ title: `MCP: ${s.name}`, list: s.tools })) },
+  ];
+  const label = kinds
+    .map(({ noun, groups }) => [noun, groups.reduce((n, g) => n + g.list.length, 0)])
+    .filter(([, n]) => n)
+    .map(([noun, n]) => plural(n, noun))
     .join(', ');
+  usageBox.hidden = !label;
+  if (usageBox.hidden) return;
+  const groups = kinds.flatMap((k) => k.groups).filter((g) => g.list.length);
   let html;
   if (!state.usageOpen) {
     html = `<button class="usage-chip" data-act="usage" aria-expanded="false">${esc(label)}</button>`;
   } else {
-    const top = Math.max(...skills.map((u) => u.count), ...mcp.flatMap((s) => s.tools.map((u) => u.count)));
+    const top = Math.max(...groups.flatMap((g) => g.list.map((u) => u.count)));
     const rows = (list) =>
       `<ul class="uses">${list
         .map(
@@ -624,11 +648,10 @@ function renderUsage() {
       </li>`,
         )
         .join('')}</ul>`;
-    html = `<section class="usage-card" aria-label="Skills and MCP tools">
+    html = `<section class="usage-card" aria-label="Skills and tools">
       <header class="detail-head usage-head"><h2>${esc(label)}</h2><button class="iconbtn" data-act="usage" aria-expanded="true" aria-label="Close the usage card">✕</button></header>
       <div class="usage-body">
-        ${skills.length ? `<h3>Skills</h3>${rows(skills)}` : ''}
-        ${mcp.map((s) => `<h3>MCP: ${esc(s.name)}</h3>${rows(s.tools)}`).join('')}
+        ${groups.map((g) => `<h3>${esc(g.title)}</h3>${rows(g.list)}`).join('')}
       </div>
     </section>`;
   }
@@ -995,7 +1018,7 @@ function selectTurn(n) {
 document.addEventListener('click', (e) => {
   if (!e.target.closest('#themePickerBtn')) toggleThemeMenu(false);
   const el = e.target.closest(
-    '[data-turn],[data-tool],[data-expand],[data-reply],[data-open],[data-act],[data-color-theme-id],#themePickerBtn',
+    '[data-turn],[data-tool],[data-expand],[data-full],[data-open],[data-act],[data-color-theme-id],#themePickerBtn',
   );
   if (!el) return;
   if (el.dataset.colorThemeId) {
@@ -1012,12 +1035,14 @@ document.addEventListener('click', (e) => {
   } else if (el.dataset.expand) {
     state.open.add(Number(el.dataset.expand));
     renderSession();
-  } else if (el.dataset.reply) {
-    const n = Number(el.dataset.reply);
-    const opening = !state.replyOpen.delete(n);
-    if (opening) state.replyOpen.add(n);
+  } else if (el.dataset.full) {
+    const part = el.dataset.full;
+    const n = Number(el.dataset.n);
+    const { opened } = state.full[part];
+    const opening = !opened.delete(n);
+    if (opening) opened.add(n);
     renderView();
-    if (opening) loadReply(n);
+    if (opening) loadFull(part, n);
   } else if (el.dataset.turn) {
     e.preventDefault();
     selectTurn(Number(el.dataset.turn));

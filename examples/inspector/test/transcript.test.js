@@ -5,7 +5,7 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
-const { parse, overview, toolDetail, replyOf } = require('../lib/transcript');
+const { parse, overview, toolDetail, fullTextOf } = require('../lib/transcript');
 
 const raw = fs.readFileSync(path.join(__dirname, 'fixture.jsonl'), 'utf8');
 const ID = '11111111-2222-4333-8444-555555555555';
@@ -125,7 +125,7 @@ test('reads the /compact that Claude Code writes again after a compaction as par
   );
 });
 
-test('clips a long reply in the overview and keeps it whole for replyOf', () => {
+test('clips a long reply in the overview and keeps it whole for fullTextOf', () => {
   const long = `${'word '.repeat(200)}end`;
   const p = parse(
     [
@@ -139,11 +139,28 @@ test('clips a long reply in the overview and keeps it whole for replyOf', () => 
   const [t] = overview(p).turns;
   assert.equal(t.replyLong, true);
   assert.ok(t.reply.length <= 400);
-  assert.equal(replyOf(p, 1).reply, long);
-  assert.equal(replyOf(p, 2), null);
+  assert.equal(fullTextOf(p, 'reply', 1).reply, long);
+  assert.equal(fullTextOf(p, 'reply', 2), null);
 });
 
-test('overview counts skills and MCP tools by server, with failures, most used first', () => {
+test('clips a long prompt in the overview and keeps it whole for fullTextOf', () => {
+  const long = `${'line of a pasted log\n'.repeat(200)}end`;
+  const p = parse(
+    [
+      JSON.stringify({ type: 'user', message: { content: long } }),
+      JSON.stringify({ type: 'user', message: { content: 'short' } }),
+    ].join('\n'),
+  );
+  const [a, b] = overview(p).turns;
+  assert.equal(a.promptLong, true);
+  assert.ok(a.prompt.length <= 2000);
+  assert.equal(fullTextOf(p, 'prompt', 1).prompt, long);
+  assert.equal(b.promptLong, false);
+  assert.equal(fullTextOf(p, 'prompt', 2).prompt, 'short');
+  assert.equal(fullTextOf(p, 'prompt', 3), null);
+});
+
+test('overview counts skills, built-in tools and MCP tools by server, with failures, most used first', () => {
   const lines = [JSON.stringify({ type: 'user', message: { content: 'go' } })];
   const call = (id, name, input, isError) =>
     lines.push(
@@ -164,10 +181,16 @@ test('overview counts skills and MCP tools by server, with failures, most used f
   call('f', 'mcp__claude-in-chrome__computer', {});
   call('g', 'mcp__plugin_redline_redline__get_review', {});
   call('h', 'Bash', { command: 'ls' });
+  call('i', 'Artifact', { action: 'publish' });
+  call('j', 'Artifact', { action: 'read' }, true);
   assert.deepEqual(overview(parse(lines.join('\n'))).usage, {
     skills: [
       { name: 'simplify', count: 2, failed: 1 },
       { name: 'tmux', count: 1, failed: 0 },
+    ],
+    builtin: [
+      { name: 'Artifact', count: 2, failed: 1 },
+      { name: 'Bash', count: 1, failed: 0 },
     ],
     mcp: [
       {

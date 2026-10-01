@@ -49,6 +49,13 @@ test('returns the reply of one turn', async () => {
   assert.equal((await fetch(`${base}/api/sessions/${ID}/turns/9/reply`)).status, 404);
 });
 
+test('returns the prompt of one turn', async () => {
+  const r = await fetch(`${base}/api/sessions/${ID}/turns/1/prompt?encoded=C--dev-shop`);
+  assert.deepEqual(await r.json(), { n: 1, prompt: 'Add a test for the cart total' });
+  assert.equal((await fetch(`${base}/api/sessions/${ID}/turns/9/prompt`)).status, 404);
+  assert.equal((await fetch(`${base}/api/sessions/${ID}/turns/1/tools`)).status, 404);
+});
+
 test('answers 404 for an unknown session or tool call', async () => {
   assert.equal((await fetch(`${base}/api/sessions/00000000-0000-4000-8000-000000000000`)).status, 404);
   assert.equal((await fetch(`${base}/api/sessions/not-an-id`)).status, 404);

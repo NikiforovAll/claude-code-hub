@@ -703,11 +703,16 @@ body.light .brush-window {
   overflow-wrap: anywhere;
 }
 
-.prompt.is-clamped {
+.prompt-clamp {
   display: -webkit-box;
   overflow: hidden;
   -webkit-line-clamp: 6;
   -webkit-box-orient: vertical;
+}
+
+.more.prompt-toggle {
+  margin: -6px 0 12px 19px;
+  padding: 0;
 }
 
 .calls {
