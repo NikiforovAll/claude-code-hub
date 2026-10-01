@@ -3,6 +3,8 @@ title: Connect to other tools
 description: How an app uses the built-in tools and lets them use it, through hub topics, actions and capabilities.
 ---
 
+import ActionRoute from '../../../../components/diagrams/ActionRoute.astro';
+
 Apps do not talk to each other directly. Each app talks to the hub page through the [SDK](/claude-code-hub/extensibility/reference/sdk/), and the hub passes the message on. An app connects to other tools in three ways:
 
 | Way | Direction | Example |
@@ -15,16 +17,16 @@ The connection is between pages only. v1 has no channel between app servers.
 
 ## Topics
 
-A topic is a fact that any number of apps can receive. Each topic is sticky: the hub keeps its last value and sends it to an app when the app connects.
+A topic is a fact that any number of apps can receive. Each topic is sticky: the hub keeps its last value and sends it to an app when the app connects. The hub publishes two topics itself:
 
-| Topic | From | Payload |
-| --- | --- | --- |
-| `project.changed` | Hub, when the user picks a project | `{project, encoded, name}`, or `null` when the user clears it |
-| `theme.changed` | Hub | `{theme, colorTheme, vars?}`. Use `bindTheme` in place of a subscription |
-| `session.changed` | Kanban | `{sessionId, project, encoded, projectName, name, gitBranch, live, source}`, or `null` when no session is open |
+| Topic | Payload |
+| --- | --- |
+| `project.changed` | `{project, encoded, name}` when the user picks a project, or `null` when the user clears it |
+| `theme.changed` | `{theme, colorTheme, vars?}`. Use `bindTheme` in place of a subscription |
+
+Apps publish the other topics. For the topics of the built-in tools, such as Kanban's `session.changed`, see [The built-in tools](/claude-code-hub/extensibility/reference/built-in/#topics).
 
 - `project` is an absolute path. `encoded` is the form that Claude Code uses for its folder names under `projects/`. Use it as it is; do not encode a path yourself.
-- `session.changed`: `live` is true while the session works or waits for the user. `source` is `user` for a pick in Kanban, `cli` for `claude-code-kanban session open`. Kanban publishes it when a selection stays the same for 150 ms.
 - The hub sends `project.changed` and `theme.changed` to every app at once. It sends an app topic only to the app on screen; a hidden app gets the last value of each topic it missed when it comes on screen.
 
 ### Receive a topic
@@ -57,11 +59,7 @@ The hub drops a topic that is not in the manifest, and does not send an event ba
 
 An action is a request that exactly one app handles. The caller names the action and does not know which app handles it. The hub switches to the handler's tab and hands it the call.
 
-| Action | Handler | Params | Shows |
-| --- | --- | --- | --- |
-| `session.cost` | Cost | `session?`: a session id | The cost of that session |
-| `project.plugins` | Marketplace | `project?`: an absolute path | The plugins of that project |
-| `project.memory` | Memory Diagnoser | `project?`: an absolute path | The memory files of that project |
+For the actions of the built-in tools, `session.cost`, `project.plugins` and `project.memory`, see [The built-in tools](/claude-code-hub/extensibility/reference/built-in/#actions).
 
 ### Call an action
 
@@ -102,7 +100,9 @@ const hub = ClaudeHub.connect({
    hub.handle('board.open', ({ session }) => openSession(session));
    ```
 
-When the page is live, the hub sends the call to `handle`. When it is not, the hub loads the `url` with the params filled in, so the app must also read them from its query string. With `mode: "url"`, the hub loads the URL each time. When a param of the URL is missing, or the handler has `closeGuard` on, the hub only switches to the tab, because loading the URL reloads the app.
+<ActionRoute />
+
+When the page is live, the hub sends the call to `handle`. When it is not, the hub loads the `url` with the params filled in, so the app must also read them from its query string. With `mode: "url"`, the hub loads the URL each time. When a param of the URL is missing, or the handler has `closeGuard` on, the hub only switches to the tab, because loading the URL reloads the app. The caller gets `{ok: true}` as soon as the hub has routed the call, before the handler has finished.
 
 To take over a built-in action, declare the same name and put your app before the built-in tool, or turn the built-in tool off. The hub logs the conflict.
 
@@ -110,10 +110,10 @@ To take over a built-in action, declare the same name and put your app before th
 
 A capability is a job for the hub that one app does. See [Capabilities](/claude-code-hub/extensibility/reference/manifest/#capabilities) for the fields.
 
-- **`projects`.** The provider answers `GET <path>` with `[{path, modifiedAt}]`. The hub calls it for the project palette. Kanban provides it.
-- **`terminal`.** The provider gets `CCK_TERMINAL` and `CCK_TERMINAL_TOKEN` in its environment, the token in its iframe URL as `#t=<token>`, and answers on `hub.terminalToken()`. It runs the terminal itself. Its `liveWork` route answers `{sessions: [...]}`, and the hub keeps the app's processes alive while the list is not empty. Kanban provides it.
+- **`projects`.** The provider answers `GET <path>` with `[{path, modifiedAt}]`. The hub calls it for the project palette.
+- **`terminal`.** The provider gets `CCK_TERMINAL` and `CCK_TERMINAL_TOKEN` in its environment, the token in its iframe URL as `#t=<token>`, and answers on `hub.terminalToken()`. It runs the terminal itself. Its `liveWork` route answers `{sessions: [...]}`, and the hub keeps the app's processes alive while the list is not empty.
 
-An app that declares a capability takes it from Kanban only when it comes first in tab order or Kanban is off.
+The first enabled app in tab order that declares a capability is its provider. Today Kanban provides both. See [The built-in tools](/claude-code-hub/extensibility/reference/built-in/#capabilities).
 
 ## Shortcuts
 

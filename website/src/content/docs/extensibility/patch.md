@@ -58,7 +58,7 @@ The hub reads the tool's name, entry and capabilities from `hub-app.json`. The n
 }
 ```
 
-Start from the original tool's manifest and change `id`, `name` and `run.entry`. `run.entry` must be inside the wrapper folder. A path into `node_modules` is correct. See [The app manifest](/claude-code-hub/extensibility/reference/manifest/#built-in-manifests) for the manifests of the built-in tools.
+Start from the original tool's manifest and change `id`, `name` and `run.entry`. `run.entry` must be inside the wrapper folder. A path into `node_modules` is correct. See [The built-in tools](/claude-code-hub/extensibility/reference/built-in/) for what each built-in manifest declares.
 
 ## 4. Add it to the hub
 

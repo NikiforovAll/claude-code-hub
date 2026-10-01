@@ -1,0 +1,86 @@
+---
+import Diagram from './Diagram.astro';
+
+const apps = ['Hub', 'Kanban', 'Marketplace', 'Cost', 'Memory', 'Your app'];
+const HUB = 0;
+const YOURS = 5;
+const groups = [
+  {
+    kind: 'Topics',
+    rows: [
+      { name: 'project.changed', from: 0, to: [1, 2, 3, 4] },
+      { name: 'session.changed', from: 1, to: [5] },
+    ],
+  },
+  {
+    kind: 'Actions',
+    rows: [
+      { name: 'project.plugins', from: 1, to: [2] },
+      { name: 'session.cost', from: 1, to: [3] },
+      { name: 'project.memory', from: 1, to: [4] },
+    ],
+  },
+  {
+    kind: 'Capabilities',
+    rows: [
+      { name: 'projects', from: 1, to: [0] },
+      { name: 'terminal', from: 1, to: [0] },
+    ],
+  },
+];
+
+const W = 800;
+const HEAD = 40;
+const TOP = 12;
+const ROW = 36;
+const KIND = 34;
+const colX = apps.map((_, i) => 230 + i * 102);
+
+let y = TOP + HEAD + 10;
+const laid = groups.map((g) => {
+  const kindY = y + 22;
+  y += KIND;
+  const rows = g.rows.map((r) => {
+    const ry = y + ROW / 2;
+    y += ROW;
+    const dir = Math.sign(colX[r.to[0]] - colX[r.from]);
+    const stops = [r.from, ...[...r.to].sort((a, b) => (b - a) * -dir)];
+    const segments = stops.slice(1).map((to, i) => ({
+      x1: colX[stops[i]] + dir * (i === 0 ? 7 : 3),
+      x2: colX[to] - dir * 7,
+    }));
+    return { ...r, y: ry, segments };
+  });
+  return { kind: g.kind, y: kindY, rows };
+});
+const H = y + 30;
+---
+
+<Diagram title="Who sends and who receives: a dot is the sender, an arrow is a receiver" viewBox={`0 0 ${W} ${H}`}>
+  {
+    colX.map((x, i) => (
+      <g class={i === YOURS ? 'd-dim' : undefined}>
+        <line x1={x} y1={TOP + HEAD} x2={x} y2={H - 26} class="d-life" />
+        <rect x={x - 48} y={TOP} width="96" height={HEAD} rx="8" class={i === HUB ? 'd-box d-box-hub' : 'd-box'} />
+        <text x={x} y={TOP + HEAD / 2 + 5} class="d-title">{apps[i]}</text>
+      </g>
+    ))
+  }
+  {
+    laid.map((g) => (
+      <g>
+        <text x="16" y={g.y} class="d-title d-start">{g.kind}</text>
+        {g.rows.map((r) => (
+          <g>
+            <text x="28" y={r.y + 4} class="d-label d-start">{r.name}</text>
+            {r.segments.map((s) => (
+              <line x1={s.x1} y1={r.y} x2={s.x2} y2={r.y} class="d-link" />
+            ))}
+            <circle cx={colX[r.from]} cy={r.y} r="5" class="d-sender" />
+          </g>
+        ))}
+      </g>
+    ))
+  }
+  <text x={W - 16} y={H - 8} class="d-note d-end">Actions and topics pass through the hub, which finds the receivers</text>
+</Diagram>

@@ -3,6 +3,9 @@ title: The apps entry and the launch
 description: How the hub selects, starts and serves an app from an entry in config.json, and what the app server must do.
 ---
 
+import AppsOrder from '../../../../components/diagrams/AppsOrder.astro';
+import AppLaunch from '../../../../components/diagrams/AppLaunch.astro';
+
 This page covers the hub side of an app: the entry in `config.json`, how the hub starts the app, and what the app server must do. For the full contract, see [Hub protocol v1](/claude-code-hub/reference/protocol/).
 
 ## The `apps` list
@@ -27,6 +30,8 @@ The `apps` list in `config.json` (in the hub folder, `~/.claude-hub` by default)
 | `port` | integer | Optional. The proxy port, 1 to 65535. See [Ports](#ports) |
 
 ### Rules
+
+<AppsOrder />
 
 1. **Order.** The listed apps come first, in list order. The built-in apps that are not listed follow, in the default order: `kanban`, `marketplace`, `cost`, `memory`. The tab order is also the order of <kbd>Alt+1</kbd> to <kbd>Alt+9</kbd>.
 2. **Replace.** An entry with a built-in id and a `path` runs that folder in place of the built-in app.
@@ -54,6 +59,10 @@ For each config dir, the hub starts each enabled app once:
 - The working directory is the hub's folder, not the app's. Resolve your files from `__dirname`.
 - It gives the app an IPC channel.
 - When the app exits, the hub starts it again, up to 5 times in 60 seconds.
+
+<AppLaunch />
+
+While the app is starting or stopped, its tab shows an error page that names the state. An app that prints no ready line in 20 s stays in Starting: the hub stops waiting for it, and takes the port if the line comes later.
 
 ### Environment
 

@@ -1,6 +1,6 @@
 ---
 title: The app manifest
-description: Every field of hub-app.json, the validation rules, and the manifests of the built-in tools.
+description: Every field of hub-app.json and the validation rules.
 ---
 
 `hub-app.json` in the app folder tells the hub how to run the app and what it offers. The hub reads it at startup, before the app runs.
@@ -81,11 +81,4 @@ The hub skips one action, and keeps the app, when the name starts with `hub.`, `
 
 ## Built-in manifests
 
-| App | Id | Default port | Publishes | Handles | Provides |
-| --- | --- | --- | --- | --- | --- |
-| Kanban | `kanban` | 3541 | `session.changed` | | `projects`, `terminal` |
-| Marketplace | `marketplace` | 3542 | | `project.plugins` | |
-| Cost | `cost` | 3543 | | `session.cost` | |
-| Memory Diagnoser | `memory` | 3544 | | `project.memory` | |
-
-A fork or patch wrapper of a built-in tool starts from that tool's manifest. The npm packages of the built-in tools do not include `hub-app.json`. Copy it from the tool's GitHub repository.
+For the ids, ports, topics, actions and capabilities of the four built-in tools, see [The built-in tools](/claude-code-hub/extensibility/reference/built-in/).

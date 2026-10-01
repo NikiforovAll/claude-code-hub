@@ -195,7 +195,7 @@ The hub does not theme semantic colors (`--success`, `--warning`, `--error`), ch
 
 ## 7. Actions
 
-An action is a request with exactly one handler, for example `session.cost`: "show the cost of this session". The caller does not know which app handles it.
+An action is a request with exactly one handler, for example `session.cost`: "show the cost of this session". The caller does not know which app handles it. The actions of the built-in tools are listed in [The built-in tools](/claude-code-hub/extensibility/reference/built-in/#actions).
 
 ### Names
 
@@ -305,7 +305,7 @@ An event is a fact that any number of apps can receive. The hub publishes some t
 |---|---|---|---|
 | `project.changed` | Hub | Yes | `{project, encoded, name}`, or `null` when there is no project |
 | `theme.changed` | Hub | Yes | `{theme, colorTheme, vars?}` |
-| `session.changed` | `kanban` | Yes | `{sessionId, project, encoded, projectName, name, gitBranch, live, source}`, or `null` when no session is open |
+| App topics | An app | Yes | See [App topics](#app-topics) |
 
 1. A **sticky** topic keeps its last value in the hub. After `welcome`, the hub sends the last value of each sticky topic the app subscribes to, then every change. A topic that has had no value yet sends nothing.
 2. The hub sends an event only to live apps that subscribe to its topic.
@@ -324,7 +324,7 @@ An event is a fact that any number of apps can receive. The hub publishes some t
 6. **Before `welcome`.** The SDK keeps only the latest payload per topic and sends it on `welcome`. With no `welcome`, it drops them.
 7. **Hidden apps.** The hub sends an app topic only to the app on screen. A hidden app gets the last value of each topic it missed when it comes on screen, before `hub:active`. `project.changed` and `theme.changed` go to every app at once.
 
-`session.changed` fields: `sessionId`; `project` (absolute path); `name` and `gitBranch` (or `null`); `live`, true while the session works or waits on the user; `source`: `user` for a change in the Kanban page, `cli` for `claude-code-kanban session open`. Kanban publishes it once a switch settles for 150 ms, and not when the session stays the same.
+The topics, actions and capabilities of the built-in tools, such as Kanban's `session.changed`, are not part of the protocol. See [The built-in tools](/claude-code-hub/extensibility/reference/built-in/).
 
 ## 11. Compatibility
 

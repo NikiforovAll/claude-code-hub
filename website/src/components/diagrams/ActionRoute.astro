@@ -1,0 +1,67 @@
+---
+import Diagram from './Diagram.astro';
+---
+
+<Diagram title="What the hub does with hub.invoke()" viewBox="0 0 760 470">
+  <rect x="10" y="30" width="130" height="56" rx="8" class="d-box" />
+  <text x="75" y="55" class="d-label">hub.invoke()</text>
+  <text x="75" y="74" class="d-note">action, params</text>
+
+  <rect x="175" y="30" width="130" height="56" rx="28" class="d-box" />
+  <text x="240" y="55" class="d-title">Handled?</text>
+  <text x="240" y="74" class="d-note">by an enabled app</text>
+
+  <rect x="340" y="30" width="130" height="56" rx="28" class="d-box" />
+  <text x="405" y="55" class="d-title">Params valid?</text>
+  <text x="405" y="74" class="d-note">types in the manifest</text>
+
+  <rect x="530" y="30" width="220" height="56" rx="8" class="d-box d-box-hub" />
+  <text x="640" y="55" class="d-title">Switch to the handler's tab</text>
+  <text x="640" y="74" class="d-note">the caller gets ok: true</text>
+
+  <rect x="175" y="130" width="130" height="50" rx="8" class="d-box" />
+  <text x="240" y="152" class="d-label">unhandled</text>
+  <text x="240" y="170" class="d-note">ok: false</text>
+
+  <rect x="340" y="130" width="130" height="50" rx="8" class="d-box" />
+  <text x="405" y="152" class="d-label">bad-params</text>
+  <text x="405" y="170" class="d-note">ok: false</text>
+
+  <line x1="140" y1="58" x2="173" y2="58" class="d-link" />
+  <line x1="305" y1="58" x2="338" y2="58" class="d-link" />
+  <text x="322" y="50" class="d-note d-yes">yes</text>
+  <line x1="470" y1="58" x2="528" y2="58" class="d-link" />
+  <text x="499" y="50" class="d-note d-yes">yes</text>
+  <line x1="240" y1="86" x2="240" y2="128" class="d-link" />
+  <text x="248" y="112" class="d-note d-start d-no">no</text>
+  <line x1="405" y1="86" x2="405" y2="128" class="d-link" />
+  <text x="413" y="112" class="d-note d-start d-no">no</text>
+
+  <rect x="550" y="220" width="180" height="56" rx="28" class="d-box" />
+  <text x="640" y="245" class="d-title">Page live?</text>
+  <text x="640" y="264" class="d-note">and mode: "message"</text>
+  <line x1="640" y1="86" x2="640" y2="218" class="d-link" />
+
+  <rect x="290" y="220" width="200" height="56" rx="8" class="d-box" />
+  <text x="390" y="245" class="d-label">hub:action</text>
+  <text x="390" y="264" class="d-note">to hub.handle() in the page</text>
+  <line x1="550" y1="248" x2="492" y2="248" class="d-link" />
+  <text x="521" y="240" class="d-note d-yes">yes</text>
+
+  <rect x="550" y="320" width="180" height="56" rx="28" class="d-box" />
+  <text x="640" y="345" class="d-title">URL complete?</text>
+  <text x="640" y="364" class="d-note">and closeGuard is off</text>
+  <line x1="640" y1="276" x2="640" y2="318" class="d-link" />
+  <text x="648" y="302" class="d-note d-start d-no">no</text>
+
+  <rect x="290" y="320" width="200" height="56" rx="8" class="d-box" />
+  <text x="390" y="345" class="d-title">Load the URL</text>
+  <text x="390" y="364" class="d-note">params filled in, the app reloads</text>
+  <line x1="550" y1="348" x2="492" y2="348" class="d-link" />
+  <text x="521" y="340" class="d-note d-yes">yes</text>
+
+  <rect x="550" y="410" width="180" height="50" rx="8" class="d-box" />
+  <text x="640" y="440" class="d-title">Only the tab switch</text>
+  <line x1="640" y1="376" x2="640" y2="408" class="d-link" />
+  <text x="648" y="397" class="d-note d-start d-no">no</text>
+</Diagram>

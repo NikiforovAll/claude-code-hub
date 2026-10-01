@@ -1,0 +1,115 @@
+---
+title: The built-in tools
+description: What Kanban, Marketplace, Cost and Memory Diagnoser offer to other apps under the hub, the topics, actions and capabilities of each.
+---
+
+import BuiltinLinks from '../../../../components/diagrams/BuiltinLinks.astro';
+
+The hub ships four tools. This page lists what each tool gives to other apps and what it takes from the hub. For how topics, actions and capabilities work, see [Connect to other tools](/claude-code-hub/extensibility/reference/connect/).
+
+| Tool | Id | Default port |
+| --- | --- | --- |
+| Kanban | `kanban` | 3541 |
+| Marketplace | `marketplace` | 3542 |
+| Cost | `cost` | 3543 |
+| Memory Diagnoser | `memory` | 3544 |
+
+<BuiltinLinks />
+
+- **Topics.** The hub publishes `project.changed` when you pick a project. Kanban filters its sessions to the project, Marketplace and Memory Diagnoser show that project, and Cost limits its totals to it. Kanban publishes [`session.changed`](#sessionchanged) when you open a session. No built-in tool subscribes to it, but your own apps can, as the Inspector does.
+- **Actions.** Kanban calls [`project.plugins`](#projectplugins), [`session.cost`](#sessioncost) and [`project.memory`](#projectmemory) from the session view. Any app can call them.
+- **Capabilities.** The hub reads [`projects`](#projects) and [`terminal`](#terminal) from Kanban.
+
+A fork or patch wrapper of a built-in tool starts from that tool's manifest. The npm packages of the built-in tools do not include `hub-app.json`. Copy it from the tool's GitHub repository.
+
+## Topics
+
+### `session.changed`
+
+Kanban publishes the session that is open in it.
+
+```json
+{
+  "sessionId": "d3a7c2e1-5b4f-4c8e-9a12-6f0e8b7d4c31",
+  "project": "C:\\demo\\api-gateway",
+  "encoded": "C--demo-api-gateway",
+  "projectName": "api-gateway",
+  "name": "Rate limit for the orders API",
+  "gitBranch": "feat/orders-rate-limit",
+  "live": false,
+  "source": "user"
+}
+```
+
+| Field | Meaning |
+| --- | --- |
+| `sessionId` | The session id |
+| `project` | The absolute path of the session's project. The hub adds `encoded` and `projectName` |
+| `name`, `gitBranch` | The session name and branch, or `null` |
+| `live` | True while the session works or waits for the user |
+| `source` | `user` for a pick in the Kanban page, `cli` for `claude-code-kanban session open` |
+
+The payload is `null` when no session is open. Kanban publishes it when a pick stays the same for 150 ms, so a move through the list with the arrow keys sends one event. It does not publish it again for the same session.
+
+The [Inspector](/claude-code-hub/extensibility/examples/inspector/) and the [Task board](/claude-code-hub/extensibility/examples/task-board/) subscribe to it.
+
+## Actions
+
+Kanban calls all three actions from the session view. It shows each button only when `hub.can()` is true.
+
+### `session.cost`
+
+| | |
+| --- | --- |
+| Handler | Cost |
+| Params | `session?`: a session id |
+| URL | `?view=detail&session={session}` |
+| Mode | `message` |
+| Shows | The cost of that session. With no `session`, Cost comes on screen and keeps its view |
+
+```js
+await hub.invoke('session.cost', { session: 'd3a7c2e1-5b4f-4c8e-9a12-6f0e8b7d4c31' });
+```
+
+### `project.plugins`
+
+| | |
+| --- | --- |
+| Handler | Marketplace |
+| Params | `project?`: an absolute path |
+| URL | `?project={project}` |
+| Mode | `message` |
+| Shows | The plugins of that project |
+
+### `project.memory`
+
+| | |
+| --- | --- |
+| Handler | Memory Diagnoser |
+| Params | `project?`: an absolute path |
+| URL | `?project={project}` |
+| Mode | `message` |
+| Shows | The memory files of that project |
+
+To run the same calls with no hub, Kanban gives `connect` a `standalone` map built from its `--cost-url`, `--marketplace-url` and `--memory-url` flags.
+
+## Capabilities
+
+Kanban provides both capabilities. To take one over, see [Capabilities](/claude-code-hub/extensibility/reference/connect/#capabilities).
+
+### `projects`
+
+`GET /api/projects` answers the projects that have sessions, sorted by path:
+
+```json
+[
+  { "path": "C:\\demo\\api-gateway", "modifiedAt": "2026-09-29T09:58:00.000Z" },
+  { "path": "C:\\Users\\me\\AppData\\Local\\Temp\\scratch", "modifiedAt": null, "temp": true }
+]
+```
+
+`modifiedAt` is the time of the last session change, or `null`. `temp` is true for a project in a temp folder. The hub shows the list in the project palette (<kbd>Ctrl+Alt+P</kbd>).
+
+### `terminal`
+
+Kanban runs the embedded terminal. `GET /api/terminals` answers `{sessions: [...]}`, one entry for each open terminal. While the list is not empty, the hub keeps that set of apps in its pool when you switch config dirs. `POST /api/apps/kanban/restart` answers `409` while Kanban has open terminals, unless the body has `force: true`.

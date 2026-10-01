@@ -46,7 +46,7 @@ Returns the hub object. A second call returns the same object.
 | `subscribe(topic, fn)` | Calls `fn(payload)` for each event of the topic. Returns a function that removes `fn`. Subscribe before the page's `load` event: the SDK sends the topic list with hello, after `load`, and the hub sends nothing for a topic that is not in it |
 | `publish(topic, payload)` | Publishes a topic that the manifest lists in `publishes`. `payload` is a plain object or `null`, at most 16 KB as JSON. Before welcome, the SDK keeps the last payload per topic and sends it on welcome |
 
-See [Topics](/claude-code-hub/extensibility/reference/connect/#topics) for the topics that exist.
+See [Topics](/claude-code-hub/extensibility/reference/connect/#topics) for the hub's topics and [The built-in tools](/claude-code-hub/extensibility/reference/built-in/#topics) for the topics of the built-in tools.
 
 ## Actions
 

@@ -1,0 +1,48 @@
+---
+import Diagram from './Diagram.astro';
+---
+
+<Diagram title="How the apps list becomes the tab order" viewBox="0 0 760 330">
+  <text x="10" y="22" class="d-title d-start">apps in config.json</text>
+  <text x="440" y="22" class="d-title d-start">Tabs</text>
+
+  <rect x="10" y="36" width="330" height="56" rx="8" class="d-box" />
+  <text x="175" y="60" class="d-detail">{'{ "id": "board", "path": "C:/dev/board" }'}</text>
+  <text x="175" y="80" class="d-note">a new id with a path: added</text>
+
+  <g class="d-dim">
+    <rect x="10" y="104" width="330" height="56" rx="8" class="d-box" />
+    <text x="175" y="128" class="d-detail">{'{ "id": "kanban", "enabled": false }'}</text>
+    <text x="175" y="148" class="d-note">turned off: no process, no tab</text>
+  </g>
+
+  <rect x="10" y="172" width="330" height="56" rx="8" class="d-box" />
+  <text x="175" y="196" class="d-detail">{'{ "id": "cost", "port": 4600 }'}</text>
+  <text x="175" y="216" class="d-note">listed: keeps its place, own proxy port</text>
+
+  <rect x="10" y="240" width="330" height="76" rx="10" class="d-group" />
+  <text x="175" y="266" class="d-title">Not listed</text>
+  <text x="175" y="286" class="d-detail">marketplace, memory</text>
+  <text x="175" y="304" class="d-note">follow, in the default order</text>
+
+  {
+    [
+      { y: 36, key: 'Alt+1', id: 'board', note: 'runs from C:/dev/board' },
+      { y: 104, key: 'Alt+2', id: 'cost', note: 'localhost:4600' },
+      { y: 172, key: 'Alt+3', id: 'marketplace', note: 'localhost:3542' },
+      { y: 240, key: 'Alt+4', id: 'memory', note: 'localhost:3544' },
+    ].map((t) => (
+      <g>
+        <rect x="440" y={t.y} width="310" height="56" rx="8" class="d-box" />
+        <text x="458" y={t.y + 33} class="d-note d-start">{t.key}</text>
+        <text x="520" y={t.y + 26} class="d-label d-start">{t.id}</text>
+        <text x="520" y={t.y + 44} class="d-note d-start">{t.note}</text>
+      </g>
+    ))
+  }
+
+  <line x1="340" y1="64" x2="438" y2="64" class="d-link" />
+  <line x1="340" y1="200" x2="438" y2="132" class="d-link" />
+  <line x1="340" y1="270" x2="438" y2="200" class="d-link" />
+  <line x1="340" y1="280" x2="438" y2="268" class="d-link" />
+</Diagram>

@@ -54,6 +54,14 @@
 .diagram .d-alt text {
   fill: var(--c-ink3);
 }
+.diagram .d-mine {
+  fill: color-mix(in srgb, var(--c-accent) 16%, transparent);
+  stroke: var(--c-accent);
+  stroke-width: 1.5;
+}
+.diagram .d-sender {
+  fill: var(--c-accent);
+}
 .diagram .d-head {
   fill: var(--c-ink1);
 }

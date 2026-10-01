@@ -108,7 +108,7 @@ When the fork replaces a built-in tool, the hub and the other tools lose what th
 | The embedded terminal | `provides.terminal` | No tool has a terminal |
 | The open session | `publishes: ["session.changed"]` | An app that subscribes to `session.changed` gets nothing |
 
-The other built-in tools handle actions: Cost handles `session.cost`, Marketplace handles `project.plugins`, and Memory Diagnoser handles `project.memory`. A fork that replaces one of them must handle the same action, or the buttons that call it in other tools go away. See [Connect to other tools](/claude-code-hub/extensibility/reference/connect/) and [The app manifest](/claude-code-hub/extensibility/reference/manifest/#built-in-manifests).
+The other built-in tools handle actions: Cost handles `session.cost`, Marketplace handles `project.plugins`, and Memory Diagnoser handles `project.memory`. A fork that replaces one of them must handle the same action, or the buttons that call it in other tools go away. See [The built-in tools](/claude-code-hub/extensibility/reference/built-in/).
 
 A fork next to the original can leave these to the original. Only the first tool in tab order gets a capability. See [One tool per capability](/claude-code-hub/extensibility/overview/#one-tool-per-capability).
 

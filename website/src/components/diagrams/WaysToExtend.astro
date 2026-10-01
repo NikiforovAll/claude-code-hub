@@ -1,0 +1,36 @@
+---
+import Diagram from './Diagram.astro';
+
+const rows = [
+  { way: 'Patch', theirs: 'the published package', mine: 'patch', split: 0.82, keep: 'One patch file per version' },
+  { way: 'Fork', mine: 'your copy of the tool source', split: 0, keep: 'A copy of the tool' },
+  { way: 'New app', mine: 'your app', split: 0, keep: 'A complete app' },
+];
+const X = 110;
+const BAR = 450;
+---
+
+<Diagram title="What runs in each way: the accent part is yours" viewBox="0 0 760 236">
+  <text x={X} y="22" class="d-title d-start">What the hub runs</text>
+  <text x="590" y="22" class="d-title d-start">You maintain</text>
+  {
+    rows.map((r, i) => {
+      const y = 38 + i * 66;
+      const cut = X + BAR * r.split;
+      return (
+        <g>
+          <text x="10" y={y + 32} class="d-title d-start">{r.way}</text>
+          {r.split > 0 && (
+            <g>
+              <rect x={X} y={y} width={cut - X} height="50" rx="8" class="d-box" />
+              <text x={(X + cut) / 2} y={y + 30} class="d-note">{r.theirs}</text>
+            </g>
+          )}
+          <rect x={cut} y={y} width={X + BAR - cut} height="50" rx="8" class="d-mine" />
+          <text x={(cut + X + BAR) / 2} y={y + 30} class="d-note">{r.mine}</text>
+          <text x="590" y={y + 30} class="d-note d-start">{r.keep}</text>
+        </g>
+      );
+    })
+  }
+</Diagram>

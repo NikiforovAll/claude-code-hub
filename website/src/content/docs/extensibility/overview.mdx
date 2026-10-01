@@ -3,13 +3,15 @@ title: Overview
 description: Change how a hub tool looks or works. Start with a small patch, go to a fork when the patch grows, and write a new app when nothing fits.
 ---
 
+import WaysToExtend from '../../../components/diagrams/WaysToExtend.astro';
+
 The hub runs each tool from a folder. An entry in `config.json` can point a tool at your own folder, so you can change a tool and keep the hub as it is. There are three ways to do it, from the smallest change to the largest:
 
-| Way | What you change | You maintain |
-| --- | --- | --- |
-| [Patch](/claude-code-hub/extensibility/patch/) | A few lines in the published package | One patch file per version |
-| [Fork](/claude-code-hub/extensibility/fork/) | Any part of the tool's source | A copy of the tool |
-| [New app](/claude-code-hub/extensibility/new-app/) | Nothing in the existing tools | A complete app |
+<WaysToExtend />
+
+- A [patch](/claude-code-hub/extensibility/patch/) changes a few lines in the published package.
+- A [fork](/claude-code-hub/extensibility/fork/) changes any part of the tool's source.
+- A [new app](/claude-code-hub/extensibility/new-app/) changes nothing in the existing tools.
 
 Start with a patch. When the patch gets large or breaks on each upgrade, go to a fork. When the tool you want does a different job, write a new app.
 
@@ -44,6 +46,7 @@ Only one tool gets the embedded terminal and the project list: the first enabled
 - [The app manifest](/claude-code-hub/extensibility/reference/manifest/)
 - [The SDK](/claude-code-hub/extensibility/reference/sdk/)
 - [Connect to other tools](/claude-code-hub/extensibility/reference/connect/)
+- [The built-in tools](/claude-code-hub/extensibility/reference/built-in/)
 - [Hub protocol v1](/claude-code-hub/reference/protocol/), the full contract
 
 ## Examples

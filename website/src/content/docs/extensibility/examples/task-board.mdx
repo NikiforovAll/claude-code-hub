@@ -229,7 +229,7 @@ The board comes first, so it gets the terminal. The original Kanban runs without
 
 ## What the fork leaves out
 
-- **Links to other tools.** The board has no buttons for Cost, Marketplace and Memory Diagnoser. To add them, call `hub.invoke('session.cost', { session })` and the other [actions](/claude-code-hub/extensibility/reference/connect/#actions).
+- **Links to other tools.** The board has no buttons for Cost, Marketplace and Memory Diagnoser. To add them, call `hub.invoke('session.cost', { session })` and the other [actions](/claude-code-hub/extensibility/reference/built-in/#actions).
 - **Replacing Kanban.** To run the board alone, change the `id` to `kanban`, and add `"publishes": ["session.changed"]` and `provides.projects` to the manifest. The board must then publish `session.changed` itself.
 - **The rest of the original page.** The board has no message log, no live feed and no team view. The fork keeps that code, so you can add parts of it back.
 

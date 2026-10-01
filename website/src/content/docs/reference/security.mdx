@@ -3,6 +3,8 @@ title: Security and the hub token
 description: What the hub token protects, how the browser gets it, how to change it, and what changes when you expose the hub to a network.
 ---
 
+import Sequence from '../../../components/diagrams/Sequence.astro';
+
 ## The hub token
 
 The hub page and every `/api/*` route need a token. By default the hub listens on loopback only, but loopback is not a user boundary: any account on the machine can reach a loopback port. The hub API also hands out the terminal token, and the terminal can run any command.
@@ -11,6 +13,19 @@ The hub page and every `/api/*` route need a token. By default the hub listens o
 - The startup banner prints the URL with the token: `http://localhost:3540/?token=<token>`. `--open` opens that URL.
 - When a request has the right token, the hub sets an `HttpOnly`, `SameSite=Strict` cookie named `hub_token` and redirects to the same URL without the token. The cookie lasts 400 days, so later visits and the installed app need no token.
 - Without the token or the cookie, the page shows a locked screen, and the API answers `401`.
+
+<Sequence
+  title="How the browser gets the hub token and the terminal token"
+  actors={['Hub page', 'Hub server', 'Kanban iframe']}
+  hub={1}
+  steps={[
+    { from: 0, to: 1, label: 'GET /?token=<token>', detail: 'the URL from the banner or --open' },
+    { from: 1, to: 0, label: '302 to /, Set-Cookie: hub_token', detail: 'HttpOnly, SameSite=Strict, 400 days' },
+    { from: 0, to: 1, label: 'GET /api/config with the cookie', detail: 'the app URLs and the terminal token' },
+    { from: 0, to: 2, label: 'iframe src …/#t=<terminal token>', detail: 'a fragment: the browser does not send it' },
+    { from: 0, to: 1, label: 'GET /api/* with no cookie', detail: '401, and the page shows the locked screen', alt: true },
+  ]}
+/>
 
 Scripts, styles, icons, and the web app manifest do not need the token. They hold no secrets, and Chrome fetches the manifest without cookies.
 

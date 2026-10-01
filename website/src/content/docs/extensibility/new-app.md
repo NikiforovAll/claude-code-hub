@@ -226,7 +226,7 @@ const r = await hub.invoke('session.cost', { session: state.id });
 if (!r.ok) toast(`Cost did not open: ${r.reason}`, 'error');
 ```
 
-See [Connect to other tools](/claude-code-hub/extensibility/reference/connect/) for the topics and actions of the built-in tools.
+See [The built-in tools](/claude-code-hub/extensibility/reference/built-in/) for the topics and actions of the built-in tools.
 
 ## 5. Add the app to the hub
 
@@ -267,4 +267,5 @@ Open `http://localhost:3545`. The page must work: it picks a session, and the th
 - [The apps entry and the launch](/claude-code-hub/extensibility/reference/apps-entry/): the env, the ready line and what the server must do.
 - [The app manifest](/claude-code-hub/extensibility/reference/manifest/): every field of `hub-app.json`.
 - [The SDK](/claude-code-hub/extensibility/reference/sdk/): the page API.
-- [Connect to other tools](/claude-code-hub/extensibility/reference/connect/): topics, actions and capabilities of the built-in tools.
+- [Connect to other tools](/claude-code-hub/extensibility/reference/connect/): how topics, actions and capabilities work.
+- [The built-in tools](/claude-code-hub/extensibility/reference/built-in/): what Kanban, Marketplace, Cost and Memory Diagnoser offer.
