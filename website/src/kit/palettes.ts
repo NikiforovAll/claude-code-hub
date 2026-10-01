@@ -12,7 +12,7 @@ export const MODE_KEY = 'starlight-theme';
 
 export const palettes = themes.map(({ id, label, light, dark }) => ({ id, label, light, dark }));
 
-function vars(t: Tokens): string {
+export function vars(t: Tokens): string {
   return [
     `--c-field:${t.field}`,
     `--c-surface:${t.surface}`,

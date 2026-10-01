@@ -63,6 +63,16 @@ npx claude-code-kanban --install
 
 The hooks and the status line are installed in one Claude config dir. If you use more than one dir, run the command for each dir, with `CLAUDE_CONFIG_DIR` set to that dir. See the [Kanban docs](https://nikiforovall.blog/claude-code-kanban/) for details.
 
+## Install the hub plugin (optional)
+
+The hub ships a Claude Code plugin with the `hub-builder` skill. With the skill, an agent can patch or fork a tool, write a new app for the hub, make a custom color theme, or fix a hub problem.
+
+```bash
+npx claude-code-hub --install
+```
+
+See [Install the hub plugin](/claude-code-hub/reference/configuration/#install-the-hub-plugin) for the config dir it goes into and when to run it again.
+
 ## Next steps
 
 - [Move between the tools](/claude-code-hub/guides/navigate/)

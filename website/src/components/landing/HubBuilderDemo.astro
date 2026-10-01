@@ -1,0 +1,510 @@
+---
+import pkg from '../../../../package.json';
+import { vars } from '../../kit/palettes';
+import themes from '../../kit/themes.json';
+
+type Line =
+  | { kind: 'prompt'; text: string }
+  | { kind: 'tool'; name: string; arg: string; result?: string }
+  | { kind: 'text'; text: string }
+  | { kind: 'code'; lang: 'diff' | 'json' | 'js' | 'text'; text: string };
+
+type Scene = { id: string; tab: string; cwd?: string; repaint?: string; lines: Line[] };
+
+const kanban = pkg.dependencies['claude-code-kanban'];
+const skill: Line = { kind: 'tool', name: 'Skill', arg: 'hub-builder', result: 'Loaded the skill and its references' };
+
+const deepSea = {
+  id: 'deep-sea',
+  label: 'Deep Sea',
+  extends: 'nord',
+  dark: { field: '#0b1220', surface: '#111a2e', ember: '#38bdf8', emberGlow: '#7dd3fc' },
+};
+const nord = themes.find((t) => t.id === deepSea.extends)!;
+
+const scenes: Scene[] = [
+  {
+    id: 'compact',
+    tab: 'Compact the sidebar',
+    lines: [
+      { kind: 'prompt', text: "/hub-builder make the session rows in Kanban's sidebar more compact" },
+      skill,
+      { kind: 'tool', name: 'Read', arg: 'references/extensibility.md', result: 'Patch, fork or new app, and the apps entry' },
+      {
+        kind: 'text',
+        text: 'This changes a few lines in one tool, so a patch fits. I will make a wrapper project that pins claude-code-kanban to the version your hub runs and applies the change with patch-package.',
+      },
+      { kind: 'tool', name: 'Write', arg: `kanban-patched/patches/claude-code-kanban+${kanban}.patch` },
+      {
+        kind: 'code',
+        lang: 'diff',
+        text: `-          <div class="session-info">
++          <span class="srow-dot \${state}"></span>
++          <div class="srow-line">
++            <span class="session-name">\${name}</span>
++            <span class="srow-when">\${when}</span>
++.session-item:has(> .srow-dot) {
++  padding: 9px 10px;`,
+      },
+      { kind: 'tool', name: 'Edit', arg: '~/.claude-hub/config.json' },
+      {
+        kind: 'code',
+        lang: 'json',
+        text: `"apps": [
+  { "id": "kanban-patched", "path": "C:/dev/kanban-patched" },
+  { "id": "kanban", "enabled": false }
+]`,
+      },
+      { kind: 'text', text: 'Restart the hub. Its log shows "kanban-patched runs from C:\\dev\\kanban-patched", and Kanban opens with the compact rows.' },
+    ],
+  },
+  {
+    id: 'theme',
+    tab: 'Make a theme',
+    repaint: vars({ ...nord.dark, ...deepSea.dark }),
+    lines: [
+      { kind: 'prompt', text: '/hub-builder make a dark theme in deep sea blues, based on nord' },
+      skill,
+      { kind: 'tool', name: 'Read', arg: 'references/themes.md', result: 'The theme file, the color roles, and the check' },
+      {
+        kind: 'text',
+        text: 'A theme that extends nord holds only the colors it changes. The hub sends it to every tab, so no tool needs a change.',
+      },
+      { kind: 'tool', name: 'Write', arg: '~/.claude-hub/themes.json' },
+      { kind: 'code', lang: 'json', text: JSON.stringify([deepSea], null, 2) },
+      { kind: 'text', text: 'Reload the hub page. Deep Sea is in the theme picker of each tab, and picking it repaints all of them.' },
+    ],
+  },
+  {
+    id: 'fork',
+    tab: 'Fork a tool',
+    lines: [
+      { kind: 'prompt', text: '/hub-builder give Kanban a new board page, and keep the old Kanban as a second tab' },
+      skill,
+      { kind: 'tool', name: 'Read', arg: 'references/extensibility.md', result: 'Patch, fork or new app, and first wins' },
+      { kind: 'tool', name: 'Fetch', arg: 'nikiforovall.blog/claude-code-hub/extensibility/fork/' },
+      {
+        kind: 'text',
+        text: 'A new page is more than a patch, so I will fork Kanban at the tag your hub runs. The server stays the same, and the new page reads the same API.',
+      },
+      { kind: 'tool', name: 'Bash', arg: `git clone --branch v${kanban} github.com/NikiforovAll/claude-task-viewer kanban-fork` },
+      {
+        kind: 'code',
+        lang: 'text',
+        text: `kanban-fork/
+├── hub-app.json     id "kanban-next", name "Task Board"
+├── server.js        not changed
+└── public/
+    ├── index.html   the shell of the new page
+    ├── board.js     the board
+    └── board.css`,
+      },
+      { kind: 'tool', name: 'Edit', arg: '~/.claude-hub/config.json' },
+      {
+        kind: 'code',
+        lang: 'json',
+        text: `"apps": [
+  { "id": "kanban-next", "path": "C:/dev/kanban-fork" },
+  { "id": "kanban" }
+]`,
+      },
+      { kind: 'text', text: 'Restart the hub. The board is the first tab and the old Kanban the second, and both read the same sessions.' },
+    ],
+  },
+  {
+    id: 'app',
+    tab: 'Write an app',
+    cwd: '~/dev/session-notes',
+    lines: [
+      { kind: 'prompt', text: '/hub-builder how do I write my own app that shows the session I pick in Kanban?' },
+      skill,
+      { kind: 'tool', name: 'Read', arg: 'references/extensibility.md', result: 'The launch, the manifest, the SDK, and topics' },
+      { kind: 'tool', name: 'Fetch', arg: 'nikiforovall.blog/claude-code-hub/extensibility/new-app/' },
+      {
+        kind: 'text',
+        text: 'Your app is a small Node server with a hub-app.json. The hub starts it, frames its page in a tab, and passes it the topics it asks for. Kanban publishes the session you pick as session.changed.',
+      },
+      {
+        kind: 'code',
+        lang: 'js',
+        text: `// server.js
+if (process.env.HUB_SDK_SERVER) require(process.env.HUB_SDK_SERVER).mount(app);
+app.listen(process.env.PORT, () => console.log(\`running at http://localhost:\${port}\`));
+
+// public/app.js
+const hub = ClaudeHub.connect();
+hub.subscribe('session.changed', (s) => showSession(s.sessionId, s.projectName));`,
+      },
+      { kind: 'text', text: 'Then add { "id": "session-notes", "path": "C:/dev/session-notes" } to the apps list and restart the hub. The app gets the next free Alt key.' },
+    ],
+  },
+  {
+    id: 'fix',
+    tab: 'Fix a problem',
+    lines: [
+      { kind: 'prompt', text: '/hub-builder Kanban shows my sessions, but no live agent log' },
+      skill,
+      { kind: 'tool', name: 'Fetch', arg: 'nikiforovall.blog/claude-code-hub/reference/troubleshooting/', result: 'Kanban shows no live agent activity' },
+      {
+        kind: 'text',
+        text: 'The Kanban hooks are not in the config dir the hub shows. Your hub is on ~/.claude-work, and the hooks are only in ~/.claude.',
+      },
+      { kind: 'tool', name: 'Bash', arg: 'CLAUDE_CONFIG_DIR=~/.claude-work npx claude-code-kanban --install', result: 'Hooks and status line installed' },
+      { kind: 'text', text: 'New sessions in ~/.claude-work now send their agent log, subagents and waiting-for-you badges to Kanban.' },
+    ],
+  },
+];
+
+const highlight = (lang: string, text: string) =>
+  text
+    .split('\n')
+    .map((raw) => {
+      const esc = raw.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+      if (lang === 'diff' && raw.startsWith('+')) return `<span class="add">${esc}</span>`;
+      if (lang === 'diff' && raw.startsWith('-')) return `<span class="del">${esc}</span>`;
+      if (lang === 'js' && raw.trimStart().startsWith('//')) return `<span class="note">${esc}</span>`;
+      return esc;
+    })
+    .join('\n');
+---
+
+<div class="term" data-term>
+  <div class="bar">
+    <div class="tabs" role="tablist" aria-label="Examples">
+      {
+        scenes.map((s, i) => (
+          <button
+            type="button"
+            role="tab"
+            id={`hb-tab-${s.id}`}
+            aria-controls={`hb-panel-${s.id}`}
+            aria-selected={i === 0 ? 'true' : 'false'}
+            tabindex={i === 0 ? 0 : -1}
+          >
+            {s.tab}
+          </button>
+        ))
+      }
+    </div>
+  </div>
+  <div class="screen">
+    {
+      scenes.map((s, i) => (
+        <div
+          class="scene"
+          role="tabpanel"
+          id={`hb-panel-${s.id}`}
+          aria-labelledby={`hb-tab-${s.id}`}
+          data-repaint={s.repaint}
+          hidden={i !== 0}
+        >
+          <p class="cwd">{s.cwd ?? '~/dev'}</p>
+          {s.lines.map((l) =>
+            l.kind === 'prompt' ? (
+              <p class="ln prompt">
+                <span class="caret" aria-hidden="true">›</span>
+                <span class="typed" data-text={l.text}>{l.text}</span>
+              </p>
+            ) : l.kind === 'tool' ? (
+              <div class="ln tool">
+                <p>
+                  <span class="dot" aria-hidden="true">●</span>
+                  <b>{l.name}</b>(<span class="arg">{l.arg}</span>)
+                </p>
+                {l.result && (
+                  <p class="res">
+                    <span aria-hidden="true">⎿ </span>
+                    {l.result}
+                  </p>
+                )}
+              </div>
+            ) : l.kind === 'text' ? (
+              <p class="ln text">
+                <span class="dot reply" aria-hidden="true">●</span>
+                <span>{l.text}</span>
+              </p>
+            ) : (
+              <pre class={`ln code ${l.lang}`} set:html={highlight(l.lang, l.text)} />
+            ),
+          )}
+        </div>
+      ))
+    }
+  </div>
+</div>
+
+<script>
+  const reduce = window.matchMedia('(prefers-reduced-motion: reduce)');
+
+  for (const term of document.querySelectorAll<HTMLElement>('[data-term]')) {
+    const tabs = [...term.querySelectorAll<HTMLButtonElement>('[role="tab"]')];
+    const panels = [...term.querySelectorAll<HTMLElement>('[role="tabpanel"]')];
+    const prompts = [...term.querySelectorAll<HTMLElement>('.typed')];
+    let timers: number[] = [];
+    const later = (fn: () => void, ms: number) => timers.push(window.setTimeout(fn, ms));
+
+    const play = (panel: HTMLElement) => {
+      for (const t of timers) clearTimeout(t);
+      timers = [];
+      for (const p of prompts) {
+        p.textContent = p.dataset.text ?? '';
+        p.classList.remove('typing');
+      }
+      term.style.cssText = '';
+      const repaint = () => {
+        if (panel.dataset.repaint) term.style.cssText = panel.dataset.repaint;
+      };
+      const lines = [...panel.querySelectorAll<HTMLElement>('.ln')];
+      if (reduce.matches) {
+        for (const l of lines) l.classList.remove('wait');
+        repaint();
+        return;
+      }
+      const typed = panel.querySelector('.typed') as HTMLElement;
+      const text = typed.textContent ?? '';
+      for (const l of lines) l.classList.add('wait');
+      typed.textContent = '';
+      typed.classList.add('typing');
+      lines[0].classList.remove('wait');
+      let i = 0;
+      const type = () => {
+        typed.textContent = text.slice(0, ++i);
+        if (i < text.length) return void later(type, 22);
+        typed.classList.remove('typing');
+        const rest = lines.slice(1);
+        rest.forEach((l, n) => later(() => l.classList.remove('wait'), 450 + n * 380));
+        later(repaint, 450 + rest.length * 380 + 300);
+      };
+      later(type, 250);
+    };
+
+    const seen = new IntersectionObserver(
+      (entries) => {
+        if (!entries.some((e) => e.isIntersecting)) return;
+        seen.disconnect();
+        play(panels[0]);
+      },
+      { threshold: 0.4 },
+    );
+    seen.observe(term);
+
+    const select = (i: number) => {
+      seen.disconnect();
+      tabs.forEach((t, n) => {
+        t.setAttribute('aria-selected', String(n === i));
+        t.tabIndex = n === i ? 0 : -1;
+        panels[n].hidden = n !== i;
+      });
+      play(panels[i]);
+    };
+
+    tabs.forEach((tab, i) => {
+      tab.addEventListener('click', () => select(i));
+      tab.addEventListener('keydown', (e) => {
+        const step = e.key === 'ArrowRight' ? 1 : e.key === 'ArrowLeft' ? -1 : 0;
+        if (!step) return;
+        e.preventDefault();
+        const next = (i + step + tabs.length) % tabs.length;
+        tabs[next].focus();
+        select(next);
+      });
+    });
+  }
+</script>
+
+<style>
+  .term {
+    min-width: 0;
+    border: 1px solid var(--c-border);
+    border-radius: 0.625rem;
+    background: var(--c-field);
+    overflow: hidden;
+    font-family: var(--font-mono);
+    box-shadow: 0 1.5rem 3rem -2rem color-mix(in srgb, var(--c-ink1) 45%, transparent);
+  }
+  .term,
+  .bar,
+  .screen,
+  .cwd,
+  .caret,
+  .dot,
+  .tool b,
+  .arg,
+  .res,
+  .code :global(span) {
+    transition:
+      background-color 0.8s,
+      color 0.8s,
+      border-color 0.8s;
+  }
+  .bar {
+    background: var(--c-surface);
+    border-bottom: 1px solid var(--c-border);
+    overflow-x: auto;
+    overflow-y: hidden;
+    scrollbar-width: none;
+  }
+  .tabs {
+    display: flex;
+    min-width: max-content;
+  }
+  .tabs button {
+    font: 500 0.8125rem/1 var(--font-mono);
+    color: var(--c-ink3);
+    background: transparent;
+    border: 0;
+    border-right: 1px solid var(--c-border);
+    padding: 0.875rem 1.125rem;
+    cursor: pointer;
+    position: relative;
+    transition:
+      background-color 0.2s,
+      color 0.2s,
+      border-color 0.8s;
+  }
+  .tabs button:hover {
+    color: var(--c-ink1);
+    background: var(--c-hover);
+  }
+  .tabs button[aria-selected='true'] {
+    color: var(--c-ink1);
+    background: var(--c-field);
+  }
+  .tabs button[aria-selected='true']::after {
+    content: '';
+    position: absolute;
+    inset: auto 0 -1px;
+    height: 2px;
+    background: var(--c-accent);
+  }
+  .tabs button:focus-visible {
+    outline: 2px solid var(--c-accent);
+    outline-offset: -2px;
+  }
+
+  .screen {
+    display: grid;
+    padding: 1.25rem 1.375rem 1.5rem;
+    font-size: 0.8125rem;
+    line-height: 1.6;
+    color: var(--c-ink2);
+  }
+  .scene {
+    grid-area: 1 / 1;
+    display: grid;
+    gap: 0.75rem;
+    align-content: start;
+    min-width: 0;
+  }
+  .scene[hidden] {
+    display: grid;
+    visibility: hidden;
+  }
+  .scene p {
+    margin: 0;
+  }
+  .cwd {
+    color: var(--c-muted);
+    font-size: 0.75rem;
+  }
+
+  .ln {
+    transition:
+      background-color 0.8s,
+      color 0.8s,
+      border-color 0.8s,
+      opacity 0.35s ease,
+      translate 0.35s ease;
+  }
+  .ln.wait {
+    opacity: 0;
+    translate: 0 0.25rem;
+  }
+
+  .prompt {
+    display: flex;
+    gap: 0.625rem;
+    padding: 0.625rem 0.875rem;
+    border: 1px solid var(--c-border);
+    border-radius: 0.375rem;
+    background: var(--c-surface);
+    color: var(--c-ink1);
+  }
+  .caret {
+    color: var(--c-accent-ink);
+    font-weight: 600;
+  }
+  .typed.typing::after {
+    content: '';
+    display: inline-block;
+    width: 0.5em;
+    height: 1.1em;
+    margin-left: 1px;
+    vertical-align: text-bottom;
+    background: var(--c-accent);
+    animation: blink 1s steps(1) infinite;
+  }
+  @keyframes blink {
+    50% {
+      opacity: 0;
+    }
+  }
+
+  .dot {
+    color: var(--c-accent);
+    margin-right: 0.5rem;
+  }
+  .dot.reply {
+    color: var(--c-ink1);
+  }
+  .tool b {
+    color: var(--c-ink1);
+    font-weight: 600;
+  }
+  .arg {
+    color: var(--c-ink2);
+    overflow-wrap: anywhere;
+  }
+  .res {
+    color: var(--c-muted);
+    padding-left: 1.125rem;
+  }
+  .text {
+    display: flex;
+    color: var(--c-ink1);
+    font-family: var(--font-sans);
+    font-size: 0.875rem;
+  }
+  .text .dot {
+    font-family: var(--font-mono);
+  }
+
+  .code {
+    margin: 0 0 0 1.125rem;
+    padding: 0.75rem 0.875rem;
+    border-left: 2px solid var(--c-border);
+    background: var(--c-surface);
+    border-radius: 0 0.375rem 0.375rem 0;
+    font: inherit;
+    font-size: 0.75rem;
+    color: var(--c-ink2);
+    overflow-x: auto;
+    white-space: pre;
+  }
+  .code :global(.add) {
+    color: var(--c-accent-ink);
+  }
+  .code :global(.del),
+  .code :global(.note) {
+    color: var(--c-muted);
+  }
+
+  @media (max-width: 40rem) {
+    .screen {
+      padding: 1rem;
+    }
+    .code {
+      margin-left: 0;
+    }
+  }
+</style>

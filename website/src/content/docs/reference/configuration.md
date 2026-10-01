@@ -27,7 +27,7 @@ A flag takes its value after a space or after `=`: `--port 4000` and `--port=400
 
 ### Install the hub plugin
 
-The hub ships a Claude Code plugin with the `hub-builder` skill. The skill helps an agent build on the hub: it links each task to the page of these docs that covers it, and explains custom themes.
+The hub ships a Claude Code plugin with the `hub-builder` skill. The skill helps an agent build on the hub: it explains how to extend the hub and make custom themes, and links each task to the page of these docs that covers it.
 
 ```bash
 npx claude-code-hub --install [--dir <config dir>]

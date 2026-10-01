@@ -7,6 +7,7 @@ import ThemeDial from '../kit/ThemeDial.astro';
 import Lightbox from '../kit/Lightbox.astro';
 import Video from '../kit/Video.astro';
 import FamilyFooter from '../kit/FamilyFooter.astro';
+import HubBuilderDemo from '../components/landing/HubBuilderDemo.astro';
 import { family, url } from '../kit/family';
 
 const GITHUB = 'https://github.com/NikiforovAll/claude-code-hub';
@@ -77,6 +78,11 @@ const setup = [
     title: 'Install the Kanban hooks',
     cmd: 'npx claude-code-kanban --install',
     body: 'Optional. The hooks give Kanban the live agent log, subagents, and waiting-for-you badges. Run it once for each config dir.',
+  },
+  {
+    title: 'Install the hub plugin',
+    cmd: 'npx claude-code-hub --install',
+    body: 'Optional. The plugin adds the hub-builder skill to Claude Code, so an agent can extend the hub, make a color theme, or fix a hub problem. Run it once for each config dir.',
   },
 ];
 ---
@@ -194,8 +200,22 @@ const setup = [
         </div>
       </section>
 
+      <section class="half" aria-labelledby="build">
+        <div class="half-head">
+          <h2 id="build">Build</h2>
+          <p>
+            Ask Claude Code to change the hub. The hub-builder skill knows how the hub runs its tools, so the agent
+            picks a patch, a fork or a new app, and reads the docs page for it.
+          </p>
+          <p class="aside">
+            Step 3 of the setup below adds the skill. Then type <code>/hub-builder</code> and your request.
+          </p>
+        </div>
+        <HubBuilderDemo />
+      </section>
+
       <section class="setup" aria-labelledby="setup">
-        <h2 id="setup">Set up in two steps</h2>
+        <h2 id="setup">Set up</h2>
         <ol>
           {
             setup.map((s) => (
