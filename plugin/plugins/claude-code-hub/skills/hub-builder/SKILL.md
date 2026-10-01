@@ -1,6 +1,6 @@
 ---
 name: hub-builder
-description: Build on Claude Code Hub. Use when the user wants to write an app for a hub tab, make a custom color theme, configure the hub (flags, config dirs, token), or fix a hub problem.
+description: Build on and extend Claude Code Hub. Use when the user wants to patch or fork a built-in tool (Kanban, Cost, Marketplace, Memory), write a new app for a hub tab, connect apps through topics and actions, make a custom color theme, configure the hub (flags, config dirs, token), or fix a hub problem.
 ---
 
 # Hub builder
@@ -13,9 +13,12 @@ The site documents the latest stable release. When the user's hub behaves differ
 
 Base URL: `https://nikiforovall.blog/claude-code-hub/`
 
+The files under `references/` ship with the installed hub, so they match its version. Read them before the site.
+
 | Case | Page |
 |---|---|
-| Write or debug an app for a hub tab: SDK, messages, manifest, theme variables | `reference/protocol/`, then `reference/architecture/` for processes and ports |
+| Extend the hub: patch or fork a built-in tool, write a new app, configure the `apps` entry, the manifest, the SDK, topics, actions, capabilities | [`references/extensibility.md`](references/extensibility.md). It names the docs page for each part |
+| The wire messages of the hub protocol | `reference/protocol/`, then `reference/architecture/` for processes and ports |
 | Start the hub, open it with its token, install it as an app | `getting-started/` |
 | Flags, environment variables, `config.json`, the files the hub writes | `reference/configuration/` |
 | Switch between Claude config dirs | `guides/config-dirs/` |
@@ -24,4 +27,4 @@ Base URL: `https://nikiforovall.blog/claude-code-hub/`
 | The embedded terminal in Kanban | `guides/terminal/` |
 | The project palette | `guides/projects/` |
 | Something is broken | `reference/troubleshooting/` |
-| Make a custom color theme, or change a built-in one | [`references/themes.md`](references/themes.md), shipped with this skill |
+| Make a custom color theme, or change a built-in one | [`references/themes.md`](references/themes.md) |
