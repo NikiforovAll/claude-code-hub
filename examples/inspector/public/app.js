@@ -548,7 +548,8 @@ function turnHtml(t) {
 
 function renderSession() {
   const d = state.data;
-  const atEnd = main.scrollHeight - main.scrollTop - main.clientHeight < 80 && main.scrollTop > 0;
+  const { scrollTop } = main;
+  const atEnd = main.scrollHeight - scrollTop - main.clientHeight < 80 && scrollTop > 0;
   const focused = focusInMain();
   windowFor(d.turns.length);
   dragging = false;
@@ -569,7 +570,7 @@ function renderSession() {
   initBrush(d.turns, d.totals.peak);
   renderView(focused);
   renderUsage();
-  if (atEnd && isLive() && !state.newestFirst) main.scrollTop = main.scrollHeight;
+  main.scrollTop = atEnd && isLive() && !state.newestFirst ? main.scrollHeight : scrollTop;
 }
 
 function renderView(focused = focusInMain()) {
@@ -636,9 +637,9 @@ function renderUsage() {
   if (!state.usageOpen) {
     html = `<button class="usage-chip" data-act="usage" aria-expanded="false">${esc(label)}</button>`;
   } else {
-    const top = Math.max(...groups.flatMap((g) => g.list.map((u) => u.count)));
-    const rows = (list) =>
-      `<ul class="uses">${list
+    const rows = (list) => {
+      const top = Math.max(...list.map((u) => u.count));
+      return `<ul class="uses">${list
         .map(
           (u) => `<li class="use" title="${esc(u.name)}">
         <span class="use-bar" style="--w:${Math.round((u.count / top) * 100)}%"></span>
@@ -648,6 +649,7 @@ function renderUsage() {
       </li>`,
         )
         .join('')}</ul>`;
+    };
     html = `<section class="usage-card" aria-label="Skills and tools">
       <header class="detail-head usage-head"><h2>${esc(label)}</h2><button class="iconbtn" data-act="usage" aria-expanded="true" aria-label="Close the usage card">✕</button></header>
       <div class="usage-body">
@@ -1033,8 +1035,11 @@ document.addEventListener('click', (e) => {
     if (state.tool === el.dataset.tool) closeDetail();
     else openTool(el.dataset.tool);
   } else if (el.dataset.expand) {
-    state.open.add(Number(el.dataset.expand));
-    renderSession();
+    const n = Number(el.dataset.expand);
+    const seen = el.closest('.turn').querySelectorAll('.call').length;
+    state.open.add(n);
+    renderView(null);
+    $(`turn-${n}`)?.querySelectorAll('.call')[seen]?.focus({ preventScroll: true });
   } else if (el.dataset.full) {
     const part = el.dataset.full;
     const n = Number(el.dataset.n);
