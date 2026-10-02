@@ -73,6 +73,11 @@ The hub creates the folder, the config file and a new token on the first run. Se
 | `ALLOWED_HOSTS` | Extra host names, if `--allowed-hosts` is not set |
 | `CLAUDE_CONFIG_DIR` | The default config dir. Else `~/.claude`. |
 | `CLAUDE_HUB_DIR` | The hub folder, if `--hub-dir` is not set. Else `~/.claude-hub`. |
+| `CLAUDE_HUB_NO_UPDATE_CHECK` | Set to any value to turn off the check for a new hub version on npm. |
+
+### Update check
+
+On start, the hub asks npm for the latest `claude-code-hub` version and keeps the answer for 12 hours. If a newer stable version exists, the hub page shows a notice in the bottom-right corner when it loads. The notice hides after 10 seconds, or when you click ×, and shows again on the next start. Click **Skip this version** to hide it until a later version ships. The hub skips the check when it runs from a git checkout.
 
 ## The config file
 

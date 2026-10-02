@@ -229,6 +229,48 @@ async function init() {
   listenKeys();
   bindPalette();
   registerSW();
+  showUpdateToast();
+}
+
+// One key, overwritten by each dismissal: a dismissed version stays hidden until a newer one ships.
+const UPDATE_DISMISSED_KEY = 'hub-update-dismissed';
+const UPDATE_TOAST_MS = 10_000;
+
+async function showUpdateToast() {
+  let info;
+  try {
+    info = await sendJson('GET', '/api/update');
+  } catch {
+    return;
+  }
+  const latest = info.update?.latest;
+  let dismissed = null;
+  try {
+    dismissed = localStorage.getItem(UPDATE_DISMISSED_KEY);
+  } catch {}
+  if (!latest || latest === dismissed) return;
+  const toast = document.getElementById('update-toast');
+  document.getElementById('update-latest').textContent = latest;
+  document.getElementById('update-current').textContent = info.version;
+  document.getElementById('update-notes').href = info.update.url;
+  let timer = 0;
+  const hide = () => {
+    clearTimeout(timer);
+    toast.classList.add('leaving');
+    setTimeout(() => (toast.hidden = true), 200);
+  };
+  const arm = () => (timer = setTimeout(hide, UPDATE_TOAST_MS));
+  toast.addEventListener('mouseenter', () => clearTimeout(timer));
+  toast.addEventListener('mouseleave', arm);
+  document.getElementById('update-close').addEventListener('click', hide);
+  document.getElementById('update-skip').addEventListener('click', () => {
+    try {
+      localStorage.setItem(UPDATE_DISMISSED_KEY, latest);
+    } catch {}
+    hide();
+  });
+  toast.hidden = false;
+  arm();
 }
 
 // The hub has no visible chrome, so the window/tab title is the only place the active config dir

@@ -57,7 +57,7 @@ The hub listens on its own port, 3540 by default, and on one port for each tool,
 
 The tool port is the tool's origin in the browser, so it keys the tool's `localStorage`. If a port is taken, the hub uses a random free port for that run, and the tool starts with empty `localStorage`.
 
-`GET /api/config` returns the tool URLs, the theme palettes, and the active config dir.
+`GET /api/config` returns the tool URLs, the theme palettes, and the active config dir. `GET /api/update` returns the hub version and, when npm has a newer one, that version and its release notes link.
 
 ## SDK
 

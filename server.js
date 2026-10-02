@@ -15,6 +15,8 @@ const { createNetGuard, KEEP_ALIVE_MS } = require('./lib/net-guard');
 const { ping } = require('./lib/ping');
 const { killChild } = require('./lib/kill-child');
 const { readRegistry, themeConfig } = require('./lib/themes');
+const { createUpdateCheck } = require('./lib/update-check');
+const { version: HUB_VERSION } = require('./package.json');
 
 function getArg(name) {
   const idx = process.argv.findIndex((a) => a.startsWith(`--${name}`));
@@ -842,6 +844,16 @@ function appsConfig() {
   );
 }
 
+// A git checkout updates through git, not npm.
+const updateCheck = createUpdateCheck({
+  current: HUB_VERSION,
+  enabled: !process.env.CLAUDE_HUB_NO_UPDATE_CHECK && !fs.existsSync(path.join(__dirname, '.git')),
+});
+
+app.get('/api/update', async (_req, res) => {
+  res.json({ version: HUB_VERSION, update: await updateCheck.update() });
+});
+
 app.get('/api/config', (_req, res) => {
   res.json({
     ...themeConfig(THEME_REGISTRY, { userFile: USER_THEMES_FILE }),
@@ -993,6 +1005,7 @@ app.use(express.static(path.join(__dirname, 'public')));
 const onReady = (actual) => {
   hubPort = actual;
   ensurePool(hubConfig.activeConfigDir);
+  updateCheck.refresh();
   printBanner(actual);
   if (process.argv.includes('--open')) {
     import('open').then((m) => m.default(accessUrl(actual)));
