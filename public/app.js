@@ -229,6 +229,7 @@ async function init() {
   listenKeys();
   bindPalette();
   registerSW();
+  bindErrorToast();
   showUpdateToast();
 }
 
@@ -271,6 +272,37 @@ async function showUpdateToast() {
   });
   toast.hidden = false;
   arm();
+}
+
+const ERROR_TOAST_MS = 8_000;
+let errorToastTimer = 0;
+
+function hideErrorToast() {
+  clearTimeout(errorToastTimer);
+  const toast = document.getElementById('error-toast');
+  toast.classList.add('leaving');
+  setTimeout(() => (toast.hidden = true), 200);
+}
+
+// A 401 means the hub_token cookie no longer matches the token file. Opening /?token=… sets a new
+// cookie; reloading lands on the locked page, where the token can be pasted instead.
+function showErrorToast(action, err) {
+  const unauthorized = err.status === 401;
+  document.getElementById('error-title').textContent = unauthorized ? `${action}: hub token rejected` : action;
+  document.getElementById('error-detail').textContent = unauthorized
+    ? `This browser has an old hub token. Open the link the hub printed in the terminal (${location.origin}/?token=…) to renew it.`
+    : err.message;
+  document.getElementById('error-actions').hidden = !unauthorized;
+  const toast = document.getElementById('error-toast');
+  toast.classList.remove('leaving');
+  toast.hidden = false;
+  clearTimeout(errorToastTimer);
+  if (!unauthorized) errorToastTimer = setTimeout(hideErrorToast, ERROR_TOAST_MS);
+}
+
+function bindErrorToast() {
+  document.getElementById('error-close').addEventListener('click', hideErrorToast);
+  document.getElementById('error-reload').addEventListener('click', () => location.reload());
 }
 
 // The hub has no visible chrome, so the window/tab title is the only place the active config dir
@@ -722,7 +754,7 @@ async function removeConfigDir(dirPath) {
   try {
     palette.configDirs = await sendJson('DELETE', '/api/config-dirs', { path: dirPath });
   } catch (err) {
-    console.warn('remove config dir failed:', err.message);
+    showErrorToast('Could not remove config dir', err);
     return;
   }
   if (dirPath in themeState.colorThemes) {
@@ -993,7 +1025,10 @@ function openPalette(mode) {
     .then(() => {
       if (palette.open && palette.mode === mode) renderPalette();
     })
-    .catch((err) => console.warn(`${mode} list unavailable:`, err.message));
+    .catch((err) => {
+      if (err.status === 401) showErrorToast('Could not load the list', err);
+      else console.warn(`${mode} list unavailable:`, err.message);
+    });
 }
 
 function closePalette() {
@@ -1057,7 +1092,7 @@ async function commitConfigDir(row) {
     try {
       target = (await withPaletteBusy(() => sendJson('POST', '/api/config-dirs', { path: row.path }))).path;
     } catch (err) {
-      console.warn('add config dir failed:', err.message);
+      showErrorToast('Could not add config dir', err);
       return;
     }
   }
@@ -1075,7 +1110,7 @@ async function commitConfigDir(row) {
     applyHubTheme();
     reloadIframes();
   } catch (err) {
-    console.warn('config dir switch failed:', err.message);
+    showErrorToast('Could not switch config dir', err);
     hideLoading();
   }
 }

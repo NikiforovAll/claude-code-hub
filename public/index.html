@@ -376,6 +376,7 @@
     }
 
     .update-toast-close:hover { color: var(--text); }
+    .error-toast { z-index: 25; border-left-color: #e5484d; }
   </style>
 </head>
 <body>
@@ -446,6 +447,17 @@
       </div>
     </div>
     <button class="update-toast-close" id="update-close" type="button" aria-label="Close">×</button>
+  </div>
+
+  <div class="update-toast error-toast" id="error-toast" role="alert" hidden>
+    <div class="update-toast-body">
+      <div class="update-toast-title" id="error-title"></div>
+      <div class="update-toast-meta" id="error-detail"></div>
+      <div class="update-toast-actions" id="error-actions" hidden>
+        <button class="update-toast-skip" id="error-reload" type="button">Paste token instead</button>
+      </div>
+    </div>
+    <button class="update-toast-close" id="error-close" type="button" aria-label="Close">×</button>
   </div>
 
   <script src="/app.js"></script>
