@@ -1,6 +1,6 @@
 {
   "name": "claude-code-hub",
-  "version": "1.0.1",
+  "version": "1.0.2",
   "description": "Unified hub for Claude Code tools — Marketplace + Kanban in one PWA",
   "main": "server.js",
   "bin": {
@@ -46,7 +46,7 @@
   "homepage": "https://github.com/NikiforovAll/claude-code-hub#readme",
   "dependencies": {
     "claude-code-cost": "1.0.0",
-    "claude-code-kanban": "5.1.0",
+    "claude-code-kanban": "5.1.1",
     "claude-code-marketplace": "1.0.0",
     "claude-code-memory-explorer": "1.0.0",
     "express": "^4.21.0",
