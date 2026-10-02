@@ -9,7 +9,7 @@ export default defineConfig({
 	integrations: [
 		starlight({
 			title: 'Claude Code Hub',
-			description: 'Kanban, Marketplace, Cost, and Memory Diagnoser for Claude Code in one window, driven from the keyboard.',
+			description: 'Your own command center for Claude Code. Run your sessions, watch your agents, and when a tool is missing, ask Claude to build it.',
 			favicon: '/favicon.svg',
 			head: [
 				{ tag: 'meta', attrs: { property: 'og:image', content: 'https://nikiforovall.blog/claude-code-hub/og.png' } },

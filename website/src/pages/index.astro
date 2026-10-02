@@ -14,14 +14,22 @@ const GITHUB = 'https://github.com/NikiforovAll/claude-code-hub';
 const NPM = 'https://www.npmjs.com/package/claude-code-hub';
 const INSTALL = 'npx claude-code-hub --open';
 
-const tools = [
+const run = [
   {
-    title: 'Kanban',
-    body: 'Tasks, sessions, and live agent activity on one board. Start a new Claude Code session or resume an old one in the embedded terminal, without leaving the window.',
+    title: 'Run Claude Code in the hub',
+    body: 'Kanban has a terminal next to its board. A session keeps running when you switch tools, switch sessions, or reload the page. [Ctrl+`] shows or hides it.',
     shot: 'terminal',
     alt: 'Kanban in zen mode with a Claude Code session running in the embedded terminal',
-    docs: 'https://nikiforovall.blog/claude-code-kanban/',
   },
+  {
+    title: 'Start a session from the board',
+    body: 'Press [Ctrl+Alt+N] in Kanban, pick a folder, and type the first prompt. Claude Code starts in the terminal, in a new git worktree if you ask for one. [Ctrl+Alt+R] resumes a past session.',
+    shot: '09-new-session',
+    alt: 'The New session dialog in Kanban with a project folder, a session name, and a prompt',
+  },
+];
+
+const tools = [
   {
     title: 'Marketplace',
     body: 'Browse the plugins and skills from your marketplaces, see what is installed, and read a skill before you add it.',
@@ -60,12 +68,6 @@ const drive = [
     shot: '12-shortcuts',
     alt: 'The Kanban keyboard shortcuts help, with a group for the hub keys',
   },
-  {
-    title: 'Start a session from the board',
-    body: 'Press [Ctrl+Alt+N] in Kanban, pick a folder, and type the first prompt. Claude Code starts in the embedded terminal, in a new git worktree if you ask for one. [Ctrl+Alt+R] resumes a past session.',
-    shot: '09-new-session',
-    alt: 'The New session dialog in Kanban with a project folder, a session name, and a prompt',
-  },
 ];
 
 const setup = [
@@ -88,8 +90,8 @@ const setup = [
 ---
 
 <SiteLayout
-  title="Claude Code Hub: Kanban, Marketplace, Cost, and Memory Diagnoser in one window"
-  description="Kanban, Marketplace, Cost, and Memory Diagnoser for Claude Code in one window, driven from the keyboard."
+  title="Claude Code Hub: your own command center for Claude Code"
+  description="Run your Claude Code sessions, watch your agents, and when a tool is missing, ask Claude to build it. One window on your machine."
   image="og.png"
 >
   <div class="page">
@@ -110,10 +112,10 @@ const setup = [
 
     <main>
       <section class="hero">
-        <h1>Four Claude Code tools, one window, no mouse.</h1>
+        <h1>Your own command center for Claude Code.</h1>
         <p class="lede">
-          Kanban, Marketplace, Cost, and Memory Diagnoser run side by side on your machine. One command starts them, and
-          one keyboard moves between them.
+          Run your sessions, watch your agents, and when a tool is missing, ask Claude to build it. One command starts
+          it on your machine.
         </p>
         <div class="actions">
           <div class="cmd">
@@ -145,6 +147,46 @@ const setup = [
           </p>
         </div>
         <Video title="Claude Code Hub tour" light="9tMiNn1v6bY" dark="avZk-3qOpWk" poster="video/hub-{mode}.webp" />
+      </section>
+
+      <section class="half" aria-labelledby="run">
+        <div class="half-head">
+          <h2 id="run">Run</h2>
+          <p>
+            Kanban shows your tasks, your sessions, and what each agent does right now. Start Claude Code from the board
+            and keep the session in the same window. <a href="https://nikiforovall.blog/claude-code-kanban/">Read the Kanban docs</a>.
+          </p>
+          <p class="aside">
+            The live agent log, subagents, and waiting-for-you badges need the Kanban hooks, step 2 of the setup below.
+          </p>
+        </div>
+        <div class="items">
+          {
+            run.map((it) => (
+              <article class="item">
+                <div class="item-text">
+                  <h3>{it.title}</h3>
+                  <p><Keys text={it.body} /></p>
+                </div>
+                <Shot themed={it.shot} alt={it.alt} />
+              </article>
+            ))
+          }
+        </div>
+      </section>
+
+      <section class="half" aria-labelledby="build">
+        <div class="half-head">
+          <h2 id="build">Build</h2>
+          <p>
+            When a tool is missing, ask Claude Code to build it. The hub-builder skill knows how the hub runs its tools,
+            so the agent picks a patch, a fork or a new app, and reads the docs page for it.
+          </p>
+          <p class="aside">
+            Step 3 of the setup below adds the skill. Then type <code>/hub-builder</code> and your request.
+          </p>
+        </div>
+        <HubBuilderDemo />
       </section>
 
       <section class="half" aria-labelledby="tools">
@@ -198,20 +240,6 @@ const setup = [
             ))
           }
         </div>
-      </section>
-
-      <section class="half" aria-labelledby="build">
-        <div class="half-head">
-          <h2 id="build">Build</h2>
-          <p>
-            Ask Claude Code to change the hub. The hub-builder skill knows how the hub runs its tools, so the agent
-            picks a patch, a fork or a new app, and reads the docs page for it.
-          </p>
-          <p class="aside">
-            Step 3 of the setup below adds the skill. Then type <code>/hub-builder</code> and your request.
-          </p>
-        </div>
-        <HubBuilderDemo />
       </section>
 
       <section class="setup" aria-labelledby="setup">
