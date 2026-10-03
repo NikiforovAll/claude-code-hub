@@ -411,6 +411,16 @@ describe('keys', () => {
     for (const e of events) assert.equal(comboOf(e), hub(e), JSON.stringify(e));
   });
 
+  it('gives the same comboOf from the client, the stub and the global', () => {
+    const env = fakeEnv({ framed: false });
+    const events = [ctrlAlt('π', 'KeyP'), ctrlAlt('ArrowLeft', 'ArrowLeft'), { ...NO_MODS, key: '?', code: 'Slash' }];
+    for (const e of events) {
+      assert.equal(stub.comboOf(e), comboOf(e), JSON.stringify(e));
+      assert.equal(stub.createClaudeHub(env.win).comboOf(e), comboOf(e));
+      assert.equal(createClaudeHub(env.win).comboOf(e), comboOf(e));
+    }
+  });
+
   it('forwards only welcome.forward, as a hub:keydown', async () => {
     const { env } = await connected();
     env.fromHub(welcome({ forward: ['ctrl+alt+p'] }));
@@ -426,8 +436,10 @@ describe('keys', () => {
     env.fromHub(welcome({ forward: ['ctrl+alt+k'] }));
     assert.equal(hub.forwards(ctrlAlt('k', 'KeyK')), true);
     assert.equal(hub.forwards(ctrlAlt('p', 'KeyP')), false);
+    assert.deepEqual(hub.forwardCombos(), ['ctrl+alt+k']);
     const alone = await connected({}, { config: { enabled: false } });
     assert.equal(alone.hub.forwards(ctrlAlt('k', 'KeyK')), false);
+    assert.deepEqual(alone.hub.forwardCombos(), []);
   });
 });
 
@@ -537,6 +549,7 @@ describe('stub', () => {
           themes: hub.themes,
           can: [hub.can('session.cost'), hub.can('project.plugins')],
           forwards: hub.forwards(e),
+          forwardCombos: hub.forwardCombos(),
           token: await hub.terminalToken(),
           cost: await hub.invoke('session.cost', { id: 's1' }),
           plugins: await hub.invoke('project.plugins', {}),
@@ -547,6 +560,7 @@ describe('stub', () => {
           themes: [],
           can: [true, false],
           forwards: false,
+          forwardCombos: [],
           token: null,
           cost: { ok: true, handledBy: 'standalone' },
           plugins: { ok: false, reason: 'unhandled' },

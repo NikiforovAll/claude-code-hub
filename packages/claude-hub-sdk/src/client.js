@@ -334,6 +334,8 @@
         },
         // For an element that eats keys before the document sees them, like a terminal.
         forwards,
+        // The combos forwards() matches, for a frame that tests keys with ClaudeHub.comboOf on its own.
+        forwardCombos: () => (forward ? [...forward] : []),
         closeGuard(on) {
           post({ type: 'hub:closeGuard', on: !!on });
         },
@@ -363,7 +365,7 @@
       return hub;
     }
 
-    return { connect };
+    return { connect, comboOf };
   }
 
   if (typeof module === 'object' && module.exports) module.exports = { createClaudeHub, comboOf };

@@ -5,6 +5,7 @@ The SDK follows semver. A new function or message is a minor version, a change t
 ## 1.2.0
 
 - Server `mount(app)` answers `hub:stats` over IPC with `{id, rss, cpu}`: the memory of the app's own process in bytes and its CPU in percent of one core, sampled over 250 ms. Child processes are not counted.
+- `hub.forwardCombos()` gives the combos that `forwards()` matches, as strings (empty before welcome and standalone). `ClaudeHub.comboOf(e)` names a key event's combo. Together they let a nested frame, such as a terminal in its own process, tell which keys to hand back to the app.
 
 ## 1.1.0
 

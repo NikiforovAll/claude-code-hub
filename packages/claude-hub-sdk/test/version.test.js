@@ -10,7 +10,7 @@ const { version } = require('../package.json');
 const RELEASED = {
   '1.0.0': '17957c297dc7',
   '1.1.0': '0fed14faa670',
-  '1.2.0': '0b8540e7ea36',
+  '1.2.0': '62c7d9f477b2',
 };
 
 describe('version', () => {

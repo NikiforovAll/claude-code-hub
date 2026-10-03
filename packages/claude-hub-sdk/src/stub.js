@@ -3,6 +3,15 @@
 ((root) => {
   'use strict';
 
+  // A copy of client.js comboOf(); a test checks they match.
+  function comboOf(e) {
+    const lower = typeof e.key === 'string' ? e.key.toLowerCase() : '';
+    const m = /^(?:Key|Digit)([A-Z1-9])$/.exec(e.code || '');
+    const key = /^[a-z1-9]$/.test(lower) ? lower : m ? m[1].toLowerCase() : e.key;
+    const mods = [e.ctrlKey && 'ctrl', e.altKey && 'alt', e.shiftKey && 'shift', e.metaKey && 'meta'];
+    return [...mods, key].filter(Boolean).join('+');
+  }
+
   function createClaudeHub(win) {
     let hub = null;
     const off = () => {};
@@ -32,6 +41,7 @@
         },
         can: (action) => !!standaloneFn(action),
         forwards: () => false,
+        forwardCombos: () => [],
         closeGuard() {},
         openExternal(url) {
           win.open(url, '_blank', 'noopener');
@@ -41,9 +51,9 @@
       return hub;
     }
 
-    return { connect };
+    return { connect, comboOf };
   }
 
-  if (typeof module === 'object' && module.exports) module.exports = { createClaudeHub };
+  if (typeof module === 'object' && module.exports) module.exports = { createClaudeHub, comboOf };
   else root.ClaudeHub = createClaudeHub(root);
 })(typeof window !== 'undefined' ? window : globalThis);
