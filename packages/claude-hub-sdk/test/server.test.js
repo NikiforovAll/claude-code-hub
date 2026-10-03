@@ -34,6 +34,16 @@ describe('server mount', () => {
     assert.deepEqual(await pong, { type: 'hub:pong', id: 7 });
   });
 
+  it('answers a stats request over IPC with its memory and CPU', async () => {
+    await start();
+    const stats = next('hub:stats');
+    child.send({ type: 'hub:stats', id: 3 });
+    const m = await stats;
+    assert.equal(m.id, 3);
+    assert.ok(m.rss > 0);
+    assert.ok(Number.isInteger(m.cpu) && m.cpu >= 0);
+  });
+
   it('exits when the hub channel closes', async () => {
     await start();
     const exited = new Promise((resolve) => child.once('exit', resolve));

@@ -12,7 +12,7 @@ const { actionTable } = require('./lib/actions');
 const { selectApps, loadApp, conflicts } = require('./lib/apps');
 const { stripCookie } = require('./lib/cookies');
 const { createNetGuard, KEEP_ALIVE_MS } = require('./lib/net-guard');
-const { ping } = require('./lib/ping');
+const { ping, stats } = require('./lib/ipc');
 const { killChild } = require('./lib/kill-child');
 const { readRegistry, themeConfig } = require('./lib/themes');
 const { createUpdateCheck } = require('./lib/update-check');
@@ -924,6 +924,16 @@ app.post('/api/config-dirs/activate', async (req, res) => {
     saveHubConfig();
   }
   res.json({ apps: appsConfig() });
+});
+
+const STATS_TIMEOUT_MS = 1000;
+app.get('/api/apps/stats', async (_req, res) => {
+  res.setHeader('Cache-Control', 'no-store');
+  const pool = activePool();
+  const entries = await Promise.all(
+    ENABLED_APPS.map(async (a) => [a.id, await stats(pool?.children.get(a.id), STATS_TIMEOUT_MS)]),
+  );
+  res.json(Object.fromEntries(entries));
 });
 
 // Restarting the terminal provider ends its live terminals, so that takes force: true.

@@ -2,6 +2,10 @@
 
 The SDK follows semver. A new function or message is a minor version, a change that breaks an app is a major version. The protocol version is separate ([Versioning](https://nikiforovall.blog/claude-code-hub/reference/protocol/#versioning)).
 
+## 1.2.0
+
+- Server `mount(app)` answers `hub:stats` over IPC with `{id, rss, cpu}`: the memory of the app's own process in bytes and its CPU in percent of one core, sampled over 250 ms. Child processes are not counted.
+
 ## 1.1.0
 
 - `onThemes(fn)` calls `fn` once with the hub's themes as `[{id, label}]`, the user's own themes included, after it adds a style sheet of `.theme-swatch-<id>` rules for their picker swatches. The stub never calls it.

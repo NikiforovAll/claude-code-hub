@@ -753,6 +753,10 @@ function relAge(ts) {
   return `${Math.round(m / 1440)}d`;
 }
 
+async function loadAppStats() {
+  palette.appStats = await sendJson('GET', '/api/apps/stats');
+}
+
 async function loadConfigDirs() {
   palette.configDirs = await sendJson('GET', '/api/config-dirs');
 }
@@ -949,12 +953,17 @@ const PALETTE_MODES = {
     hint: 'Enter switch · Ctrl+R restart the app',
     empty: 'No matching app',
     rows: (_typed, q) => appRows(q),
+    load: loadAppStats,
     initialSel(rows) {
       const prev = rows.findIndex((r) => r.id === previousApp);
       return prev < 0 ? 0 : prev;
     },
     fillRow(li, row, q) {
       li.append(appIcon(row.app), markedSpan('name', row.app.name, q));
+      const s = palette.appStats?.[row.id];
+      const stats = el('span', 'stats', s ? `${Math.round(s.rss / 1048576)} MB · ${s.cpu}%` : '');
+      stats.title = 'Memory and CPU of the app process. Child processes are not counted. 100% is one core.';
+      li.append(stats);
       const key = row.id === activeApp ? 'active' : row.index < 9 ? `Alt+${row.index + 1}` : '';
       li.append(el('span', 'age', key));
       li.append(rowButton('palette-restart', '↻', 'r', 'Restart the app (Ctrl+R)', `Restart ${row.app.name}`));

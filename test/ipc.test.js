@@ -2,7 +2,7 @@ const { describe, it, afterEach } = require('node:test');
 const assert = require('node:assert/strict');
 const { fork } = require('node:child_process');
 const path = require('node:path');
-const { ping } = require('../lib/ping');
+const { ping } = require('../lib/ipc');
 
 const SDK_APP = path.join(__dirname, '..', 'packages', 'claude-hub-sdk', 'test', 'fixtures', 'app.js');
 

@@ -70,6 +70,7 @@ When the app listens, it prints one stdout line with its real port:
 The hub spawns the app with a Node IPC channel. The server SDK's `mount()` does all of this:
 
 - The app answers `{type: 'hub:ping', id}` with `{type: 'hub:pong', id}`.
+- The app answers `{type: 'hub:stats', id}` with `{type: 'hub:stats', id, rss, cpu}`: the memory of its own process in bytes and its CPU in percent of one core, sampled over 250 ms. The app launcher shows them. An app that does not answer within 1 s shows no stats.
 - The app exits when the channel closes, and unrefs the channel.
 
 After 3 failed connects to the app, the hub pings it:
@@ -100,7 +101,7 @@ The hub ships the SDK and hands it to each app it spawns, so the app runs the hu
 
 | File | Runs in | Does |
 |---|---|---|
-| `server.js` | The app server, under the hub | `mount(app)` answers `hub:ping` ([Launch](#1-launch)), and registers `GET /hub-config` and `GET /vendor/claude-hub-sdk.js`, which serves `client.js` |
+| `server.js` | The app server, under the hub | `mount(app)` answers `hub:ping` and `hub:stats` ([Launch](#1-launch)), and registers `GET /hub-config` and `GET /vendor/claude-hub-sdk.js`, which serves `client.js` |
 | `client.js` | The app page, under the hub | The app side of this spec. It sets `window.ClaudeHub` |
 | `stub.js` | The app page, standalone | The same API as `client.js`, with no hub. It never fetches `/hub-config` and sends no message |
 
