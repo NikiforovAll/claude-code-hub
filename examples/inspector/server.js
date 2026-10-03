@@ -69,6 +69,8 @@ app.get(
   }),
 );
 
+app.get('/hub-app.json', (_req, res) => res.sendFile(path.join(__dirname, 'hub-app.json')));
+
 app.use(express.static(path.join(__dirname, 'public')));
 
 app.use((err, _req, res, _next) => {

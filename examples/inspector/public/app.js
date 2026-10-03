@@ -18,7 +18,6 @@ const state = {
   encoded: null,
   data: null,
   error: null,
-  active: true,
   turn: null,
   tool: null,
   open: new Set(),
@@ -176,8 +175,8 @@ buildThemeMenu();
 
 // #region DATA
 // The browser turns a 304 into a 200 with the stored body, so the ETag goes by hand and a 304 returns null.
-async function getJson(url, etag) {
-  const r = await fetch(url, { cache: 'no-store', headers: etag ? { 'If-None-Match': etag } : {} });
+async function getJson(url, etag, signal) {
+  const r = await fetch(url, { cache: 'no-store', headers: etag ? { 'If-None-Match': etag } : {}, signal });
   if (r.status === 304) return null;
   const body = await r.json().catch(() => ({}));
   if (!r.ok) throw Object.assign(new Error(body.error || `HTTP ${r.status}`), { status: r.status });
@@ -217,14 +216,19 @@ const forget = (id) => saveTouched(touched().filter((s) => s.id !== id));
 
 const query = () => (state.encoded ? `?encoded=${encodeURIComponent(state.encoded)}` : '');
 
+let loading = null;
+
 async function load({ manual = false } = {}) {
   const id = state.id;
   if (!id) return;
   const btn = $('refreshBtn');
   if (manual) btn.classList.add('loading');
+  loading?.abort();
+  const ctl = new AbortController();
+  loading = ctl;
   try {
-    const data = await getJson(`/api/sessions/${encodeURIComponent(id)}${query()}`, state.data?.version);
-    if (id !== state.id) return;
+    const data = await getJson(`/api/sessions/${encodeURIComponent(id)}${query()}`, state.data?.version, ctl.signal);
+    if (ctl.signal.aborted) return;
     state.error = null;
     if (data) {
       const stale = state.tool && toolStatus(state.data, state.tool) !== toolStatus(data, state.tool);
@@ -243,7 +247,7 @@ async function load({ manual = false } = {}) {
       if (stale) openTool(state.tool, { keepFocus: true });
     }
   } catch (err) {
-    if (id !== state.id) return;
+    if (ctl.signal.aborted) return;
     if (state.data && !manual) return;
     if (state.data) toast(`Refresh failed: ${err.message}`, 'error');
     else {
@@ -288,6 +292,7 @@ function openSession(id, encoded = null) {
   url.searchParams.delete('encoded');
   history.replaceState(null, '', url);
   main.scrollTop = 0;
+  if (!shown) return;
   render();
   load();
 }
@@ -296,11 +301,38 @@ const isLive = () => !!state.data && Date.now() - new Date(state.data.meta.updat
 
 // An idle session can start again at any time, so it is polled too, less often. An unchanged file answers 304.
 let ticks = 0;
-setInterval(() => {
-  ticks += 1;
-  if (!state.id || !state.active || document.visibilityState !== 'visible') return;
-  if (isLive() || ticks % IDLE_POLL_EVERY === 0) load();
-}, POLL_MS);
+let poller = null;
+
+function startPolling() {
+  poller ??= setInterval(() => {
+    ticks += 1;
+    if (state.id && (isLive() || ticks % IDLE_POLL_EVERY === 0)) load();
+  }, POLL_MS);
+}
+
+function stopPolling() {
+  clearInterval(poller);
+  poller = null;
+  loading?.abort();
+}
+
+// Under the hub the page is a hidden iframe while another tab is on screen. While hidden, openSession only records
+// the session, and no fetch, render or timer runs until the page is shown again.
+let shown = false;
+
+function show(on) {
+  if (on === shown) return;
+  shown = on;
+  if (!on) {
+    stopPolling();
+    stopVerbs();
+    return;
+  }
+  startPolling();
+  if (!state.data) render();
+  if (state.id) load();
+  else autoPick();
+}
 // #endregion DATA
 
 // #region HUB_INTEGRATION
@@ -328,34 +360,35 @@ hub.onThemes((themes) => buildThemeMenu(themes.map((t) => [t.id, t.label])));
 // A page opened on ?session= keeps its own session, so it skips that replay.
 let pinnedByUrl = new URLSearchParams(location.search).has('session');
 let settled = false;
+let hubActive = true;
 hub.subscribe('session.changed', (s) => {
   if (!s?.sessionId || pinnedByUrl) return;
   openSession(s.sessionId, s.encoded);
 });
 
-hub.handle('session.inspect', ({ session }) => {
-  if (session) openSession(session);
-});
+hub.handle('session.inspect', ({ session }) => openSession(session));
+
+const showIfSeen = () => show(settled && hubActive && document.visibilityState === 'visible');
 
 hub.onActive((active) => {
-  state.active = active;
+  hubActive = active;
   settled = true;
   pinnedByUrl = false;
-  if (active && state.id) load();
-  else autoPick();
+  showIfSeen();
 });
+
+document.addEventListener('visibilitychange', showIfSeen);
 
 function settleAlone(status) {
   if (settled || (status !== 'standalone' && status !== 'unanswered')) return;
   settled = true;
-  autoPick();
+  showIfSeen();
 }
 
 hub.onStatus((status) => {
   settleAlone(status);
   renderTopbar();
 });
-settleAlone(hub.status);
 
 document.addEventListener('click', (e) => {
   const link = e.target.closest('a[target="_blank"]');
@@ -366,9 +399,11 @@ document.addEventListener('click', (e) => {
 // #endregion HUB_INTEGRATION
 
 // #region RENDER
+const noSession = () => settled && !state.id;
+
 function titleOf() {
   if (state.data) return state.data.meta.title || 'Untitled session';
-  if (!state.id) return 'No session';
+  if (noSession()) return 'No session';
   return state.error ? 'Not found' : 'Loading…';
 }
 
@@ -386,13 +421,89 @@ function renderTopbar() {
 function render() {
   renderTopbar();
   if (!state.data) usageBox.hidden = true;
-  if (!state.id) return renderEmpty();
   if (state.error) return renderError();
-  if (!state.data) {
-    main.innerHTML = '<p class="loading">Reading the transcript…</p>';
-    return;
-  }
-  renderSession();
+  if (state.data) return renderSession();
+  if (!noSession()) return renderSkeleton();
+  renderEmpty();
+}
+
+const SKELETON_TURN = `<div class="turn">
+    <span class="turn-n"></span>
+    <div class="turn-body">
+      <span class="sk sk-meta"></span>
+      <span class="prompt sk sk-prompt"></span>
+      <span class="sk sk-call"></span>
+      <span class="sk sk-call is-short"></span>
+      <span class="sk sk-reply"></span>
+    </div>
+  </div>`;
+
+const SKELETON = `<section class="skeleton" aria-busy="true">
+    <div class="boot">
+      <svg class="clawd clawd-jump" viewBox="1 0 16 10" shape-rendering="crispEdges" aria-hidden="true">
+        <rect x="3" y="0" width="12" height="2"/>
+        <rect x="3" y="2" width="2" height="2"/>
+        <rect x="6" y="2" width="6" height="2"/>
+        <rect x="13" y="2" width="2" height="2"/>
+        <rect x="1" y="4" width="16" height="2"/>
+        <rect x="3" y="6" width="12" height="2"/>
+        <rect x="4" y="8" width="1" height="2"/>
+        <rect x="6" y="8" width="1" height="2"/>
+        <rect x="11" y="8" width="1" height="2"/>
+        <rect x="13" y="8" width="1" height="2"/>
+      </svg>
+      <p class="boot-verb" id="bootVerb" role="status">Reading the transcript…</p>
+    </div>
+    <header class="head">
+      <span class="sk sk-title"></span>
+      <span class="sk sk-line"></span>
+    </header>
+    <div class="tide" aria-hidden="true">${[
+      18, 26, 22, 34, 30, 41, 38, 52, 47, 60, 55, 68, 74, 66, 81, 77, 88, 72, 79, 92,
+    ]
+      .map((h) => `<span class="bar sk" style="--h:${h}%"></span>`)
+      .join('')}</div>
+    <div class="ledger" aria-hidden="true">${SKELETON_TURN.repeat(3)}</div>
+  </section>`;
+
+const VERB_MS = 2400;
+let verbs = ['Reading the transcript…'];
+let verbsLoaded = false;
+let verbAt = 0;
+let verbTimer = null;
+
+function renderSkeleton() {
+  if (!main.querySelector('.skeleton')) main.innerHTML = SKELETON;
+  if (shown) spinVerbs();
+}
+
+function paintVerb() {
+  const el = $('bootVerb');
+  if (el) el.textContent = verbs[verbAt % verbs.length];
+  else stopVerbs();
+}
+
+function spinVerbs() {
+  if (verbTimer) return;
+  paintVerb();
+  verbTimer = setInterval(() => {
+    verbAt += 1;
+    paintVerb();
+  }, VERB_MS);
+  if (verbsLoaded) return;
+  verbsLoaded = true;
+  // hub-app.json is the only copy of the loading verbs.
+  getJson('/hub-app.json')
+    .then((m) => {
+      if (m.loading?.verbs?.length) verbs = m.loading.verbs;
+      if (verbTimer) paintVerb();
+    })
+    .catch(() => {});
+}
+
+function stopVerbs() {
+  clearInterval(verbTimer);
+  verbTimer = null;
 }
 
 function sessionList() {
@@ -941,7 +1052,7 @@ async function openTool(id, { keepFocus = false } = {}) {
 
 // #region MODAL
 function autoPick() {
-  if (!settled || state.id || !state.active || picker.open || helpModal.open) return;
+  if (state.id || !shown || picker.open || helpModal.open) return;
   const last = touched()[0];
   if (last) openSession(last.id, last.encoded);
   else showPicker();
@@ -1119,6 +1230,7 @@ document.addEventListener('keydown', (e) => {
 
 // #region INIT
 const params = new URLSearchParams(location.search);
-if (params.get('session')) openSession(params.get('session'), params.get('encoded'));
-else render();
+openSession(params.get('session'), params.get('encoded'));
+render();
+settleAlone(hub.status);
 // #endregion INIT
