@@ -289,7 +289,7 @@ An element that handles keys before the document sees them, such as a terminal, 
 1. **Discovery, not runtime.** The manifest holds what the hub needs before the app runs. The protocol version comes from `hello` only, because the running document may be an older bundle.
 2. **Where the hub reads it.** For an `apps` entry with a `path`, the hub reads the manifest from that folder. For a built-in app, it reads it from the submodule, else from the installed package, and keeps no copy. The hub's tests validate the manifest of each pinned package. See [The apps entry and the launch](/claude-code-hub/extensibility/reference/apps-entry/).
 3. **Skip.** The hub skips an app, with a log line, when its file is missing or not valid JSON, `manifest` is a version it does not know, `id` does not match the id rule ([Terms](#terms)) or is not the app's id, `run.entry` is not inside the app directory, a `provides` path does not start with `/`, or a `publishes` topic breaks the topic rule or is the hub's ([Events](#10-events)). It skips one action, with a log line, when the action is not valid ([Actions](#7-actions)).
-4. **Providers.** For each capability, the first enabled app in tab order whose `provides` declares it is the provider. `projects.path` and `terminal.liveWork` must be paths on the provider's origin. `projects.path` answers `[{path, modifiedAt}]`. `terminal.liveWork` answers `{sessions: []}`, and a pool whose provider has sessions is not evicted. With no provider, the capability is off: no terminal, and the project palette has no list.
+4. **Providers.** For each capability, the first enabled app in tab order whose `provides` declares it is the provider. `projects.path` and `terminal.liveWork` must be paths on the provider's origin. `projects.path` answers `[{path, modifiedAt, worktrees?}]`, where `worktrees` lists the linked worktree paths folded into that repo row. `terminal.liveWork` answers `{sessions: []}`, and a pool whose provider has sessions is not evicted. With no provider, the capability is off: no terminal, and the project palette has no list.
 
 ## 10. Events
 
@@ -303,16 +303,17 @@ An event is a fact that any number of apps can receive. The hub publishes some t
 
 | Topic | From | Sticky | Payload |
 |---|---|---|---|
-| `project.changed` | Hub | Yes | `{project, encoded, name}`, or `null` when there is no project |
+| `project.changed` | Hub | Yes | `{project, encoded, name, worktrees}`, or `null` when there is no project |
 | `theme.changed` | Hub | Yes | `{theme, colorTheme, vars?}` |
 | App topics | An app | Yes | See [App topics](#app-topics) |
 
 1. A **sticky** topic keeps its last value in the hub. After `welcome`, the hub sends the last value of each sticky topic the app subscribes to, then every change. A topic that has had no value yet sends nothing.
 2. The hub sends an event only to live apps that subscribe to its topic.
-3. `project` is the absolute path and `encoded` is the hub's encoded form of it. An app does not encode a path itself.
-4. The hub starts with no project, so that each app restores its own. It sends `null` only when the user clears the project. On `null`, the app clears its project scope.
-5. A document that the hub loaded from an action URL does not get the `project.changed` replay after `welcome`, so the link keeps its project. The next change goes to it as usual.
-6. An event never carries a secret.
+3. `project` is the absolute path and `encoded` is the hub's encoded form of it: Claude Code's project dir name, with every character that is not a letter or a digit changed to `-`. An app does not encode a path itself.
+4. `worktrees` is `[{path, encoded}]`, the linked worktrees of the project's repo that the projects provider reported. Claude Code keeps a worktree's transcripts in its own project dir, so an app that reads transcripts by `encoded` reads each worktree's `encoded` too. The array is empty for a path the user typed.
+5. The hub starts with no project, so that each app restores its own. It sends `null` only when the user clears the project. On `null`, the app clears its project scope.
+6. A document that the hub loaded from an action URL does not get the `project.changed` replay after `welcome`, so the link keeps its project. The next change goes to it as usual.
+7. An event never carries a secret.
 
 ### App topics
 

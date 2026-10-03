@@ -103,12 +103,16 @@ Kanban provides both capabilities. To take one over, see [Capabilities](/claude-
 
 ```json
 [
-  { "path": "C:\\demo\\api-gateway", "modifiedAt": "2026-09-29T09:58:00.000Z" },
+  {
+    "path": "C:\\demo\\api-gateway",
+    "modifiedAt": "2026-09-29T09:58:00.000Z",
+    "worktrees": ["C:\\demo\\api-gateway\\.claude\\worktrees\\fix-auth"]
+  },
   { "path": "C:\\Users\\me\\AppData\\Local\\Temp\\scratch", "modifiedAt": null, "temp": true }
 ]
 ```
 
-`modifiedAt` is the time of the last session change, or `null`. `temp` is true for a project in a temp folder. The hub shows the list in the project palette (<kbd>Ctrl+Alt+P</kbd>).
+`modifiedAt` is the time of the last session change, or `null`. `temp` is true for a project in a temp folder. A linked git worktree is not a row of its own: it is listed in `worktrees` of its repo's row, and `modifiedAt` covers the repo and its worktrees. Kanban remembers which repo a worktree belongs to after the worktree is deleted. The hub shows the list in the project palette (<kbd>Ctrl+Alt+P</kbd>), and picking a repo selects its worktree sessions too.
 
 ### `terminal`
 

@@ -118,10 +118,10 @@ function applyHubTheme() {
   for (const [name, value] of Object.entries(vars ?? {})) root.style.setProperty(name, value);
 }
 
-// Claude's on-disk project-directory name. Matches memory/server.js encodeProjectPath. The hub
+// Claude's on-disk project-directory name: every non-alphanumeric character becomes a dash. The hub
 // owns this transform so cost never has to convert anything; the inverse is lossy and not needed.
 function encodeProjectPath(p) {
-  return p.replace(/\\/g, '/').replace(/:/g, '-').replace(/\//g, '-');
+  return p.replace(/[^a-zA-Z0-9]/g, '-');
 }
 
 function basename(p) {
@@ -154,8 +154,14 @@ function sendTopic(appId, topic, payload) {
   if (liveApps.get(appId)?.has(topic)) postTo(appId, { type: 'hub:event', topic, payload });
 }
 
-function setProject(absPath) {
-  projectState = { project: absPath, encoded: encodeProjectPath(absPath), name: basename(absPath) };
+// `worktrees` are the linked worktrees the projects provider folded into this repo.
+function setProject(absPath, worktrees = []) {
+  projectState = {
+    project: absPath,
+    encoded: encodeProjectPath(absPath),
+    name: basename(absPath),
+    worktrees: worktrees.map((p) => ({ path: p, encoded: encodeProjectPath(p) })),
+  };
   for (const id of Object.keys(iframes)) sendProject(id);
 }
 
@@ -644,6 +650,8 @@ async function loadProjects() {
       path: p.path,
       name: basename(p.path),
       parent: parentOf(p.path),
+      worktrees: p.worktrees ?? [],
+      worktreeNames: (p.worktrees ?? []).map((w) => basename(w).toLowerCase()),
       ts: p.modifiedAt ? Date.parse(p.modifiedAt) : 0,
     }))
     .sort((a, b) => b.ts - a.ts);
@@ -676,6 +684,7 @@ function projectRows(projects, q) {
     const path = p.path.toLowerCase();
     if (path.split(/[/\\]/).includes(q)) return PATH_RANK;
     if (path.includes(q)) return PATH_RANK + 1;
+    if (p.worktreeNames.some((w) => w.includes(q))) return PATH_RANK + 2;
     return -1;
   };
   let out = projects.map((p) => ({ p, rank: rankOf(p) })).filter((x) => x.rank >= 0);
@@ -1060,7 +1069,7 @@ async function commitProject(row) {
   const absPath = row.kind === 'project' ? row.path : await resolveTypedPath(row.path);
   if (!absPath) return;
   closePalette();
-  setProject(absPath);
+  setProject(absPath, row.p?.worktrees);
 }
 
 async function sendJson(method, url, body) {
