@@ -385,6 +385,7 @@
 
     .update-toast-close:hover { color: var(--text); }
     .error-toast { z-index: 25; border-left-color: #e5484d; }
+    .slow-toast { z-index: 20; border-left-color: #f5a524; }
   </style>
 </head>
 <body>
@@ -455,6 +456,17 @@
       </div>
     </div>
     <button class="update-toast-close" id="update-close" type="button" aria-label="Close">×</button>
+  </div>
+
+  <div class="update-toast slow-toast" id="slow-toast" role="status" hidden>
+    <div class="update-toast-body">
+      <div class="update-toast-title" id="slow-title"></div>
+      <div class="update-toast-meta" id="slow-detail"></div>
+      <div class="update-toast-actions">
+        <button class="update-toast-skip" id="slow-restart" type="button">Restart</button>
+      </div>
+    </div>
+    <button class="update-toast-close" id="slow-close" type="button" aria-label="Close">×</button>
   </div>
 
   <div class="update-toast error-toast" id="error-toast" role="alert" hidden>

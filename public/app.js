@@ -236,6 +236,7 @@ async function init() {
   bindPalette();
   registerSW();
   bindErrorToast();
+  bindSlowToast();
   showUpdateToast();
 }
 
@@ -263,8 +264,7 @@ async function showUpdateToast() {
   let timer = 0;
   const hide = () => {
     clearTimeout(timer);
-    toast.classList.add('leaving');
-    setTimeout(() => (toast.hidden = true), 200);
+    hideToast(toast);
   };
   const arm = () => (timer = setTimeout(hide, UPDATE_TOAST_MS));
   toast.addEventListener('mouseenter', () => clearTimeout(timer));
@@ -276,8 +276,102 @@ async function showUpdateToast() {
     } catch {}
     hide();
   });
-  toast.hidden = false;
+  showToast(toast);
   arm();
+}
+
+function showToast(toast) {
+  toast.classList.remove('leaving');
+  toast.hidden = false;
+}
+
+// A show during the fade cancels the hide.
+function hideToast(toast) {
+  toast.classList.add('leaving');
+  setTimeout(() => {
+    if (toast.classList.contains('leaving')) toast.hidden = true;
+  }, 200);
+}
+
+// The stalls belong to the port, so a dismissal holds while the app stays on it.
+const SLOW_POLL_MS = 30_000;
+const slowDismissed = new Map();
+const slowToast = { id: null, port: 0, confirm: false, busy: false };
+
+function hideSlowToast() {
+  slowToast.id = null;
+  hideToast(document.getElementById('slow-toast'));
+}
+
+function renderSlowToast(app) {
+  const restart = document.getElementById('slow-restart');
+  document.getElementById('slow-title').textContent = `${app.name} answers slowly`;
+  document.getElementById('slow-detail').textContent =
+    `Its port delays requests by up to ${(app.worstMs / 1000).toFixed(1)} s. A restart moves it to a new port.`;
+  restart.textContent = 'Restart';
+  restart.disabled = false;
+  slowToast.id = app.id;
+  slowToast.port = app.port;
+  slowToast.confirm = false;
+  showToast(document.getElementById('slow-toast'));
+}
+
+async function pollSlowApps() {
+  if (document.hidden || slowToast.busy) return;
+  let slow;
+  try {
+    ({ slow } = await sendJson('GET', '/api/apps/health'));
+  } catch {
+    return;
+  }
+  if (slowToast.id && !slow.some((a) => a.id === slowToast.id)) hideSlowToast();
+  const next = slow.find((a) => slowDismissed.get(a.id) !== a.port);
+  if (next && next.id !== slowToast.id) renderSlowToast(next);
+}
+
+// Null on success. A 409 with live terminals asks for force: true on the next call.
+async function requestRestart(id, force) {
+  try {
+    await sendJson('POST', `/api/apps/${encodeURIComponent(id)}/restart`, { force });
+    return null;
+  } catch (err) {
+    const name = apps[id]?.name ?? id;
+    const n = err.status === 409 && err.data?.terminals;
+    if (!n) return { message: `${name} did not restart: ${err.message}` };
+    const them = n === 1 ? 'it' : 'them';
+    return { terminals: n, message: `${name} has ${n} live terminal${n === 1 ? '' : 's'}. A restart ends ${them}.` };
+  }
+}
+
+async function restartSlowApp() {
+  const { id } = slowToast;
+  if (!id) return;
+  const restart = document.getElementById('slow-restart');
+  slowToast.busy = true;
+  restart.disabled = true;
+  restart.textContent = 'Restarting…';
+  const failed = await requestRestart(id, slowToast.confirm);
+  slowToast.busy = false;
+  if (!failed) {
+    hideSlowToast();
+    replaceIframe(id);
+    return;
+  }
+  slowToast.confirm = !!failed.terminals;
+  document.getElementById('slow-detail').textContent = failed.message;
+  restart.textContent = failed.terminals ? 'Restart anyway' : 'Restart';
+  restart.disabled = false;
+}
+
+function bindSlowToast() {
+  document.getElementById('slow-restart').addEventListener('click', restartSlowApp);
+  document.getElementById('slow-close').addEventListener('click', () => {
+    if (slowToast.id) slowDismissed.set(slowToast.id, slowToast.port);
+    hideSlowToast();
+  });
+  setInterval(pollSlowApps, SLOW_POLL_MS);
+  document.addEventListener('visibilitychange', pollSlowApps);
+  pollSlowApps();
 }
 
 const ERROR_TOAST_MS = 8_000;
@@ -285,9 +379,7 @@ let errorToastTimer = 0;
 
 function hideErrorToast() {
   clearTimeout(errorToastTimer);
-  const toast = document.getElementById('error-toast');
-  toast.classList.add('leaving');
-  setTimeout(() => (toast.hidden = true), 200);
+  hideToast(document.getElementById('error-toast'));
 }
 
 // A 401 means the hub_token cookie no longer matches the token file. Opening /?token=… sets a new
@@ -299,9 +391,7 @@ function showErrorToast(action, err) {
     ? `This browser has an old hub token. Open the link the hub printed in the terminal (${location.origin}/?token=…) to renew it.`
     : err.message;
   document.getElementById('error-actions').hidden = !unauthorized;
-  const toast = document.getElementById('error-toast');
-  toast.classList.remove('leaving');
-  toast.hidden = false;
+  showToast(document.getElementById('error-toast'));
   clearTimeout(errorToastTimer);
   if (!unauthorized) errorToastTimer = setTimeout(hideErrorToast, ERROR_TOAST_MS);
 }
@@ -864,20 +954,17 @@ function setPaletteHint(text) {
 
 // The terminal provider answers 409 with a terminal count; the second Ctrl+R on the same app sends force.
 async function restartFromPalette(id) {
-  const name = apps[id]?.name ?? id;
   const force = palette.confirmRestart === id;
   palette.confirmRestart = null;
-  setPaletteHint(`Restarting ${name}…`);
-  try {
-    await withPaletteBusy(() => sendJson('POST', `/api/apps/${encodeURIComponent(id)}/restart`, { force }));
-  } catch (err) {
-    if (err.status === 409 && err.data?.terminals) {
-      palette.confirmRestart = id;
-      const n = err.data.terminals;
-      setPaletteHint(
-        `${name} has ${n} live terminal${n === 1 ? '' : 's'}. A restart ends ${n === 1 ? 'it' : 'them'}. Press Ctrl+R again to restart.`,
-      );
-    } else setPaletteHint(`${name} did not restart: ${err.message}`);
+  setPaletteHint(`Restarting ${apps[id]?.name ?? id}…`);
+  const failed = await withPaletteBusy(() => requestRestart(id, force));
+  if (failed?.terminals) {
+    palette.confirmRestart = id;
+    setPaletteHint(`${failed.message} Press Ctrl+R again to restart.`);
+    return;
+  }
+  if (failed) {
+    setPaletteHint(failed.message);
     return;
   }
   closePalette();

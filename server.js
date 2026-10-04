@@ -14,6 +14,7 @@ const { stripCookie } = require('./lib/cookies');
 const { createNetGuard, KEEP_ALIVE_MS } = require('./lib/net-guard');
 const { ping, stats } = require('./lib/ipc');
 const { killChild } = require('./lib/kill-child');
+const { createPortHealth } = require('./lib/port-health');
 const { readRegistry, themeConfig } = require('./lib/themes');
 const { createUpdateCheck } = require('./lib/update-check');
 const { liveHub, removeRecord, writeRecord } = require('./lib/hub-record');
@@ -962,6 +963,54 @@ app.get('/api/apps/stats', async (_req, res) => {
   res.json(Object.fromEntries(entries));
 });
 
+// The stalls hit a few percent of requests, so each round sends several probes per app.
+const HEALTH_INTERVAL_MS = 30_000;
+const HEALTH_PROBES = 5;
+const HEALTH_TIMEOUT_MS = 5000;
+const portHealth = createPortHealth();
+let healthRunning = false;
+
+async function msUntil(promise) {
+  const t = performance.now();
+  await promise;
+  return performance.now() - t;
+}
+
+async function probeApp(id) {
+  const port = activePool()?.ports[id];
+  for (let i = 0; port && i < HEALTH_PROBES; i++) {
+    const child = currentChild(id, port);
+    if (!child) return;
+    const answered = fetch(`http://127.0.0.1:${port}/hub-config`, { signal: AbortSignal.timeout(HEALTH_TIMEOUT_MS) })
+      .then((r) => r.arrayBuffer())
+      .catch(() => {});
+    const pong = ping(child, PING_TIMEOUT_MS);
+    const [httpMs, ipcMs, ponged] = await Promise.all([msUntil(answered), msUntil(pong), pong]);
+    portHealth.record(child, { httpMs, ipcMs: ponged ? ipcMs : null });
+  }
+}
+
+async function checkPortHealth() {
+  if (healthRunning) return;
+  healthRunning = true;
+  try {
+    await Promise.all(ENABLED_APPS.map((a) => probeApp(a.id)));
+  } finally {
+    healthRunning = false;
+  }
+}
+
+app.get('/api/apps/health', (_req, res) => {
+  res.setHeader('Cache-Control', 'no-store');
+  const pool = activePool();
+  const slow = [];
+  for (const a of ENABLED_APPS) {
+    const f = pool?.children.has(a.id) && portHealth.flagged(pool.children.get(a.id));
+    if (f) slow.push({ id: a.id, name: a.name, port: pool.ports[a.id], worstMs: f.worstMs });
+  }
+  res.json({ slow });
+});
+
 // Restarting the terminal provider ends its live terminals, so that takes force: true.
 const restarting = new Set();
 app.post('/api/apps/:id/restart', async (req, res) => {
@@ -1050,6 +1099,7 @@ const onReady = (actual) => {
   writeRecord(HUB_DIR, actual);
   ensurePool(hubConfig.activeConfigDir);
   updateCheck.refresh();
+  setInterval(checkPortHealth, HEALTH_INTERVAL_MS).unref();
   printBanner(actual);
   if (process.argv.includes('--open')) {
     import('open').then((m) => m.default(accessUrl(actual)));
