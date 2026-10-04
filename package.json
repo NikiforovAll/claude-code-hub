@@ -60,6 +60,7 @@
     "public/**/*",
     "lib/**/*",
     "plugin/**/*",
+    "tray/**/*",
     "packages/claude-hub-sdk/src/**/*"
   ],
   "devDependencies": {

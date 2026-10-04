@@ -177,9 +177,24 @@ The shortcuts also work when focus is inside a tool. Kanban keeps <kbd>Ctrl</kbd
 --host <addr>           Bind address (default: 127.0.0.1)
 --allowed-hosts <list>  Extra host names to accept, comma-separated
 --open                  Open the browser on start
+--tray                  Windows: run the hub from a tray icon
+--autostart             Windows: same as --tray, and start the tray at logon
+--no-autostart          Windows: stop starting the tray at logon
+--tray-status           Windows: show whether autostart is on and the tray and hub are running
+--app-id <id>           Windows, with --tray or --autostart: the installed app that Open Hub starts
 ```
 
 If a port is busy, the hub uses a free port and reports it.
+
+## Tray icon (Windows)
+
+```
+npx claude-code-hub --autostart
+```
+
+The hub runs in the background with an icon in the notification area. Click the icon to open the hub. Right-click it to stop, start or restart the hub, open its log, turn **Start with Windows** on or off, or quit. The dot on the icon shows the state: green is running, amber is starting, red is stopped. If the hub stops unexpectedly, the tray shows a notice and turns red; start the hub again from the menu.
+
+To turn off autostart, untick **Start with Windows** or run `npx claude-code-hub --no-autostart`. To check the state, run `npx claude-code-hub --tray-status`. See [Run the hub from the tray](https://nikiforovall.blog/claude-code-hub/guides/tray/).
 
 ## Included tools
 

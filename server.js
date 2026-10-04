@@ -16,6 +16,7 @@ const { ping, stats } = require('./lib/ipc');
 const { killChild } = require('./lib/kill-child');
 const { readRegistry, themeConfig } = require('./lib/themes');
 const { createUpdateCheck } = require('./lib/update-check');
+const { liveHub, removeRecord, writeRecord } = require('./lib/hub-record');
 const { version: HUB_VERSION } = require('./package.json');
 
 function getArg(name) {
@@ -26,7 +27,8 @@ function getArg(name) {
   return process.argv[idx + 1] || null;
 }
 
-const HUB_PORT = parseInt(getArg('port') || process.env.PORT || '3540', 10);
+const DEFAULT_HUB_PORT = 3540;
+const HUB_PORT = parseInt(getArg('port') || process.env.PORT || DEFAULT_HUB_PORT, 10);
 let hubPort = HUB_PORT;
 
 const POOL_SIZE = Math.max(1, parseInt(getArg('pool-size') || '3', 10));
@@ -50,6 +52,19 @@ function activePool() {
 // be known before the first spawn, and the hub already has one localStorage key to reason about.
 const HUB_DIR = path.resolve(expandHome(getArg('hub-dir') || process.env.CLAUDE_HUB_DIR || '~/.claude-hub'));
 const HUB_CONFIG_FILE = path.join(HUB_DIR, 'config.json');
+
+const TRAY_FLAG = ['--tray', '--autostart', '--no-autostart', '--tray-status'].find((f) => process.argv.includes(f));
+if (TRAY_FLAG) {
+  const { runTrayCommand } = require('./lib/tray');
+  runTrayCommand({
+    flag: TRAY_FLAG,
+    hubDir: HUB_DIR,
+    port: HUB_PORT,
+    defaultPort: DEFAULT_HUB_PORT,
+    appId: getArg('app-id'),
+    configDir: resolveHubConfig().config.activeConfigDir,
+  }).then((ok) => process.exit(ok ? 0 : 1));
+}
 
 if (process.argv.includes('--install') || process.argv.includes('--uninstall')) {
   const { runInstall, runUninstall } = require('./lib/install');
@@ -82,6 +97,14 @@ function canonicalDir(p) {
 }
 
 function loadHubConfig() {
+  const { config, raw, fallback } = resolveHubConfig();
+  defaultConfigDir = fallback;
+  // Configs saved before canonicalization can hold one dir under two spellings; persist the merge.
+  if (serializeConfig(config) !== raw) writeHubConfig(config);
+  return config;
+}
+
+function resolveHubConfig() {
   const canonical = (p) => {
     try {
       return canonicalDir(p);
@@ -92,7 +115,6 @@ function loadHubConfig() {
   const fallback = canonical(
     process.env.CLAUDE_CONFIG_DIR || process.env.CLAUDE_DIR || path.join(os.homedir(), '.claude'),
   );
-  defaultConfigDir = fallback;
   let raw = '';
   let saved = {};
   try {
@@ -108,9 +130,7 @@ function loadHubConfig() {
   // Hand-edited only; kept verbatim so a rewrite of the file does not drop it.
   if (saved.terminal && typeof saved.terminal === 'object') config.terminal = saved.terminal;
   if (Array.isArray(saved.apps)) config.apps = saved.apps;
-  // Configs saved before canonicalization can hold one dir under two spellings; persist the merge.
-  if (serializeConfig(config) !== raw) writeHubConfig(config);
-  return config;
+  return { config, raw, fallback };
 }
 
 function serializeConfig(config) {
@@ -398,20 +418,24 @@ process.on('SIGINT', shutdown);
 process.on('SIGTERM', shutdown);
 process.on('SIGHUP', shutdown);
 process.on('exit', killAll);
+process.on('exit', () => removeRecord(HUB_DIR));
 
-// Git Bash + tmux on Windows doesn't deliver signals — read stdin directly
-process.stdin.setEncoding('utf8');
-process.stdin.resume();
-process.stdin.on('data', (data) => {
-  const d = data.trim().toLowerCase();
-  // Ctrl+C (0x03), Ctrl+D (0x04), or typed "q"/"exit"
-  if (data.includes('\x03') || data.includes('\x04') || d === 'q' || d === 'exit') {
-    console.log('\nShutting down...');
-    shutdown();
-  }
-});
-process.stdin.on('end', shutdown);
-process.stdin.on('close', shutdown);
+// Git Bash + tmux on Windows doesn't deliver signals — read stdin directly. Only a hub that starts
+// watches it: a closed stdin would end a CLI command or the running-hub check halfway.
+function watchStdin() {
+  process.stdin.setEncoding('utf8');
+  process.stdin.resume();
+  process.stdin.on('data', (data) => {
+    const d = data.trim().toLowerCase();
+    // Ctrl+C (0x03), Ctrl+D (0x04), or typed "q"/"exit"
+    if (data.includes('\x03') || data.includes('\x04') || d === 'q' || d === 'exit') {
+      console.log('\nShutting down...');
+      shutdown();
+    }
+  });
+  process.stdin.on('end', shutdown);
+  process.stdin.on('close', shutdown);
+}
 
 // Raise header size limit to 64KB — localhost cookies from sibling apps can pile up and
 // trip Node's default 16KB limit, breaking iframes with HTTP 431.
@@ -798,16 +822,18 @@ function listenWithFallback(handler, port, onReady, label, onUpgrade) {
   return server;
 }
 
-for (const [name, port] of Object.entries(publicPorts)) {
-  listenWithFallback(
-    proxyHandler(name),
-    port,
-    (actual) => {
-      publicPorts[name] = actual;
-    },
-    `[${name}] `,
-    proxyUpgrade(name),
-  );
+function listenProxies() {
+  for (const [name, port] of Object.entries(publicPorts)) {
+    listenWithFallback(
+      proxyHandler(name),
+      port,
+      (actual) => {
+        publicPorts[name] = actual;
+      },
+      `[${name}] `,
+      proxyUpgrade(name),
+    );
+  }
 }
 
 const app = express();
@@ -1000,6 +1026,13 @@ app.get('/api/projects', async (_req, res) => {
   }
 });
 
+// The tray stops the hub through this rather than taskkill, so the children and hub.json are cleaned up.
+app.post('/api/shutdown', (_req, res) => {
+  console.log('Shutdown asked for over the API');
+  res.on('finish', shutdown);
+  res.json({ ok: true });
+});
+
 // List-picked project paths skip this: they are byte-exact copies of what kanban reported.
 app.get('/api/resolve-path', (req, res) => {
   res.setHeader('Cache-Control', 'no-store');
@@ -1014,6 +1047,7 @@ app.use(express.static(path.join(__dirname, 'public')));
 // the hub actually bound: HUB_PORT may be busy and fall back to a random one.
 const onReady = (actual) => {
   hubPort = actual;
+  writeRecord(HUB_DIR, actual);
   ensurePool(hubConfig.activeConfigDir);
   updateCheck.refresh();
   printBanner(actual);
@@ -1022,7 +1056,24 @@ const onReady = (actual) => {
   }
 };
 
-listenWithFallback(app, HUB_PORT, onReady, '');
+// One hub per hub dir: a second one would overwrite hub.json, and the first would run unseen.
+// A tray flag's command is still running here and exits on its own.
+if (!TRAY_FLAG) {
+  liveHub(HUB_DIR, HUB_TOKEN).then((running) => {
+    if (!running) {
+      watchStdin();
+      listenProxies();
+      listenWithFallback(app, HUB_PORT, onReady, '');
+      return;
+    }
+    console.log(`Claude Code Hub already runs for ${HUB_DIR} at ${accessUrl(running.port)}`);
+    if (process.argv.includes('--open')) {
+      import('open').then((m) => m.default(accessUrl(running.port))).finally(() => process.exit(0));
+    } else {
+      process.exit(0);
+    }
+  });
+}
 
 function accessUrl(port) {
   return `http://localhost:${port}/?token=${HUB_TOKEN}`;

@@ -57,7 +57,9 @@ The hub listens on its own port, 3540 by default, and on one port for each tool,
 
 The tool port is the tool's origin in the browser, so it keys the tool's `localStorage`. If a port is taken, the hub uses a random free port for that run, and the tool starts with empty `localStorage`.
 
-`GET /api/config` returns the tool URLs, the theme palettes, and the active config dir. `GET /api/update` returns the hub version and, when npm has a newer one, that version and its release notes link.
+`GET /api/config` returns the tool URLs, the theme palettes, and the active config dir. `GET /api/update` returns the hub version and, when npm has a newer one, that version and its release notes link. `POST /api/shutdown` stops the hub and its tools, as Ctrl+C does. Like every `/api/*` route, it needs the hub token.
+
+One hub runs for each hub folder. When the hub listens, it writes `hub.json` in the hub folder with its process id and port, and it deletes the file when it stops. A second hub that starts for the same folder finds the first one through this file, prints its URL and exits. The file counts only when a hub on that port accepts the folder's token, so a file left behind by a killed hub does not block a start.
 
 ## SDK
 
