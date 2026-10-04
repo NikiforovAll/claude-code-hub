@@ -10,15 +10,17 @@ The tray is opt-in. Without the flags on this page, the hub runs as before: no i
 ## Start the tray
 
 ```bash
-npx claude-code-hub --tray
+claude-code-hub --tray
 ```
+
+Run the tray from a [global install](/claude-code-hub/getting-started/#install-the-hub), so that an update and **Restart Hub** load the new version. See [Update the hub](#update-the-hub).
 
 The command starts the tray and exits. The tray then starts the hub. If a hub already runs from the same hub folder, the tray uses that hub and does not start a second one.
 
 To also start the tray when you log on:
 
 ```bash
-npx claude-code-hub --autostart
+claude-code-hub --autostart
 ```
 
 `--hub-dir` and `--port` carry over to the tray. For example, `--tray --hub-dir ~/.claude-hub-work --port 4540` runs a tray for a [second hub](/claude-code-hub/reference/configuration/#run-a-second-hub). Each hub folder gets its own tray and its own autostart entry.
@@ -55,7 +57,7 @@ An app belongs to the address you installed it from, for example `localhost:3540
 To choose the app yourself, for example for a second hub, give its id:
 
 ```bash
-npx claude-code-hub --tray --hub-dir ~/.claude-hub-work --port 4540 --app-id <id>
+claude-code-hub --tray --hub-dir ~/.claude-hub-work --port 4540 --app-id <id>
 ```
 
 With `--app-id`, the tray opens that app when the hub runs on the `--port` you gave. To find the id, right-click the app in the Start Menu, click **Open file location**, and open the properties of its shortcut. The **Target** box ends with `--app-id=<id>`. Use the app that you installed from the address of that hub.
@@ -63,7 +65,7 @@ With `--app-id`, the tray opens that app when the hub runs on the `--port` you g
 ## Check the state
 
 ```bash
-npx claude-code-hub --tray-status
+claude-code-hub --tray-status
 ```
 
 ```
@@ -86,7 +88,7 @@ Add `--hub-dir` to check the tray of another hub folder.
 Untick **Start with Windows** in the tray menu, or run:
 
 ```bash
-npx claude-code-hub --no-autostart
+claude-code-hub --no-autostart
 ```
 
 This removes the registry entry only. A tray that runs keeps running until you click **Quit**.
@@ -97,7 +99,7 @@ This removes the registry entry only. A tray that runs keeps running until you c
 
 | Install | After an update |
 | --- | --- |
-| `npm i -g claude-code-hub` | Click **Restart Hub**. The update replaces the files at the same path. |
+| `npm i -g claude-code-hub` | Run `npm i -g claude-code-hub@latest`, then click **Restart Hub**. The update replaces the files at the same path. |
 | `npx claude-code-hub` | Run `npx claude-code-hub@latest --tray`. Each npx version is in a different cache folder, so a restart keeps the old version. |
 | A git checkout | Click **Restart Hub**. |
 
@@ -113,7 +115,7 @@ If the hub files that the tray points to are gone, for example because npm clear
 
 The tray is a PowerShell script that `wscript.exe` starts with no window. `--autostart` adds a value under `HKCU\Software\Microsoft\Windows\CurrentVersion\Run`, so it needs no admin rights.
 
-When the hub listens, it writes `hub.json` with its process id and port, and it deletes the file when it stops. The tray reads this file to find the hub and open it on the right port, so the tray also works when the hub uses a fallback port. If you start the hub yourself while the tray runs it, for example with `npx claude-code-hub` and the same hub folder, the new hub prints the URL of the running one and exits.
+When the hub listens, it writes `hub.json` with its process id and port, and it deletes the file when it stops. The tray reads this file to find the hub and open it on the right port, so the tray also works when the hub uses a fallback port. If you start the hub yourself while the tray runs it, for example with `claude-code-hub` and the same hub folder, the new hub prints the URL of the running one and exits.
 
 **Stop Hub** asks the hub to stop through `POST /api/shutdown`, so the hub stops its tools first. If the hub does not stop in 15 seconds, the tray ends its processes.
 

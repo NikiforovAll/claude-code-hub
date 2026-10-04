@@ -52,7 +52,7 @@ The hub forwards `postMessage` messages only to and from the four tool origins, 
 By default the hub binds to `127.0.0.1`. To reach it from another machine, set the bind address and add the host name you will use:
 
 ```bash
-npx claude-code-hub --host 0.0.0.0 --allowed-hosts=my-box.local
+claude-code-hub --host 0.0.0.0 --allowed-hosts=my-box.local
 ```
 
 The hub prints a warning when it listens on a non-loopback address. The hub page still needs the token, but the four tools have no login, so anyone who can reach their ports can use them. Do this only on a network you trust. The embedded terminal is off in this mode.

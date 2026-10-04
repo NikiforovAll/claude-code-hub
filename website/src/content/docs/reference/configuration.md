@@ -6,8 +6,10 @@ description: The hub's command-line flags, environment variables, config file, a
 ## Flags
 
 ```bash
-npx claude-code-hub [flags]
+claude-code-hub [flags]
 ```
+
+The examples use the command of a [global install](/claude-code-hub/getting-started/#install-the-hub). With npx, put `npx` in front: `npx claude-code-hub [flags]`.
 
 | Flag | Default | Action |
 | --- | --- | --- |
@@ -35,8 +37,8 @@ A flag takes its value after a space or after `=`: `--port 4000` and `--port=400
 The hub ships a Claude Code plugin with the `hub-builder` skill. The skill helps an agent build on the hub: it explains how to extend the hub and make custom themes, and links each task to the page of these docs that covers it.
 
 ```bash
-npx claude-code-hub --install [--dir <config dir>]
-npx claude-code-hub --uninstall [--dir <config dir>]
+claude-code-hub --install [--dir <config dir>]
+claude-code-hub --uninstall [--dir <config dir>]
 ```
 
 | Flag | Default | Action |
@@ -64,7 +66,7 @@ If that port is busy, the hub uses a random free port for this run and logs `por
 Every hub reads its config file and token from the same folder, `~/.claude-hub`. To run a second hub with its own config dirs, tools and ports, give it its own folder with `--hub-dir` or `CLAUDE_HUB_DIR`:
 
 ```bash
-npx claude-code-hub --hub-dir ~/.claude-hub-work --port 4540
+claude-code-hub --hub-dir ~/.claude-hub-work --port 4540
 ```
 
 The hub creates the folder, the config file and a new token on the first run. Set a `port` for each tool in that config file, or the second hub's tools fall back to random ports while the first hub holds the defaults.

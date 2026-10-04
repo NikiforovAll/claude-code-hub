@@ -13,10 +13,20 @@ Claude Code Hub runs four Claude Code tools on your machine and shows them in on
 - Node.js 18 or later.
 - Claude Code, installed. The tools read its files from your Claude config dir, `~/.claude` by default.
 
+## Install the hub
+
+```bash
+npm i -g claude-code-hub
+```
+
+To update the hub, run `npm i -g claude-code-hub@latest`. When a new version is on npm, the hub page shows a notice.
+
+To try the hub without installing it, use `npx claude-code-hub --open`. Each npx version runs from a different cache folder, so for daily use install the hub.
+
 ## Start the hub
 
 ```bash
-npx claude-code-hub --open
+claude-code-hub --open
 ```
 
 The hub starts the four tools as child processes, then prints a banner:
@@ -53,6 +63,19 @@ The hub page is a progressive web app. In Chrome or Edge, use the install button
 
 The app window opens the address you installed it from, so keep the hub on the same port.
 
+## Recommended on Windows
+
+On Windows, we recommend that you run the hub as an app that starts when you log on:
+
+1. [Install the hub as an app](#install-as-an-app).
+2. Start the hub from the tray, and start the tray when you log on:
+
+   ```bash
+   claude-code-hub --autostart
+   ```
+
+A tray icon then runs the hub in the background, with no terminal window. Click the icon to open the hub in the installed app. Right-click it to stop, start or restart the hub. See [Run the hub from the tray](/claude-code-hub/guides/tray/).
+
 ## Turn on live agent activity (one time)
 
 Kanban shows tasks and sessions without any setup. For the agent log, live subagents, waiting-for-you badges, and context window use, install its hooks:
@@ -68,7 +91,7 @@ The hooks and the status line are installed in one Claude config dir. If you use
 The hub ships a Claude Code plugin with the `hub-builder` skill. With the skill, an agent can patch or fork a tool, write a new app for the hub, make a custom color theme, or fix a hub problem.
 
 ```bash
-npx claude-code-hub --install
+claude-code-hub --install
 ```
 
 See [Install the hub plugin](/claude-code-hub/reference/configuration/#install-the-hub-plugin) for the config dir it goes into and when to run it again.

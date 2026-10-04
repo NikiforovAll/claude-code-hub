@@ -12,7 +12,8 @@ import { family, url } from '../kit/family';
 
 const GITHUB = 'https://github.com/NikiforovAll/claude-code-hub';
 const NPM = 'https://www.npmjs.com/package/claude-code-hub';
-const INSTALL = 'npx claude-code-hub --open';
+const INSTALL = 'npm i -g claude-code-hub';
+const START = 'claude-code-hub --open';
 
 const run = [
   {
@@ -72,8 +73,13 @@ const drive = [
 
 const setup = [
   {
-    title: 'Start the hub',
+    title: 'Install the hub',
     cmd: INSTALL,
+    body: 'Run it again with @latest to update. The hub page tells you when a new version is out.',
+  },
+  {
+    title: 'Start the hub',
+    cmd: START,
     body: 'It starts the four tools and opens the browser. To get a window with no browser UI, install the page as an app.',
   },
   {
@@ -83,8 +89,20 @@ const setup = [
   },
   {
     title: 'Install the hub plugin',
-    cmd: 'npx claude-code-hub --install',
+    cmd: 'claude-code-hub --install',
     body: 'Optional. The plugin adds the hub-builder skill to Claude Code, so an agent can extend the hub, make a color theme, or fix a hub problem. Run it once for each config dir.',
+  },
+];
+
+const windows = [
+  {
+    title: 'Install the hub as an app',
+    body: 'In Chrome or Edge, click the install button in the address bar. The hub opens in its own window, with no browser UI.',
+  },
+  {
+    title: 'Start it with Windows',
+    cmd: 'claude-code-hub --autostart',
+    body: 'A tray icon runs the hub in the background from logon. Click it to open the app.',
   },
 ];
 ---
@@ -114,7 +132,7 @@ const setup = [
       <section class="hero">
         <h1>Your own command center for Claude Code.</h1>
         <p class="lede">
-          Run your sessions, watch your agents, and when a tool is missing, ask Claude to build it. One command starts
+          Run your sessions, watch your agents, and when a tool is missing, ask Claude to build it. One command installs
           it on your machine.
         </p>
         <div class="actions">
@@ -157,7 +175,7 @@ const setup = [
             and keep the session in the same window. <a href="https://nikiforovall.blog/claude-code-kanban/">Read the Kanban docs</a>.
           </p>
           <p class="aside">
-            The live agent log, subagents, and waiting-for-you badges need the Kanban hooks, step 2 of the setup below.
+            The live agent log, subagents, and waiting-for-you badges need the Kanban hooks, step 3 of the setup below.
           </p>
         </div>
         <div class="items">
@@ -183,7 +201,7 @@ const setup = [
             so the agent picks a patch, a fork or a new app, and reads the docs page for it.
           </p>
           <p class="aside">
-            Step 3 of the setup below adds the skill. Then type <code>/hub-builder</code> and your request.
+            Step 4 of the setup below adds the skill. Then type <code>/hub-builder</code> and your request.
           </p>
         </div>
         <HubBuilderDemo />
@@ -255,6 +273,23 @@ const setup = [
             ))
           }
         </ol>
+      </section>
+
+      <section class="setup windows" aria-labelledby="windows">
+        <h2 id="windows">Recommended on Windows</h2>
+        <p class="lede">Run the hub as an app that starts when you log on, with no terminal window.</p>
+        <ol>
+          {
+            windows.map((s) => (
+              <li>
+                <h3>{s.title}</h3>
+                {s.cmd && <code class="step-cmd">{s.cmd}</code>}
+                {s.body && <p><Keys text={s.body} /></p>}
+              </li>
+            ))
+          }
+        </ol>
+        <a class="button" href={url('guides/tray/')}>Read the tray guide</a>
       </section>
     </main>
 
@@ -528,6 +563,9 @@ const setup = [
 
   .setup {
     margin-block: clamp(5rem, 10vw, 9rem) clamp(4rem, 8vw, 6rem);
+  }
+  .setup.windows {
+    margin-top: 0;
   }
   .setup ol {
     margin: 2rem 0;
