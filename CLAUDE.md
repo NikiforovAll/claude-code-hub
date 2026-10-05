@@ -27,6 +27,10 @@ CLI flags: `--port <n>`, `--<id>-port <n>` (`kanban`, `marketplace`, `cost`, `me
 
 **App ports.** `--<id>-port`, else `port` in the app's `apps` entry in `config.json`, else the manifest's `run.defaultPort`. A busy port falls back to a random one for that run. Nothing saves it: the port is the app's origin, so the app has empty `localStorage` for that run.
 
+## Performance
+
+Every feature, in the hub or a sub-app, states its performance impact before you build it: what work it adds, where that work runs (startup, a hot path such as a render, a poll, the session list or a keystroke, or only on demand), and how often. If the change can cause a delay the user notices, push back and propose a cheaper design before you write it. Report the impact with the change.
+
 ## Architecture
 
 **Apps.** `lib/apps.js` lists the four built-in apps (id, submodule dir, npm package) in default tab order; nothing else in `server.js` names them all. Name, icon, entry, default port, loading verbs, actions and capabilities come from the app's `hub-app.json` (in the submodule, else the npm package). An app whose manifest is missing or fails validation is logged and skipped. `test/apps.test.js` validates each app's manifest, so the release run checks the pinned packages. **Capabilities.** `provides.projects.path` and `provides.terminal.liveWork` name the provider of the project list and the embedded terminal; the first enabled app in tab order that declares one wins (today Kanban). The terminal env, the terminal token, pool pinning and `/api/projects` go to that app. The hand-edited `apps` list in `~/.claude-hub/config.json` (`[{id, enabled, port, path}]`) reorders them and turns them off: a disabled app is not spawned and gets no proxy port or tab. `path` (relative to the hub dir) runs the app from that folder: a fork in place of a built-in id, or a new app under a new id; its `hub-app.json` id must match. When two enabled apps declare the same capability, action or port, the hub logs it at startup; the first in tab order wins. With no enabled provider, the terminal is off and `/api/projects` answers 503 at once.
