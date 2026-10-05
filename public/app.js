@@ -236,7 +236,6 @@ async function init() {
   bindPalette();
   registerSW();
   bindErrorToast();
-  bindSlowToast();
   showUpdateToast();
 }
 
@@ -293,42 +292,6 @@ function hideToast(toast) {
   }, 200);
 }
 
-// The stalls belong to the port, so a dismissal holds while the app stays on it.
-const SLOW_POLL_MS = 30_000;
-const slowDismissed = new Map();
-const slowToast = { id: null, port: 0, confirm: false, busy: false };
-
-function hideSlowToast() {
-  slowToast.id = null;
-  hideToast(document.getElementById('slow-toast'));
-}
-
-function renderSlowToast(app) {
-  const restart = document.getElementById('slow-restart');
-  document.getElementById('slow-title').textContent = `${app.name} answers slowly`;
-  document.getElementById('slow-detail').textContent =
-    `Its port delays requests by up to ${(app.worstMs / 1000).toFixed(1)} s. A restart moves it to a new port.`;
-  restart.textContent = 'Restart';
-  restart.disabled = false;
-  slowToast.id = app.id;
-  slowToast.port = app.port;
-  slowToast.confirm = false;
-  showToast(document.getElementById('slow-toast'));
-}
-
-async function pollSlowApps() {
-  if (document.hidden || slowToast.busy) return;
-  let slow;
-  try {
-    ({ slow } = await sendJson('GET', '/api/apps/health'));
-  } catch {
-    return;
-  }
-  if (slowToast.id && !slow.some((a) => a.id === slowToast.id)) hideSlowToast();
-  const next = slow.find((a) => slowDismissed.get(a.id) !== a.port);
-  if (next && next.id !== slowToast.id) renderSlowToast(next);
-}
-
 // Null on success. A 409 with live terminals asks for force: true on the next call.
 async function requestRestart(id, force) {
   try {
@@ -341,37 +304,6 @@ async function requestRestart(id, force) {
     const them = n === 1 ? 'it' : 'them';
     return { terminals: n, message: `${name} has ${n} live terminal${n === 1 ? '' : 's'}. A restart ends ${them}.` };
   }
-}
-
-async function restartSlowApp() {
-  const { id } = slowToast;
-  if (!id) return;
-  const restart = document.getElementById('slow-restart');
-  slowToast.busy = true;
-  restart.disabled = true;
-  restart.textContent = 'Restarting…';
-  const failed = await requestRestart(id, slowToast.confirm);
-  slowToast.busy = false;
-  if (!failed) {
-    hideSlowToast();
-    replaceIframe(id);
-    return;
-  }
-  slowToast.confirm = !!failed.terminals;
-  document.getElementById('slow-detail').textContent = failed.message;
-  restart.textContent = failed.terminals ? 'Restart anyway' : 'Restart';
-  restart.disabled = false;
-}
-
-function bindSlowToast() {
-  document.getElementById('slow-restart').addEventListener('click', restartSlowApp);
-  document.getElementById('slow-close').addEventListener('click', () => {
-    if (slowToast.id) slowDismissed.set(slowToast.id, slowToast.port);
-    hideSlowToast();
-  });
-  setInterval(pollSlowApps, SLOW_POLL_MS);
-  document.addEventListener('visibilitychange', pollSlowApps);
-  pollSlowApps();
 }
 
 const ERROR_TOAST_MS = 8_000;
@@ -1048,7 +980,12 @@ const PALETTE_MODES = {
     fillRow(li, row, q) {
       li.append(appIcon(row.app), markedSpan('name', row.app.name, q));
       const s = palette.appStats?.[row.id];
-      const stats = el('span', 'stats', s ? `${Math.round(s.rss / 1048576)} MB · ${s.cpu}%` : '');
+      if (s?.slowMs) {
+        const badge = el('span', 'slow', 'slow port');
+        badge.title = `Its port delays requests by up to ${(s.slowMs / 1000).toFixed(1)} s. Restart (Ctrl+R) moves it to a new port.`;
+        li.append(badge);
+      }
+      const stats = el('span', 'stats', s?.rss ? `${Math.round(s.rss / 1048576)} MB · ${s.cpu}%` : '');
       stats.title = 'Memory and CPU of the app process. Child processes are not counted. 100% is one core.';
       li.append(stats);
       const key = row.id === activeApp ? 'active' : row.index < 9 ? `Alt+${row.index + 1}` : '';

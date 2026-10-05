@@ -953,16 +953,6 @@ app.post('/api/config-dirs/activate', async (req, res) => {
   res.json({ apps: appsConfig() });
 });
 
-const STATS_TIMEOUT_MS = 1000;
-app.get('/api/apps/stats', async (_req, res) => {
-  res.setHeader('Cache-Control', 'no-store');
-  const pool = activePool();
-  const entries = await Promise.all(
-    ENABLED_APPS.map(async (a) => [a.id, await stats(pool?.children.get(a.id), STATS_TIMEOUT_MS)]),
-  );
-  res.json(Object.fromEntries(entries));
-});
-
 // The stalls hit a few percent of requests, so each round sends several probes per app.
 const HEALTH_INTERVAL_MS = 30_000;
 const HEALTH_PROBES = 5;
@@ -1000,15 +990,18 @@ async function checkPortHealth() {
   }
 }
 
-app.get('/api/apps/health', (_req, res) => {
+const STATS_TIMEOUT_MS = 1000;
+app.get('/api/apps/stats', async (_req, res) => {
   res.setHeader('Cache-Control', 'no-store');
   const pool = activePool();
-  const slow = [];
-  for (const a of ENABLED_APPS) {
-    const f = pool?.children.has(a.id) && portHealth.flagged(pool.children.get(a.id));
-    if (f) slow.push({ id: a.id, name: a.name, port: pool.ports[a.id], worstMs: f.worstMs });
-  }
-  res.json({ slow });
+  const entries = await Promise.all(
+    ENABLED_APPS.map(async (a) => {
+      const child = pool?.children.get(a.id);
+      const slowMs = (child && portHealth.flagged(child)?.worstMs) ?? null;
+      return [a.id, { ...(await stats(child, STATS_TIMEOUT_MS)), slowMs }];
+    }),
+  );
+  res.json(Object.fromEntries(entries));
 });
 
 // Restarting the terminal provider ends its live terminals, so that takes force: true.
