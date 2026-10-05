@@ -18,10 +18,10 @@ SRC="$ROOT/scripts/security-lib"
 # given package does not ship, so every package can run the same one.
 TARGETS=(
   ".:lib/contain.js,lib/net-guard.js"
-  "cck:lib/open-editor.js,lib/contain.js,lib/net-guard.js,test/security.test.js"
-  "marketplace:lib/open-editor.js,lib/contain.js,lib/net-guard.js,test/security.test.js"
-  "memory:lib/open-editor.js,lib/net-guard.js,test/security.test.js"
-  "cost:lib/net-guard.js,test/security.test.js"
+  "cck:lib/open-editor.js,lib/contain.js,lib/net-guard.js,test/security.test.js,test/escaping-scan.js,test/escaping.test.js"
+  "marketplace:lib/open-editor.js,lib/contain.js,lib/net-guard.js,test/security.test.js,test/escaping-scan.js,test/escaping.test.js"
+  "memory:lib/open-editor.js,lib/net-guard.js,test/security.test.js,test/escaping-scan.js,test/escaping.test.js"
+  "cost:lib/net-guard.js,test/security.test.js,test/escaping-scan.js,test/escaping.test.js"
 )
 
 CHECK=0
