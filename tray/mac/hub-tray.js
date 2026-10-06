@@ -58,7 +58,9 @@ function log(msg) {
     const h = appendHandle(TRAY_LOG);
     h.writeData($(`${new Date().toISOString()} ${msg}\n`).dataUsingEncoding($.NSUTF8StringEncoding));
     h.closeFile;
-  } catch (e) {}
+  } catch (e) {
+    console.log(`${msg} (tray.log: ${e})`);
+  }
 }
 
 function guard(name, fn) {
