@@ -97,7 +97,7 @@ The app must allow framing by the hub origin: it must not send an `X-Frame-Optio
 
 ## 3. SDK
 
-The hub ships the SDK and hands it to each app it spawns, so the app runs the hub's version. The SDK has three files in [`packages/claude-hub-sdk/src`](https://github.com/NikiforovAll/claude-code-hub/tree/master/packages/claude-hub-sdk/src):
+The hub ships the SDK and hands it to each app it spawns, so the app runs the hub's version. The SDK has three files in [`packages/claude-hub-sdk/src`](https://github.com/NikiforovAll/claude-code-hub/tree/main/packages/claude-hub-sdk/src):
 
 | File | Runs in | Does |
 |---|---|---|

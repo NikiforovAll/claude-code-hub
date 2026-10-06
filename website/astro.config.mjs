@@ -16,7 +16,7 @@ export default defineConfig({
 				{ tag: 'meta', attrs: { name: 'twitter:image', content: 'https://nikiforovall.blog/claude-code-hub/og.png' } },
 			],
 			social: [{ icon: 'github', label: 'GitHub', href: 'https://github.com/NikiforovAll/claude-code-hub' }],
-			editLink: { baseUrl: 'https://github.com/NikiforovAll/claude-code-hub/edit/master/website/' },
+			editLink: { baseUrl: 'https://github.com/NikiforovAll/claude-code-hub/edit/main/website/' },
 			customCss: ['./src/kit/kit.css'],
 			components: {
 				ThemeProvider: './src/components/ThemeProvider.astro',

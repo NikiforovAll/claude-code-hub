@@ -23,4 +23,4 @@ Run from this folder. Node 22.12 or later.
 
 ## Deploy
 
-`.github/workflows/pages.yml` builds and deploys the site to GitHub Pages. `release.yml` calls it after each stable release publishes to npm. To deploy docs without a release, run it by hand from `master` (`gh workflow run pages.yml`).
+`.github/workflows/pages.yml` builds and deploys the site to GitHub Pages. `release.yml` calls it after each stable release publishes to npm. To deploy docs without a release, run it by hand from `main` (`gh workflow run pages.yml`).
