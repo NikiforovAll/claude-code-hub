@@ -2,8 +2,6 @@ name: Tray (macOS)
 
 on:
   workflow_dispatch:
-  push:
-    branches: [feat/macos-tray]
 
 permissions:
   contents: read
