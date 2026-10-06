@@ -1,6 +1,6 @@
 ---
 name: hub-builder
-description: Build on and extend Claude Code Hub. Use when the user wants to patch or fork a built-in tool (Kanban, Cost, Marketplace, Memory), write a new app for a hub tab, connect apps through topics and actions, make a custom color theme, configure the hub (flags, config dirs, token), or fix a hub problem.
+description: Build on and extend Claude Code Hub. Use when the user wants to patch or fork a built-in tool (Kanban, Cost, Marketplace, Memory), write a new app for a hub tab, connect apps through topics and actions, make a custom color theme, configure the hub (flags, config dirs, token, hub keyboard shortcuts), or fix a hub problem.
 ---
 
 # Hub builder
@@ -23,7 +23,8 @@ The files under `references/` ship with the installed hub, so they match its ver
 | Flags, environment variables, `config.json`, the files the hub writes | `reference/configuration/` |
 | Switch between Claude config dirs | `guides/config-dirs/` |
 | The hub token, or exposing the hub to a network | `reference/security/` |
-| Keys the hub binds, keys the tools keep, and changing the hub's keys in `config.json` `keys` | `reference/shortcuts/` |
+| Rebind or turn off a hub key (`keys` in `config.json`) | [`references/keys.md`](references/keys.md) |
+| Look up a key: the hub's, a palette's, or a tool's own | `reference/shortcuts/` |
 | The embedded terminal in Kanban | `guides/terminal/` |
 | The project palette | `guides/projects/` |
 | Something is broken | `reference/troubleshooting/` |

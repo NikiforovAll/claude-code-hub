@@ -14,7 +14,7 @@ Start with a patch. Move to a fork when the patch grows or breaks on each upgrad
 
 ## The apps entry
 
-`<hub-dir>/config.json` (`--hub-dir`, else `CLAUDE_HUB_DIR`, else `~/.claude-hub`) has `apps: [{id, path?, enabled?, port?}]`. Page: `extensibility/reference/apps-entry/`. The other keys of the file (`configDirs`, `activeConfigDir`, `terminal`, `keys`) are in `reference/configuration/#the-config-file`; keep them as they are.
+`<hub-dir>/config.json` (`--hub-dir`, else `CLAUDE_HUB_DIR`, else `~/.claude-hub`) has `apps: [{id, path?, enabled?, port?}]`. Page: `extensibility/reference/apps-entry/`. The other keys of the file (`configDirs`, `activeConfigDir`, `terminal`, `keys`) are in `reference/configuration/#the-config-file`, and `keys` in [`keys.md`](keys.md); keep them as they are.
 
 To configure an extension:
 
