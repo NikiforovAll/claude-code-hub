@@ -1,6 +1,8 @@
 let apps = {};
-// bindings() builds it from apps; setApps clears it.
+// bindings() builds it from apps and userKeys; setApps clears it.
 let keymap = null;
+// config.json `keys`, {actionId: combo | null}, from /api/config.
+let userKeys = {};
 const { comboOf } = ClaudeHubKeys;
 let activeApp = null;
 // The app launcher's cursor starts here, so Ctrl+Alt+A then Enter goes back to the last tab.
@@ -226,6 +228,7 @@ async function init() {
   showLoading();
   const res = await fetch('/api/config');
   const config = await res.json();
+  userKeys = config.keys ?? {};
   setApps(config.apps);
   defaultConfigDir = config.defaultConfigDir ?? null;
   activeConfigDir = config.activeConfigDir ?? null;
@@ -603,8 +606,9 @@ function handleForwardedKey(d) {
   bindings()[comboOf(e)]?.run();
 }
 
-// The hub's actions and their default combos. hub.appByNumber is a pattern: one combo per tab,
-// for the first nine. inPalette: the binding still fires while the palette is open.
+// The hub's actions and their default combos. hub.appByNumber is a pattern: {n} is the tab number,
+// for the first nine. inPalette: the binding still fires while the palette is open. The ids are the
+// keys of config.json `keys`, listed again in lib/keymap.js.
 function hubActions() {
   return [
     { id: 'hub.projectPicker', combo: 'ctrl+alt+p', run: () => togglePalette('project'), inPalette: true },
@@ -612,25 +616,35 @@ function hubActions() {
     { id: 'hub.appLauncher', combo: 'ctrl+alt+a', run: () => togglePalette('app'), inPalette: true },
     { id: 'hub.prevApp', combo: 'ctrl+alt+ArrowLeft', run: () => cycleTab(-1) },
     { id: 'hub.nextApp', combo: 'ctrl+alt+ArrowRight', run: () => cycleTab(1) },
-    { id: 'hub.appByNumber', combo: (i) => tabCombo(i), run: (i) => switchTab(Object.keys(apps)[i]), count: 9 },
+    {
+      id: 'hub.appByNumber',
+      combo: `${IS_MAC ? 'ctrl+alt' : 'alt'}+{n}`,
+      run: (i) => switchTab(Object.keys(apps)[i]),
+      count: 9,
+    },
   ];
 }
 
 // The one keymap, combo → binding. Its combos are what welcome.forward lists for the apps.
-// Built on first use after setApps, so a key press only looks a combo up.
+// Built on first use after setApps, so a key press only looks a combo up. userKeys comes checked
+// from the server: null unbinds an action, and a combo the user sets is taken from the action
+// that has it by default.
 function bindings() {
   if (keymap) return keymap;
-  keymap = {};
   const tabs = Object.keys(apps).length;
-  for (const action of hubActions()) {
-    if (typeof action.combo === 'string') {
-      keymap[action.combo] = action;
-      continue;
-    }
-    for (let i = 0; i < Math.min(action.count, tabs); i++) {
-      keymap[action.combo(i)] = { ...action, combo: action.combo(i), run: () => action.run(i) };
-    }
-  }
+  const own = (b) => Object.hasOwn(userKeys, b.id);
+  const expand = (action) => {
+    const combo = own(action) ? userKeys[action.id] : action.combo;
+    if (!combo) return [];
+    if (!action.count) return [[combo, { ...action, combo }]];
+    return Array.from({ length: Math.min(action.count, tabs) }, (_, i) => {
+      const c = combo.replace('{n}', i + 1);
+      return [c, { ...action, combo: c, index: i, run: () => action.run(i) }];
+    });
+  };
+  const entries = hubActions().flatMap(expand);
+  const userCombos = new Set(entries.filter(([, b]) => own(b)).map(([c]) => c));
+  keymap = Object.fromEntries(entries.filter(([c, b]) => own(b) || !userCombos.has(c)));
   return keymap;
 }
 
@@ -639,8 +653,8 @@ function setApps(list) {
   keymap = null;
 }
 
-function tabCombo(i) {
-  return `${IS_MAC ? 'ctrl+alt' : 'alt'}+${i + 1}`;
+function appNumberCombo(i) {
+  return Object.values(bindings()).find((b) => b.id === 'hub.appByNumber' && b.index === i)?.combo;
 }
 
 function comboLabel(combo) {
@@ -1004,7 +1018,8 @@ const PALETTE_MODES = {
       const stats = el('span', 'stats', s?.rss ? `${Math.round(s.rss / 1048576)} MB · ${s.cpu}%` : '');
       stats.title = 'Memory and CPU of the app process. Child processes are not counted. 100% is one core.';
       li.append(stats);
-      const key = row.id === activeApp ? 'active' : row.index < 9 ? comboLabel(tabCombo(row.index)) : '';
+      const combo = appNumberCombo(row.index);
+      const key = row.id === activeApp ? 'active' : combo ? comboLabel(combo) : '';
       li.append(el('span', 'age', key));
       li.append(rowButton('palette-restart', '↻', 'r', 'Restart the app (Ctrl+R)', `Restart ${row.app.name}`));
     },

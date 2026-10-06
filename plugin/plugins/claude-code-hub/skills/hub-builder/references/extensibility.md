@@ -14,7 +14,7 @@ Start with a patch. Move to a fork when the patch grows or breaks on each upgrad
 
 ## The apps entry
 
-`<hub-dir>/config.json` (`--hub-dir`, else `CLAUDE_HUB_DIR`, else `~/.claude-hub`) has `apps: [{id, path?, enabled?, port?}]`. Page: `extensibility/reference/apps-entry/`. The other keys of the file (`configDirs`, `activeConfigDir`, `terminal`) are in `reference/configuration/#the-config-file`; keep them as they are.
+`<hub-dir>/config.json` (`--hub-dir`, else `CLAUDE_HUB_DIR`, else `~/.claude-hub`) has `apps: [{id, path?, enabled?, port?}]`. Page: `extensibility/reference/apps-entry/`. The other keys of the file (`configDirs`, `activeConfigDir`, `terminal`, `keys`) are in `reference/configuration/#the-config-file`; keep them as they are.
 
 To configure an extension:
 
@@ -68,7 +68,7 @@ The npm packages of the built-in tools do not ship `hub-app.json`. A patch or fo
 
 The page loads `/vendor/claude-hub-sdk.js` as the first element in `<body>`, a classic script, and calls `ClaudeHub.connect()`. Under the hub, `mount()` serves the hub's client at that URL, so the app always runs the hub's SDK. Alone, the app serves its own copy of the stub (`packages/claude-hub-sdk/src/stub.js`, copied by `npm run sdk:sync -- <app folder>` in a hub clone), which has the same API and does nothing. Page: `extensibility/reference/sdk/`.
 
-The SDK writes the hub's color variables (`--accent`, `--bg-surface`, …) on `document.body`, so the app's CSS reads them and follows every hub theme, the user's own themes too. `bindTheme` keeps light/dark and the color theme in step. `onActive` tells a hidden tab to pause polling. The SDK forwards the hub's keys by itself; an element that eats keys first, such as a terminal, asks `forwards(e)`. An app that uses a `Ctrl+Alt` combo of its own lists it in `keys.keeps` in `hub-app.json`, for example `{"keeps": ["ctrl+alt+n"]}`, so the hub does not bind it. Page: `extensibility/reference/manifest/#kept-keys`.
+The SDK writes the hub's color variables (`--accent`, `--bg-surface`, …) on `document.body`, so the app's CSS reads them and follows every hub theme, the user's own themes too. `bindTheme` keeps light/dark and the color theme in step. `onActive` tells a hidden tab to pause polling. The SDK forwards the hub's keys by itself; an element that eats keys first, such as a terminal, asks `forwards(e)`. An app that uses a `Ctrl+Alt` combo of its own lists it in `keys.keeps` in `hub-app.json`, for example `{"keeps": ["ctrl+alt+n"]}`, so the hub does not bind it, and the user cannot give it to a hub action in `config.json` `keys`. The user can change the hub's own keys there, so an app takes them from `welcome.forward`, never from a fixed list. Page: `extensibility/reference/manifest/#kept-keys`.
 
 ## Connect to other tools
 

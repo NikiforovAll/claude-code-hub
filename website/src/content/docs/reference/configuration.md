@@ -100,13 +100,15 @@ The hub keeps its settings in `config.json` in the hub folder, `~/.claude-hub` b
     { "id": "kanban" },
     { "id": "cost", "port": 4543 },
     { "id": "marketplace", "enabled": false }
-  ]
+  ],
+  "keys": { "hub.projectPicker": "ctrl+alt+o" }
 }
 ```
 
 - `configDirs` and `activeConfigDir` are the config-dir list and the active dir. The config-dir palette writes them. You do not need to edit them.
 - `terminal` is for you to edit. `"enabled": false` turns off the embedded terminal. The hub gives the whole block to Kanban as its terminal config, so you can also set keys like `shell`, `fontFamily`, `maxSessions` (most terminals open at the same time, 30 by default) and `restore` (on by default: resume the terminals that were open when the hub last stopped; `false` turns it off) here. See [Terminal config](https://nikiforovall.blog/claude-code-kanban/reference/configuration/#terminal-config) in the Kanban docs. The hub keeps this block when it writes the file.
 - `apps` is for you to edit. It sets which tools run and the tab order. The ids are `kanban`, `marketplace`, `cost` and `memory`. The tools you list come first, in list order, and the tools you do not list follow in the default order. A tool with `"enabled": false` does not start, gets no tab and no port, and links from other tools to it do nothing. With Kanban off, the embedded terminal is off and the project palette has no project list. <kbd>Alt</kbd>+<kbd>1</kbd> to <kbd>Alt</kbd>+<kbd>4</kbd> follow the tab order. `port` sets the tool's port, a whole number from 1 to 65535 (see [Ports](#ports)). The hub logs and ignores a value that is not valid, such as `"4543"` in quotes. The hub keeps this list when it writes the file, and does not start when every tool is off.
+- `keys` is for you to edit. It changes the hub's keys. See [Change the keys](/claude-code-hub/reference/shortcuts/#change-the-keys). The hub keeps this block when it writes the file.
 
 Restart the hub after you edit the file.
 
@@ -116,7 +118,7 @@ The paths are for the default hub folder. With `--hub-dir` or `CLAUDE_HUB_DIR`, 
 
 | File | Content |
 | --- | --- |
-| `~/.claude-hub/config.json` | The config-dir list, the active dir, and your `terminal` block and `apps` list |
+| `~/.claude-hub/config.json` | The config-dir list, the active dir, and your `terminal` block, `apps` list and `keys` |
 | `~/.claude-hub/token` | The [hub token](/claude-code-hub/reference/security/#the-hub-token) |
 | `~/.claude-hub/plugin/` | The copy of the [hub plugin](#install-the-hub-plugin) that `--install` writes |
 | `~/.claude-hub/hub.json` | The process id and port of the running hub. A second hub for the same hub dir reads it, prints the running hub's URL and exits. |

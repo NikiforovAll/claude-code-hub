@@ -1,6 +1,7 @@
 const { describe, it } = require('node:test');
 const assert = require('node:assert/strict');
-const { MATRIX, loadHubKeys, eventOf, payloadOf } = require('./helpers/hub-keys');
+const { MATRIX, ROW_SETS, loadHubKeys, eventOf, payloadOf } = require('./helpers/hub-keys');
+const { HUB_ACTIONS } = require('../lib/keymap');
 
 const PALETTE_AND_ARROWS = ['ctrl+alt+p', 'ctrl+alt+w', 'ctrl+alt+a', 'ctrl+alt+ArrowLeft', 'ctrl+alt+ArrowRight'];
 
@@ -27,7 +28,7 @@ describe('hub keymap', () => {
     for (const [platform, labels] of [['win', ['Alt+1', 'Alt+9']], ['mac', ['⌃⌥1', '⌃⌥9']]]) {
       const hub = loadHubKeys({ apps: 9, platform });
       const combos = Object.keys(hub.bindings()).slice(-9);
-      assert.deepEqual(combos, Array.from({ length: 9 }, (_, i) => hub.tabCombo(i)), platform);
+      assert.deepEqual(combos, Array.from({ length: 9 }, (_, i) => hub.appNumberCombo(i)), platform);
       assert.deepEqual([hub.comboLabel(combos[0]), hub.comboLabel(combos[8])], labels, platform);
     }
   });
@@ -62,14 +63,55 @@ describe('hub keymap', () => {
   });
 });
 
-describe('key matrix', () => {
-  const hubs = { win: loadHubKeys(), mac: loadHubKeys({ platform: 'mac' }) };
-  for (const row of MATRIX.rows) {
-    it(row.name, { todo: row.todo }, () => {
-      const hub = hubs[row.platform];
-      assert.equal(hub.actionOf(eventOf(row)), row.expect, 'press on the hub page');
-      // The SDK never forwards an AltGr character; the SDK's own matrix test covers that path.
-      if (!row.altGraph) assert.equal(hub.actionOfForwarded(payloadOf(row)), row.expect, 'press forwarded from an app');
-    });
-  }
+describe('user keymap', () => {
+  it('forwards a user combo and drops the default it replaces', () => {
+    const hub = loadHubKeys({ apps: 2, keys: { 'hub.projectPicker': 'ctrl+alt+o', 'hub.appByNumber': 'ctrl+{n}' } });
+    assert.deepEqual(Object.keys(hub.bindings()), [
+      'ctrl+alt+o',
+      'ctrl+alt+w',
+      'ctrl+alt+a',
+      'ctrl+alt+ArrowLeft',
+      'ctrl+alt+ArrowRight',
+      'ctrl+1',
+      'ctrl+2',
+    ]);
+    assert.equal(hub.bindings()['ctrl+alt+o'].inPalette, true);
+  });
+
+  it('takes a combo from the action that has it by default', () => {
+    const map = loadHubKeys({ keys: { 'hub.nextApp': 'ctrl+alt+p' } }).bindings();
+    assert.equal(map['ctrl+alt+p'].id, 'hub.nextApp');
+    assert.equal(Object.values(map).some((b) => b.id === 'hub.projectPicker'), false);
+    assert.equal(map['ctrl+alt+ArrowRight'], undefined);
+  });
+
+  it('unbinds an action set to null', () => {
+    const map = loadHubKeys({ keys: { 'hub.appByNumber': null, 'hub.appLauncher': null } }).bindings();
+    assert.deepEqual(Object.keys(map), PALETTE_AND_ARROWS.filter((c) => c !== 'ctrl+alt+a'));
+  });
+
+  it('labels each tab number in the launcher with its user combo', () => {
+    const hub = loadHubKeys({ keys: { 'hub.appByNumber': 'ctrl+shift+{n}' } });
+    assert.equal(hub.comboLabel(hub.appNumberCombo(1)), 'Ctrl+Shift+2');
+    assert.equal(hub.appNumberCombo(4), undefined);
+    assert.equal(loadHubKeys({ keys: { 'hub.appByNumber': null } }).appNumberCombo(0), undefined);
+  });
+
+  it('lists the same action ids as lib/keymap.js', () => {
+    assert.deepEqual(Array.from(loadHubKeys().hubActions(), (a) => a.id), HUB_ACTIONS);
+  });
 });
+
+for (const set of ROW_SETS) {
+  describe(set.rows === MATRIX.rows ? 'key matrix' : 'key matrix, remapped', () => {
+    const hubs = { win: loadHubKeys({ keys: set.keys }), mac: loadHubKeys({ platform: 'mac', keys: set.keys }) };
+    for (const row of set.rows) {
+      it(row.name, { todo: row.todo }, () => {
+        const hub = hubs[row.platform];
+        assert.equal(hub.actionOf(eventOf(row)), row.expect, 'press on the hub page');
+        // The SDK never forwards an AltGr character; the SDK's own matrix test covers that path.
+        if (!row.altGraph) assert.equal(hub.actionOfForwarded(payloadOf(row)), row.expect, 'press forwarded from an app');
+      });
+    }
+  });
+}

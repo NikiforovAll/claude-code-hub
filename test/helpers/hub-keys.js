@@ -4,7 +4,7 @@ const vm = require('node:vm');
 
 const SRC = fs.readFileSync(path.join(__dirname, '../../public/app.js'), 'utf8');
 const MATRIX = JSON.parse(fs.readFileSync(path.join(__dirname, '../fixtures/key-matrix.json'), 'utf8'));
-const FUNCTIONS = ['hubActions', 'bindings', 'setApps', 'tabCombo', 'comboLabel', 'handleForwardedKey'];
+const FUNCTIONS = ['hubActions', 'bindings', 'setApps', 'appNumberCombo', 'comboLabel', 'handleForwardedKey'];
 const { comboOf } = require('../../packages/claude-hub-sdk/src/keys');
 
 function source(name) {
@@ -14,13 +14,15 @@ function source(name) {
 }
 
 // The hub page's keymap, run with its UI calls replaced by a log of the action they stand for.
-function loadHubKeys({ apps: appCount = MATRIX.apps, platform = 'win' } = {}) {
+// keys is config.json `keys` as the server hands it over, already checked.
+function loadHubKeys({ apps: appCount = MATRIX.apps, platform = 'win', keys = {} } = {}) {
   const ids = Array.from({ length: appCount }, (_, i) => `app${i + 1}`);
   const ran = [];
   const ctx = {
     IS_MAC: platform === 'mac',
     comboOf,
     keymap: null,
+    userKeys: keys,
     apps: Object.fromEntries(ids.map((id) => [id, {}])),
     togglePalette: (mode) => ran.push({ project: 'hub.projectPicker', configDir: 'hub.configDirPicker', app: 'hub.appLauncher' }[mode]),
     cycleTab: (delta) => ran.push(delta < 0 ? 'hub.prevApp' : 'hub.nextApp'),
@@ -57,4 +59,7 @@ function eventOf(row) {
   return { ...rest, ctrlKey: ctrl, altKey: alt, shiftKey: shift, metaKey: meta, getModifierState };
 }
 
-module.exports = { MATRIX, source, loadHubKeys, eventOf, payloadOf };
+// Each set of matrix rows with the config.json `keys` it runs under.
+const ROW_SETS = [{ keys: {}, rows: MATRIX.rows }, MATRIX.remap];
+
+module.exports = { MATRIX, ROW_SETS, source, loadHubKeys, eventOf, payloadOf };

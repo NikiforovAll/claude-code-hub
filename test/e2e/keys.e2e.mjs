@@ -14,7 +14,7 @@ import assert from 'node:assert/strict';
 import { chromium } from 'playwright-core';
 
 const require = createRequire(import.meta.url);
-const { MATRIX } = require('../helpers/hub-keys.js');
+const { MATRIX, ROW_SETS } = require('../helpers/hub-keys.js');
 const { killChild } = require('../../lib/kill-child.js');
 const { APPS } = require('../../lib/apps.js');
 
@@ -99,9 +99,16 @@ before(async () => {
 
 const PLATFORMS = { win: { platform: 'Win32', uaPlatform: 'Windows' }, mac: { platform: 'MacIntel', uaPlatform: 'macOS' } };
 
-// The hub picks its keys from navigator.platform, so each platform gets its own page.
-async function openHub(name) {
+// The hub picks its keys from navigator.platform, so each platform gets its own page. keys stands
+// in for config.json `keys` as /api/config carries it; lib/keymap.js has its own tests.
+async function openHub(name, keys) {
   const context = await browser.newContext({ serviceWorkers: 'block' });
+  if (keys) {
+    await context.route('**/api/config', async (route) => {
+      const response = await route.fetch();
+      route.fulfill({ response, json: { ...(await response.json()), keys } });
+    });
+  }
   await context.addInitScript(({ platform, uaPlatform }) => {
     Object.defineProperty(Navigator.prototype, 'platform', { get: () => platform });
     Object.defineProperty(Navigator.prototype, 'userAgentData', { get: () => ({ platform: uaPlatform }) });
@@ -151,14 +158,18 @@ async function focusApp(id) {
 const PALETTES = { 'hub.projectPicker': 'project', 'hub.configDirPicker': 'configDir', 'hub.appLauncher': 'app' };
 const MOVES = { 'hub.prevApp': 'e2e1', 'hub.nextApp': 'e2e3' };
 
-for (const platform of Object.keys(PLATFORMS)) describe(`key matrix in Chrome on ${platform}, focus in an app`, () => {
+const SUITES = ROW_SETS.flatMap((set) =>
+  Object.keys(PLATFORMS).map((platform) => ({ ...set, platform, remapped: set.rows !== MATRIX.rows })),
+);
+
+for (const { platform, rows, keys, remapped } of SUITES) describe(`key matrix${remapped ? ', remapped,' : ''} in Chrome on ${platform}, focus in an app`, () => {
   let context;
   before(async () => {
-    context = await openHub(platform);
+    context = await openHub(platform, remapped ? keys : null);
   });
   after(() => context?.close());
 
-  for (const row of MATRIX.rows.filter((r) => r.platform === platform)) {
+  for (const row of rows.filter((r) => r.platform === platform)) {
     it(row.name, { todo: row.todo }, async () => {
       const start = row.expect === 'hub.appByNumber:2' ? 'e2e1' : 'e2e2';
       const frame = await focusApp(start);

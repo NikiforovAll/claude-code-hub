@@ -10,6 +10,7 @@ const os = require('os');
 const path = require('path');
 const { actionTable } = require('./lib/actions');
 const { selectApps, loadApp, conflicts } = require('./lib/apps');
+const { userKeys } = require('./lib/keymap');
 const { stripCookie } = require('./lib/cookies');
 const { createNetGuard, KEEP_ALIVE_MS } = require('./lib/net-guard');
 const { ping, stats } = require('./lib/ipc');
@@ -131,6 +132,7 @@ function resolveHubConfig() {
   // Hand-edited only; kept verbatim so a rewrite of the file does not drop it.
   if (saved.terminal && typeof saved.terminal === 'object') config.terminal = saved.terminal;
   if (Array.isArray(saved.apps)) config.apps = saved.apps;
+  if (saved.keys !== undefined) config.keys = saved.keys;
   return { config, raw, fallback };
 }
 
@@ -164,6 +166,8 @@ if (!ENABLED_APPS.length) {
   process.exit(1);
 }
 const ACTIONS = actionTable(ENABLED_APPS);
+const { keys: USER_KEYS, lines: keyLines } = userKeys(hubConfig.keys, ENABLED_APPS);
+for (const line of keyLines) console.log(`${HUB_CONFIG_FILE}: ${line}`);
 // The first enabled app in tab order that declares the capability in its manifest.
 const provider = (cap) => ENABLED_APPS.find((a) => a.provides[cap]);
 const PROJECTS_APP = provider('projects');
@@ -886,6 +890,7 @@ app.get('/api/config', (_req, res) => {
     ...themeConfig(THEME_REGISTRY, { userFile: USER_THEMES_FILE }),
     apps: appsConfig(),
     actions: ACTIONS,
+    keys: USER_KEYS,
     activeConfigDir: hubConfig.activeConfigDir,
     defaultConfigDir,
   });

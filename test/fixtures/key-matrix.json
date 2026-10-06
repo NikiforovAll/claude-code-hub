@@ -37,5 +37,25 @@
     { "name": "macOS German: ⌥5 types [", "platform": "mac", "key": "[", "code": "Digit5", "mods": ["alt"], "expect": "text" },
     { "name": "macOS German: ⌥2 types “", "platform": "mac", "key": "“", "code": "Digit2", "mods": ["alt"], "expect": "text" },
     { "name": "macOS: ⌘⌥1", "platform": "mac", "key": "¡", "code": "Digit1", "mods": ["alt", "meta"], "expect": "text" }
-  ]
+  ],
+  "remap": {
+    "keys": {
+      "hub.projectPicker": "ctrl+alt+o",
+      "hub.nextApp": "ctrl+alt+a",
+      "hub.configDirPicker": null,
+      "hub.appByNumber": "ctrl+shift+{n}"
+    },
+    "rows": [
+      { "name": "Remapped: Ctrl+Alt+O opens the project picker", "platform": "win", "key": "o", "code": "KeyO", "mods": ["ctrl", "alt"], "expect": "hub.projectPicker" },
+      { "name": "Remapped: Ctrl+Alt+P is text", "platform": "win", "key": "p", "code": "KeyP", "mods": ["ctrl", "alt"], "expect": "text" },
+      { "name": "Remapped: Ctrl+Alt+A, taken from the app launcher, is next app", "platform": "win", "key": "a", "code": "KeyA", "mods": ["ctrl", "alt"], "expect": "hub.nextApp" },
+      { "name": "Remapped: Ctrl+Alt+ArrowRight is text", "platform": "win", "key": "ArrowRight", "code": "ArrowRight", "mods": ["ctrl", "alt"], "expect": "text" },
+      { "name": "Remapped: Ctrl+Alt+W, unbound, is text", "platform": "win", "key": "w", "code": "KeyW", "mods": ["ctrl", "alt"], "expect": "text" },
+      { "name": "Remapped: Ctrl+Alt+ArrowLeft keeps its default", "platform": "win", "key": "ArrowLeft", "code": "ArrowLeft", "mods": ["ctrl", "alt"], "expect": "hub.prevApp" },
+      { "name": "Remapped: Ctrl+Shift+2 (@) is app 2", "platform": "win", "key": "@", "code": "Digit2", "mods": ["ctrl", "shift"], "expect": "hub.appByNumber:2" },
+      { "name": "Remapped: Alt+2 is text", "platform": "win", "key": "2", "code": "Digit2", "mods": ["alt"], "expect": "text" },
+      { "name": "Remapped on macOS: ⌃⇧2 is app 2", "platform": "mac", "key": "@", "code": "Digit2", "mods": ["ctrl", "shift"], "expect": "hub.appByNumber:2" },
+      { "name": "Remapped on macOS: ⌃⌥2 is text", "platform": "mac", "key": "™", "code": "Digit2", "mods": ["ctrl", "alt"], "expect": "text" }
+    ]
+  }
 }

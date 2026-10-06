@@ -433,20 +433,22 @@ describe('keys', () => {
 });
 
 describe('key matrix, app to hub', () => {
-  const { MATRIX, loadHubKeys, eventOf } = require('../../../test/helpers/hub-keys');
-  const hubs = { win: loadHubKeys(), mac: loadHubKeys({ platform: 'mac' }) };
+  const { ROW_SETS, loadHubKeys, eventOf } = require('../../../test/helpers/hub-keys');
 
-  for (const row of MATRIX.rows) {
-    it(row.name, { todo: row.todo }, async () => {
-      const hubKeys = hubs[row.platform];
-      const { env } = await connected();
-      env.fromHub(welcome({ forward: Object.keys(hubKeys.bindings()) }));
-      const press = env.key(eventOf(row));
-      const forwarded = env.sent().slice(1);
-      assert.equal(press.prevented, row.expect !== 'text', 'the app keeps the press');
-      assert.equal(forwarded.length, row.expect === 'text' ? 0 : 1);
-      if (forwarded.length) assert.equal(hubKeys.actionOfForwarded(forwarded[0]), row.expect);
-    });
+  for (const { keys, rows } of ROW_SETS) {
+    const hubs = { win: loadHubKeys({ keys }), mac: loadHubKeys({ platform: 'mac', keys }) };
+    for (const row of rows) {
+      it(row.name, { todo: row.todo }, async () => {
+        const hubKeys = hubs[row.platform];
+        const { env } = await connected();
+        env.fromHub(welcome({ forward: Object.keys(hubKeys.bindings()) }));
+        const press = env.key(eventOf(row));
+        const forwarded = env.sent().slice(1);
+        assert.equal(press.prevented, row.expect !== 'text', 'the app keeps the press');
+        assert.equal(forwarded.length, row.expect === 'text' ? 0 : 1);
+        if (forwarded.length) assert.equal(hubKeys.actionOfForwarded(forwarded[0]), row.expect);
+      });
+    }
   }
 });
 

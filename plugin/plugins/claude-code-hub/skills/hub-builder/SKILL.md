@@ -23,7 +23,7 @@ The files under `references/` ship with the installed hub, so they match its ver
 | Flags, environment variables, `config.json`, the files the hub writes | `reference/configuration/` |
 | Switch between Claude config dirs | `guides/config-dirs/` |
 | The hub token, or exposing the hub to a network | `reference/security/` |
-| Keys the hub binds and keys the tools keep | `reference/shortcuts/` |
+| Keys the hub binds, keys the tools keep, and changing the hub's keys in `config.json` `keys` | `reference/shortcuts/` |
 | The embedded terminal in Kanban | `guides/terminal/` |
 | The project palette | `guides/projects/` |
 | Something is broken | `reference/troubleshooting/` |
