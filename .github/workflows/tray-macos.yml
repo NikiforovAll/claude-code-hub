@@ -46,6 +46,11 @@ jobs:
 
       - name: Self-test the menu while the hub runs
         run: |
+          kill "$(cat "$HUB/tray.pid")"
+          rm "$HUB/tray.pid"
+          for i in $(seq 1 20); do pgrep -f hub-tray.js > /dev/null || break; sleep 0.5; done
+          ! pgrep -f hub-tray.js
+          [ -f "$HUB/hub.json" ]
           $TRAY --self-test --screenshot "$OUT/menu.png" | tee "$OUT/self-test-running.json"
           jq -e '.ok and .steps[0].state == "running" and (.steps[0].items[0].title | startswith("Running on port 3640"))' "$OUT/self-test-running.json"
           jq -e '[.steps[0].items[].title] | contains(["Open Hub", "Stop Hub", "Restart Hub", "Open log", "Open at Login", "Quit (stops the hub)"])' "$OUT/self-test-running.json"
@@ -56,7 +61,6 @@ jobs:
           got=$(jq -r '[.steps[] | .step + ":" + .state] | join(" ")' "$OUT/self-test-actions.json")
           [ "$got" = "initial:running stop:stopped start:running restart:running stop:stopped" ] || { echo "$got"; exit 1; }
           [ ! -f "$HUB/hub.json" ]
-          for i in $(seq 1 20); do grep -q 'hub exited' "$HUB/tray.log" && break; sleep 0.5; done
           screencapture -x "$OUT/stopped.png"
 
       - name: Autostart through launchd
@@ -69,8 +73,8 @@ jobs:
           launchctl bootstrap gui/$(id -u) "$plist"
           launchctl print gui/$(id -u)/$label | head -20
           launchctl bootout gui/$(id -u)/$label || true
-          for i in $(seq 1 20); do [ "$(pgrep -f hub-tray.js | wc -l)" -eq 1 ] && break; sleep 0.5; done
-          [ "$(pgrep -f hub-tray.js | wc -l)" -eq 1 ]
+          for i in $(seq 1 20); do pgrep -f hub-tray.js > /dev/null || break; sleep 0.5; done
+          ! pgrep -f hub-tray.js
           node server.js --no-autostart --hub-dir "$HUB"
           [ ! -f "$plist" ]
 

@@ -23,10 +23,10 @@ let HUB_DIR, TRAY_DIR, HUB_FILE, LOG_FILE, TRAY_LOG, PID_FILE, config;
 let target, statusItem, menu, icons;
 let miHeader, miOpen, miStartStop, miRestart, miAuto;
 let hubTask = null;
-let nodePid = null;
+let checkedPid = null;
+let checkedIsNode = false;
 let hub = null;
 let state = '';
-let timer = null;
 let selfTestArgv = null;
 
 const dirname = (p) => ObjC.unwrap($(p).stringByDeletingLastPathComponent);
@@ -114,11 +114,11 @@ function waitExit(pid, seconds) {
 function getHub() {
   const rec = readJson(HUB_FILE);
   if (!rec || !Number.isInteger(rec.pid) || !alive(rec.pid)) return null;
-  if (rec.pid !== nodePid) {
-    if (!/(^|\/)node$/.test(processCommand(rec.pid, 'comm'))) return null;
-    nodePid = rec.pid;
+  if (rec.pid !== checkedPid) {
+    checkedPid = rec.pid;
+    checkedIsNode = /(^|\/)node$/.test(processCommand(rec.pid, 'comm'));
   }
-  return rec;
+  return checkedIsNode ? rec : null;
 }
 
 function token() {
@@ -166,12 +166,12 @@ function startHub() {
 // a hub that does not answer. The tools exit on their own when the hub's IPC channel closes.
 function stopHub() {
   const rec = getHub();
-  let pid = rec ? rec.pid : hubTask && hubTask.processIdentifier;
+  const pid = rec ? rec.pid : hubTask && hubTask.processIdentifier;
   if (rec) {
     log(`stop: pid ${rec.pid}`);
     try {
       sh(`/usr/bin/curl -s -m 3 -X POST ${q(`http://127.0.0.1:${rec.port}/api/shutdown?token=${token()}`)}`);
-      if (waitExit(rec.pid, 15)) pid = null;
+      waitExit(rec.pid, 15);
     } catch (e) {
       log(`shutdown request failed: ${e}`);
     }
@@ -328,7 +328,6 @@ function updateState() {
 }
 
 function quit() {
-  if (timer) timer.invalidate;
   stopHub();
   fm.removeItemAtPathError(PID_FILE, null);
   $.NSApplication.sharedApplication.terminate(null);
@@ -490,7 +489,7 @@ function run(argv) {
   } else {
     setState('starting');
     guard('start', startHub)();
-    timer = schedule(3, 'tick:', true);
+    schedule(3, 'tick:', true);
   }
   app.run;
 }
