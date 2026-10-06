@@ -32,6 +32,29 @@ describe('hub keymap', () => {
     }
   });
 
+  it('binds each hub action to its default combo', () => {
+    const ids = (platform) =>
+      Object.entries(loadHubKeys({ apps: 2, platform }).bindings()).map(([combo, b]) => [b.id, combo]);
+    const fixed = [
+      ['hub.projectPicker', 'ctrl+alt+p'],
+      ['hub.configDirPicker', 'ctrl+alt+w'],
+      ['hub.appLauncher', 'ctrl+alt+a'],
+      ['hub.prevApp', 'ctrl+alt+ArrowLeft'],
+      ['hub.nextApp', 'ctrl+alt+ArrowRight'],
+    ];
+    assert.deepEqual(ids('win'), [...fixed, ['hub.appByNumber', 'alt+1'], ['hub.appByNumber', 'alt+2']]);
+    assert.deepEqual(ids('mac'), [...fixed, ['hub.appByNumber', 'ctrl+alt+1'], ['hub.appByNumber', 'ctrl+alt+2']]);
+  });
+
+  it('builds the keymap once and again after the app list changes', () => {
+    const hub = loadHubKeys({ apps: 4 });
+    assert.equal(hub.bindings(), hub.bindings());
+    hub.setApps({ a: {}, b: {} });
+    assert.deepEqual(Object.keys(hub.bindings()).slice(-2), ['alt+1', 'alt+2']);
+    assert.equal(hub.actionOf(eventOf({ key: '3', code: 'Digit3', mods: ['alt'] })), 'text');
+    assert.equal(hub.actionOf(eventOf({ key: '2', code: 'Digit2', mods: ['alt'] })), 'hub.appByNumber:2');
+  });
+
   it('keeps the palette keys working while the palette is open', () => {
     const map = loadHubKeys().bindings();
     const inPalette = Object.keys(map).filter((c) => map[c].inPalette);

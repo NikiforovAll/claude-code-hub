@@ -284,12 +284,13 @@ An element that handles keys before the document sees them, such as a terminal, 
 | `actions.handles` | [Actions](#7-actions) |
 | `publishes` | The topics the app publishes ([Events](#10-events)). Optional |
 | `provides` | Capabilities, for example `{"projects": {"path": "/api/projects"}, "terminal": {"liveWork": "/api/terminals"}}`. The hub finds a capability's provider here |
+| `keys.keeps` | The combos the app keeps for its own commands, by combo name ([Keys](#8-keys)), for example `["ctrl+alt+n"]`. The hub does not bind them. Optional |
 
 ### Rules
 
 1. **Discovery, not runtime.** The manifest holds what the hub needs before the app runs. The protocol version comes from `hello` only, because the running document may be an older bundle.
 2. **Where the hub reads it.** For an `apps` entry with a `path`, the hub reads the manifest from that folder. For a built-in app, it reads it from the submodule, else from the installed package, and keeps no copy. The hub's tests validate the manifest of each pinned package. See [The apps entry and the launch](/claude-code-hub/extensibility/reference/apps-entry/).
-3. **Skip.** The hub skips an app, with a log line, when its file is missing or not valid JSON, `manifest` is a version it does not know, `id` does not match the id rule ([Terms](#terms)) or is not the app's id, `run.entry` is not inside the app directory, a `provides` path does not start with `/`, or a `publishes` topic breaks the topic rule or is the hub's ([Events](#10-events)). It skips one action, with a log line, when the action is not valid ([Actions](#7-actions)).
+3. **Skip.** The hub skips an app, with a log line, when its file is missing or not valid JSON, `manifest` is a version it does not know, `id` does not match the id rule ([Terms](#terms)) or is not the app's id, `run.entry` is not inside the app directory, a `provides` path does not start with `/`, a `publishes` topic breaks the topic rule or is the hub's ([Events](#10-events)), or a `keys.keeps` entry is not a combo name with one modifier at least. It skips one action, with a log line, when the action is not valid ([Actions](#7-actions)).
 4. **Providers.** For each capability, the first enabled app in tab order whose `provides` declares it is the provider. `projects.path` and `terminal.liveWork` must be paths on the provider's origin. `projects.path` answers `[{path, modifiedAt, worktrees?}]`, where `worktrees` lists the linked worktree paths folded into that repo row. `terminal.liveWork` answers `{sessions: []}`, and a pool whose provider has sessions is not evicted. With no provider, the capability is off: no terminal, and the project palette has no list.
 
 ## 10. Events

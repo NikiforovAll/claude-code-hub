@@ -1083,6 +1083,8 @@ app.get('/api/resolve-path', (req, res) => {
   else res.json({ path: r.path });
 });
 
+const HUB_KEYS_JS = path.join(__dirname, 'packages', 'claude-hub-sdk', 'src', 'keys.js');
+app.get('/sdk/keys.js', (_req, res) => res.sendFile(HUB_KEYS_JS));
 app.use(express.static(path.join(__dirname, 'public')));
 
 // Children get HUB_URL at spawn and trust only that origin, so the first pool waits for the port

@@ -393,19 +393,6 @@ describe('keys', () => {
     assert.equal(comboOf({ ...ctrlAlt('K', 'KeyK'), shiftKey: true, metaKey: true }), 'ctrl+alt+shift+meta+k');
   });
 
-  it('names combos the same as the hub page', () => {
-    const hub = require('../../../test/helpers/hub-keys').loadHubKeys().comboOf;
-    const events = [
-      ctrlAlt('P', 'KeyP'),
-      ctrlAlt('π', 'KeyP'),
-      ctrlAlt('ArrowRight', 'ArrowRight'),
-      { ...NO_MODS, key: '¡', code: 'Digit1', altKey: true },
-      { ...NO_MODS, key: '?', code: 'Slash', shiftKey: true },
-      { ...ctrlAlt('K', 'KeyK'), shiftKey: true, metaKey: true },
-    ];
-    for (const e of events) assert.equal(comboOf(e), hub(e), JSON.stringify(e));
-  });
-
   it('gives the same comboOf from the client, the stub and the global', () => {
     const env = fakeEnv({ framed: false });
     const events = [ctrlAlt('π', 'KeyP'), ctrlAlt('ArrowLeft', 'ArrowLeft'), { ...NO_MODS, key: '?', code: 'Slash' }];

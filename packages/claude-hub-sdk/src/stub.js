@@ -3,14 +3,8 @@
 ((root) => {
   'use strict';
 
-  // A copy of client.js comboOf(); a test checks they match.
-  function comboOf(e) {
-    const lower = typeof e.key === 'string' ? e.key.toLowerCase() : '';
-    const m = /^(?:Key|Digit)([A-Z1-9])$/.exec(e.code || '');
-    const key = /^[a-z1-9]$/.test(lower) ? lower : m ? m[1].toLowerCase() : e.key;
-    const mods = [e.ctrlKey && 'ctrl', e.altKey && 'alt', e.shiftKey && 'shift', e.metaKey && 'meta'];
-    return [...mods, key].filter(Boolean).join('+');
-  }
+  // keys.js comes first in the synced file. Required as a module, stub.js loads it itself.
+  const { comboOf } = typeof ClaudeHubKeys === 'object' ? ClaudeHubKeys : require('./keys');
 
   function createClaudeHub(win) {
     let hub = null;

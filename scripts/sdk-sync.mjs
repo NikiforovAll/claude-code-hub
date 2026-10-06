@@ -15,8 +15,9 @@ const { APPS } = require(join(root, 'lib/apps.js'));
 const sdkDir = join(root, 'packages/claude-hub-sdk');
 const { version } = JSON.parse(readFileSync(join(sdkDir, 'package.json'), 'utf8'));
 const hash = require(join(sdkDir, 'src-hash.js'))();
+const { bundle } = require(join(sdkDir, 'src/server.js'));
 const stamped = (file) =>
-  `// claude-hub-sdk ${version} (sha256 ${hash}). Copied by npm run sdk:sync in claude-code-hub. Do not edit.\n${readFileSync(join(sdkDir, 'src', file), 'utf8')}`;
+  `// claude-hub-sdk ${version} (sha256 ${hash}). Copied by npm run sdk:sync in claude-code-hub. Do not edit.\n${bundle(file)}`;
 const copies = [
   ['public/vendor/claude-hub-sdk.js', stamped('stub.js')],
   ['test/vendor/claude-hub-sdk.js', stamped('client.js')],

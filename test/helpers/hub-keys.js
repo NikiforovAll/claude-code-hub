@@ -4,7 +4,8 @@ const vm = require('node:vm');
 
 const SRC = fs.readFileSync(path.join(__dirname, '../../public/app.js'), 'utf8');
 const MATRIX = JSON.parse(fs.readFileSync(path.join(__dirname, '../fixtures/key-matrix.json'), 'utf8'));
-const FUNCTIONS = ['bindingKey', 'comboOf', 'bindings', 'tabCombo', 'comboLabel', 'handleForwardedKey'];
+const FUNCTIONS = ['hubActions', 'bindings', 'setApps', 'tabCombo', 'comboLabel', 'handleForwardedKey'];
+const { comboOf } = require('../../packages/claude-hub-sdk/src/keys');
 
 function source(name) {
   const m = new RegExp(`^function ${name}\\([^)]*\\) \\{[\\s\\S]*?^\\}`, 'm').exec(SRC);
@@ -18,10 +19,12 @@ function loadHubKeys({ apps: appCount = MATRIX.apps, platform = 'win' } = {}) {
   const ran = [];
   const ctx = {
     IS_MAC: platform === 'mac',
+    comboOf,
+    keymap: null,
     apps: Object.fromEntries(ids.map((id) => [id, {}])),
     togglePalette: (mode) => ran.push({ project: 'hub.projectPicker', configDir: 'hub.configDirPicker', app: 'hub.appLauncher' }[mode]),
     cycleTab: (delta) => ran.push(delta < 0 ? 'hub.prevApp' : 'hub.nextApp'),
-    switchTab: (id) => ran.push(`hub.appByNumber:${ids.indexOf(id) + 1}`),
+    switchTab: (id) => ran.push(`hub.appByNumber:${Object.keys(ctx.apps).indexOf(id) + 1}`),
   };
   vm.runInNewContext(`${FUNCTIONS.map(source).join('\n')}\nthis.k = { ${FUNCTIONS.join(', ')} };`, ctx);
   const run = (fn) => {
@@ -31,7 +34,7 @@ function loadHubKeys({ apps: appCount = MATRIX.apps, platform = 'win' } = {}) {
   };
   return {
     ...ctx.k,
-    actionOf: (e) => run(() => ctx.k.bindings()[ctx.k.comboOf(e)]?.run()),
+    actionOf: (e) => run(() => ctx.k.bindings()[comboOf(e)]?.run()),
     actionOfForwarded: (payload) => run(() => ctx.k.handleForwardedKey(payload)),
   };
 }

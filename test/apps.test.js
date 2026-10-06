@@ -93,6 +93,10 @@ describe('app manifests', () => {
     const kanban = loadApp(KANBAN, { log: () => {} });
     assert.deepEqual(Object.keys(kanban.provides).sort(), ['projects', 'terminal']);
   });
+
+  it('kanban keeps its session keys', () => {
+    assert.deepEqual(loadApp(KANBAN, { log: () => {} }).keeps, ['ctrl+alt+n', 'ctrl+alt+r', 'ctrl+alt+s']);
+  });
 });
 
 describe('manifestError', () => {
@@ -129,6 +133,17 @@ describe('manifestError', () => {
       manifestError({ ...ok, provides: { terminal: { liveWork: 'http://x/' } } }, 'cost', root),
       /provides.terminal.liveWork/,
     );
+  });
+
+  it('accepts kept combo names and rejects anything else', () => {
+    const keeps = ['ctrl+alt+n', 'ctrl+shift+z', 'alt+1', 'ctrl+alt+ArrowLeft', 'ctrl+alt+shift+meta+k'];
+    assert.equal(manifestError({ ...ok, keys: { keeps } }, 'cost', root), null);
+    assert.equal(manifestError({ ...ok, keys: {} }, 'cost', root), null);
+    assert.match(manifestError({ ...ok, keys: [] }, 'cost', root), /keys is not an object/);
+    assert.match(manifestError({ ...ok, keys: { keeps: 'ctrl+alt+n' } }, 'cost', root), /not an array/);
+    for (const bad of ['n', 'alt+ctrl+n', 'ctrl+alt+N', 'Ctrl+Alt+N', 'ctrl+alt+', 'ctrl+alt+no', 5]) {
+      assert.match(manifestError({ ...ok, keys: { keeps: [bad] } }, 'cost', root), /not a combo name/, String(bad));
+    }
   });
 
   it("accepts published topics and rejects a bad name or the hub's own", () => {
@@ -188,6 +203,7 @@ describe('loadApp', () => {
       actions: COST_MANIFEST.actions,
       provides: {},
       publishes: [],
+      keeps: [],
     });
     assert.deepEqual(logs, []);
   });

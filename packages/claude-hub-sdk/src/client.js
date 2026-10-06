@@ -7,14 +7,8 @@
   const VARS_KEY = 'claude-hub:vars';
   const WELCOME_WAIT_MS = 2000;
 
-  // The hub's comboOf(). macOS turns Option+<key> into another character, so e.code is the fallback.
-  function comboOf(e) {
-    const lower = typeof e.key === 'string' ? e.key.toLowerCase() : '';
-    const m = /^(?:Key|Digit)([A-Z1-9])$/.exec(e.code || '');
-    const key = /^[a-z1-9]$/.test(lower) ? lower : m ? m[1].toLowerCase() : e.key;
-    const mods = [e.ctrlKey && 'ctrl', e.altKey && 'alt', e.shiftKey && 'shift', e.metaKey && 'meta'];
-    return [...mods, key].filter(Boolean).join('+');
-  }
+  // keys.js comes first in the served file. Required as a module, client.js loads it itself.
+  const { comboOf } = typeof ClaudeHubKeys === 'object' ? ClaudeHubKeys : require('./keys');
 
   function isVars(v) {
     return (

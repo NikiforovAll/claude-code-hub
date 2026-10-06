@@ -1,5 +1,6 @@
 'use strict';
 
+const fs = require('node:fs');
 const path = require('node:path');
 
 // The hub hands this file to each app it spawns (HUB_SDK_SERVER), so it runs the hub's version, not
@@ -39,14 +40,20 @@ function answerHub() {
   process.channel.unref();
 }
 
+// What an app page loads as /vendor/claude-hub-sdk.js: keys.js, then client.js or stub.js.
+function bundle(file) {
+  const read = (f) => fs.readFileSync(path.join(__dirname, f), 'utf8');
+  return `${read('keys.js')}\n${read(file)}`;
+}
+
 // Mount before express.static: the hub's client must win over the app's stub in public/vendor.
 function mount(app) {
   answerHub();
-  const client = path.join(__dirname, 'client.js');
-  app.get('/vendor/claude-hub-sdk.js', (_req, res) => res.sendFile(client));
+  const client = bundle('client.js');
+  app.get('/vendor/claude-hub-sdk.js', (_req, res) => res.type('js').send(client));
   app.get('/hub-config', (_req, res) => {
     res.json({ enabled: !!process.env.CLAUDE_HUB, url: process.env.HUB_URL || null });
   });
 }
 
-module.exports = { mount };
+module.exports = { mount, bundle };

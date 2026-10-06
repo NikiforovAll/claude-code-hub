@@ -37,6 +37,7 @@ description: Every field of hub-app.json and the validation rules.
 | `publishes` | No | The topics the app publishes. See [Topics](/claude-code-hub/extensibility/reference/connect/#topics) |
 | `actions.handles` | No | The actions the app handles. See [Actions](#actions) |
 | `provides` | No | The capabilities the app provides. See [Capabilities](#capabilities) |
+| `keys.keeps` | No | The combos the app uses for its own commands. See [Kept keys](#kept-keys) |
 
 ## Actions
 
@@ -61,6 +62,16 @@ A capability is a job that one app does for the hub. For each capability, the fi
 
 Each field is a path on the provider's own origin that starts with `/`. With no provider, the capability is off: no terminal, and the palette has no project list.
 
+## Kept keys
+
+`keys.keeps` lists the combos that your app keeps for itself, by combo name: the modifiers in the order `ctrl`, `alt`, `shift`, `meta`, joined by `+`, then the key, for example `ctrl+alt+n`. The key is a lowercase letter, a digit from 1 to 9, or a key name such as `ArrowLeft`. Each combo needs one modifier at least. See [Keys](/claude-code-hub/reference/protocol/#8-keys) for the full rule.
+
+```json
+"keys": { "keeps": ["ctrl+alt+n", "ctrl+alt+r", "ctrl+alt+s"] }
+```
+
+The hub does not bind a kept combo. Kanban keeps <kbd>Ctrl+Alt+N</kbd>, <kbd>Ctrl+Alt+R</kbd> and <kbd>Ctrl+Alt+S</kbd>.
+
 ## Validation
 
 The hub skips the app, with a log line, when:
@@ -76,6 +87,9 @@ The hub skips the app, with a log line, when:
 | `provides.<cap>.<key> is not a path` | A capability path does not start with `/` |
 | `publishes topic ... does not match ...` | A topic breaks the topic rule |
 | `publishes topic "<t>" is the hub's` | `project.changed`, `theme.changed` or a `hub.*` topic |
+| `keys is not an object` | `keys` is an array or a value |
+| `keys.keeps is not an array` | `keys.keeps` is not a list |
+| `keys.keeps combo ... is not a combo name` | A kept combo breaks the [combo rule](#kept-keys) |
 
 The hub skips one action, and keeps the app, when the name starts with `hub.`, `url` has a `#` or is not a string, `mode` is not `url` or `message`, or a param type is not `string` or `string?`.
 

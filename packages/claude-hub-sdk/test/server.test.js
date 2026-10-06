@@ -6,6 +6,7 @@ const path = require('node:path');
 
 const FIXTURE = path.join(__dirname, 'fixtures', 'app.js');
 const CLIENT_SRC = path.join(__dirname, '..', 'src', 'client.js');
+const KEYS_SRC = path.join(__dirname, '..', 'src', 'keys.js');
 
 let child;
 afterEach(() => child?.kill());
@@ -66,6 +67,16 @@ describe('server mount', () => {
   it("serves the hub's client over the app's own file", async () => {
     const url = await start();
     const body = await (await fetch(`${url}/vendor/claude-hub-sdk.js`)).text();
-    assert.equal(body, fs.readFileSync(CLIENT_SRC, 'utf8'));
+    assert.equal(body, `${fs.readFileSync(KEYS_SRC, 'utf8')}\n${fs.readFileSync(CLIENT_SRC, 'utf8')}`);
+  });
+
+  it('serves a client that runs as one classic script', async () => {
+    const url = await start();
+    const body = await (await fetch(`${url}/vendor/claude-hub-sdk.js`)).text();
+    const context = { document: {} };
+    context.window = context.top = context;
+    require('node:vm').runInNewContext(body, context);
+    assert.equal(typeof context.ClaudeHub?.connect, 'function');
+    assert.equal(context.ClaudeHub.comboOf({ key: 'π', code: 'KeyP', ctrlKey: true, altKey: true }), 'ctrl+alt+p');
   });
 });

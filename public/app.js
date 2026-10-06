@@ -1,4 +1,7 @@
 let apps = {};
+// bindings() builds it from apps; setApps clears it.
+let keymap = null;
+const { comboOf } = ClaudeHubKeys;
 let activeApp = null;
 // The app launcher's cursor starts here, so Ctrl+Alt+A then Enter goes back to the last tab.
 let previousApp = null;
@@ -223,7 +226,7 @@ async function init() {
   showLoading();
   const res = await fetch('/api/config');
   const config = await res.json();
-  apps = config.apps;
+  setApps(config.apps);
   defaultConfigDir = config.defaultConfigDir ?? null;
   activeConfigDir = config.activeConfigDir ?? null;
   applyTitle(config.activeConfigDir);
@@ -600,22 +603,40 @@ function handleForwardedKey(d) {
   bindings()[comboOf(e)]?.run();
 }
 
-// The one keymap. Its combo names are what welcome.forward lists for the apps.
-// inPalette: the binding still fires while the palette is open.
+// The hub's actions and their default combos. hub.appByNumber is a pattern: one combo per tab,
+// for the first nine. inPalette: the binding still fires while the palette is open.
+function hubActions() {
+  return [
+    { id: 'hub.projectPicker', combo: 'ctrl+alt+p', run: () => togglePalette('project'), inPalette: true },
+    { id: 'hub.configDirPicker', combo: 'ctrl+alt+w', run: () => togglePalette('configDir'), inPalette: true },
+    { id: 'hub.appLauncher', combo: 'ctrl+alt+a', run: () => togglePalette('app'), inPalette: true },
+    { id: 'hub.prevApp', combo: 'ctrl+alt+ArrowLeft', run: () => cycleTab(-1) },
+    { id: 'hub.nextApp', combo: 'ctrl+alt+ArrowRight', run: () => cycleTab(1) },
+    { id: 'hub.appByNumber', combo: (i) => tabCombo(i), run: (i) => switchTab(Object.keys(apps)[i]), count: 9 },
+  ];
+}
+
+// The one keymap, combo → binding. Its combos are what welcome.forward lists for the apps.
+// Built on first use after setApps, so a key press only looks a combo up.
 function bindings() {
-  const map = {
-    'ctrl+alt+p': { run: () => togglePalette('project'), inPalette: true },
-    'ctrl+alt+w': { run: () => togglePalette('configDir'), inPalette: true },
-    'ctrl+alt+a': { run: () => togglePalette('app'), inPalette: true },
-    'ctrl+alt+ArrowLeft': { run: () => cycleTab(-1) },
-    'ctrl+alt+ArrowRight': { run: () => cycleTab(1) },
-  };
-  Object.keys(apps)
-    .slice(0, 9)
-    .forEach((id, i) => {
-      map[tabCombo(i)] = { run: () => switchTab(id) };
-    });
-  return map;
+  if (keymap) return keymap;
+  keymap = {};
+  const tabs = Object.keys(apps).length;
+  for (const action of hubActions()) {
+    if (typeof action.combo === 'string') {
+      keymap[action.combo] = action;
+      continue;
+    }
+    for (let i = 0; i < Math.min(action.count, tabs); i++) {
+      keymap[action.combo(i)] = { ...action, combo: action.combo(i), run: () => action.run(i) };
+    }
+  }
+  return keymap;
+}
+
+function setApps(list) {
+  apps = list;
+  keymap = null;
 }
 
 function tabCombo(i) {
@@ -626,24 +647,6 @@ function comboLabel(combo) {
   const keys = combo.split('+');
   if (IS_MAC) return keys.map((k) => ({ ctrl: '⌃', alt: '⌥', shift: '⇧', meta: '⌘' })[k] ?? k.toUpperCase()).join('');
   return keys.map((k) => ({ ctrl: 'Ctrl', alt: 'Alt', shift: 'Shift', meta: 'Win' })[k] ?? k.toUpperCase()).join('+');
-}
-
-// The SDK's comboOf() is a copy of this: modifiers in ctrl, alt, shift, meta order, joined by
-// '+' to the key as bindingKey() names it.
-function comboOf(e) {
-  const mods = [e.ctrlKey && 'ctrl', e.altKey && 'alt', e.shiftKey && 'shift', e.metaKey && 'meta'];
-  return [...mods, bindingKey(e)].filter(Boolean).join('+');
-}
-
-// macOS composes Option+<key> into a character — Option+1 is '¡', Option+P is 'π' — and holding
-// Control does not undo it, so e.key alone cannot carry these bindings there. e.code is the
-// physical key, which is wrong for non-US layouts, hence only as a fallback. Takes a real
-// KeyboardEvent or a forwarded {key, code} payload; a payload without code degrades to key.
-function bindingKey(e) {
-  const lower = typeof e.key === 'string' ? e.key.toLowerCase() : '';
-  if (/^[a-z1-9]$/.test(lower)) return lower;
-  const m = /^(?:Key|Digit)([A-Z1-9])$/.exec(e.code || '');
-  return m ? m[1].toLowerCase() : e.key;
 }
 
 function cycleTab(delta) {
@@ -1156,7 +1159,7 @@ async function commitConfigDir(row) {
   if (target === palette.configDirs.active) return;
   showLoading();
   try {
-    apps = (await sendJson('POST', '/api/config-dirs/activate', { path: target })).apps;
+    setApps((await sendJson('POST', '/api/config-dirs/activate', { path: target })).apps);
     // The palette renders from this cache before its refetch lands, and initialSel keys off it.
     palette.configDirs.active = target;
     activeConfigDir = target;

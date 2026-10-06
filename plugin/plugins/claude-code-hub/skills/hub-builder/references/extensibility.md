@@ -68,7 +68,7 @@ The npm packages of the built-in tools do not ship `hub-app.json`. A patch or fo
 
 The page loads `/vendor/claude-hub-sdk.js` as the first element in `<body>`, a classic script, and calls `ClaudeHub.connect()`. Under the hub, `mount()` serves the hub's client at that URL, so the app always runs the hub's SDK. Alone, the app serves its own copy of the stub (`packages/claude-hub-sdk/src/stub.js`, copied by `npm run sdk:sync -- <app folder>` in a hub clone), which has the same API and does nothing. Page: `extensibility/reference/sdk/`.
 
-The SDK writes the hub's color variables (`--accent`, `--bg-surface`, …) on `document.body`, so the app's CSS reads them and follows every hub theme, the user's own themes too. `bindTheme` keeps light/dark and the color theme in step. `onActive` tells a hidden tab to pause polling. The SDK forwards the hub's keys by itself; an element that eats keys first, such as a terminal, asks `forwards(e)`.
+The SDK writes the hub's color variables (`--accent`, `--bg-surface`, …) on `document.body`, so the app's CSS reads them and follows every hub theme, the user's own themes too. `bindTheme` keeps light/dark and the color theme in step. `onActive` tells a hidden tab to pause polling. The SDK forwards the hub's keys by itself; an element that eats keys first, such as a terminal, asks `forwards(e)`. An app that uses a `Ctrl+Alt` combo of its own lists it in `keys.keeps` in `hub-app.json`, for example `{"keeps": ["ctrl+alt+n"]}`, so the hub does not bind it. Page: `extensibility/reference/manifest/#kept-keys`.
 
 ## Connect to other tools
 
@@ -89,5 +89,5 @@ A replacement must keep what the original gave, or the other tools lose it: Kanb
 An extension is done when:
 
 - The hub startup log shows `<id> runs from <folder>` and no skip or conflict line for it.
-- Its tab shows at the expected `Alt+N`, and what it publishes, handles or provides reaches the other tools.
+- Its tab shows at the expected `Alt+N` (`⌃⌥N` on macOS), and what it publishes, handles or provides reaches the other tools.
 - It still runs alone, with the stub.

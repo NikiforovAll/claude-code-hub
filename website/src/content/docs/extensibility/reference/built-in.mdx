@@ -19,6 +19,7 @@ The hub ships four tools. This page lists what each tool gives to other apps and
 - **Topics.** The hub publishes `project.changed` when you pick a project. Kanban filters its sessions to the project, Marketplace and Memory Diagnoser show that project, and Cost limits its totals to it. Kanban publishes [`session.changed`](#sessionchanged) when you open a session. No built-in tool subscribes to it, but your own apps can, as the Inspector does.
 - **Actions.** Kanban calls [`project.plugins`](#projectplugins), [`session.cost`](#sessioncost) and [`project.memory`](#projectmemory) from the session view. Any app can call them.
 - **Capabilities.** The hub reads [`projects`](#projects) and [`terminal`](#terminal) from Kanban.
+- **Kept keys.** Kanban keeps <kbd>Ctrl+Alt+N</kbd> (new session), <kbd>Ctrl+Alt+R</kbd> (resume session) and <kbd>Ctrl+Alt+S</kbd> (swap to the previous session) in `keys.keeps`. See [Kept keys](/claude-code-hub/extensibility/reference/manifest/#kept-keys).
 
 A fork or patch wrapper of a built-in tool starts from that tool's manifest. The npm packages of the built-in tools do not include `hub-app.json`. Copy it from the tool's GitHub repository.
 
