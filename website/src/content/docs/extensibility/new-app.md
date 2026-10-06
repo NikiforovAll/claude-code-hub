@@ -5,7 +5,7 @@ description: Add a separate web app to the hub, in its own tab, that talks to th
 
 A new app is a separate web app that the hub runs in its own tab. Use it when the tool you want does a different job from the built-in tools.
 
-This guide uses the [Inspector](/claude-code-hub/extensibility/examples/inspector/) as its example. The Inspector shows the turns, tool calls and token use of one Claude Code session. Its source is in [`examples/inspector`](https://github.com/NikiforovAll/claude-code-hub/tree/master/examples/inspector) in the hub repository.
+This guide uses the [Inspector](/claude-code-hub/extensibility/examples/inspector/) as its example. The Inspector shows the turns, tool calls and token use of one Claude Code session. Its source is in [`examples/inspector`](https://github.com/NikiforovAll/claude-code-hub/tree/main/examples/inspector) in the hub repository.
 
 ## What you make
 

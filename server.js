@@ -1104,7 +1104,7 @@ const onReady = (actual) => {
 if (!TRAY_FLAG) {
   liveHub(HUB_DIR, HUB_TOKEN).then((running) => {
     if (!running) {
-      watchStdin();
+      if (!process.argv.includes('--detached')) watchStdin();
       listenProxies();
       listenWithFallback(app, HUB_PORT, onReady, '');
       return;

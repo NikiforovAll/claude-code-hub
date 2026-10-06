@@ -7,7 +7,7 @@ The hub SDK is one script that the app page loads. Under the hub, the hub serves
 
 ## Set up
 
-1. **Ship the stub.** Copy `packages/claude-hub-sdk/src/stub.js` from the [hub repository](https://github.com/NikiforovAll/claude-code-hub/tree/master/packages/claude-hub-sdk/src) to `public/vendor/claude-hub-sdk.js` in your app. In a clone of the hub, `npm run sdk:sync -- <app folder>` does this.
+1. **Ship the stub.** Copy `packages/claude-hub-sdk/src/stub.js` from the [hub repository](https://github.com/NikiforovAll/claude-code-hub/tree/main/packages/claude-hub-sdk/src) to `public/vendor/claude-hub-sdk.js` in your app. In a clone of the hub, `npm run sdk:sync -- <app folder>` does this.
 2. **Mount the server SDK.** See [What the app server must do](/claude-code-hub/extensibility/reference/apps-entry/#what-the-app-server-must-do). Under the hub, `mount()` serves the real client at the same URL, in place of the stub.
 3. **Load it first.** Make it the first element in `<body>`, as a classic script, with no `defer` or `async`. The SDK paints the cached theme before the first paint.
 

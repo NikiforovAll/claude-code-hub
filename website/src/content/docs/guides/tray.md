@@ -1,11 +1,11 @@
 ---
 title: Run the hub from the tray
-description: On Windows, run the hub in the background with an icon in the notification area, and start it when you log on.
+description: On Windows and macOS, run the hub in the background with an icon in the notification area, and start it when you log on.
 ---
 
 On Windows, the hub can run in the background with no terminal window. An icon in the notification area shows whether the hub runs, and its menu starts, stops and opens the hub. You can also make the hub start when you log on.
 
-The tray is opt-in. Without the flags on this page, the hub runs as before: no icon, no registry entry, no copied files. The flags work only on Windows. On other systems they print an error and exit.
+The tray is opt-in. Without the flags on this page, the hub runs as before: no icon, no registry entry, no copied files. The flags work on Windows and, as an experiment, on [macOS](#macos). On other systems they print an error and exit.
 
 ## Start the tray
 
@@ -131,9 +131,19 @@ The paths are for the default hub folder.
 | `~/.claude-hub/tray.log` | When the tray starts and stops the hub |
 | `~/.claude-hub/tray.pid` | The process id of the tray |
 
+## macOS
+
+On macOS, the tray is an experiment. It works like the Windows tray, with these differences:
+
+- The icon is in the menu bar. Click it for the menu.
+- The autostart item is **Open at Login**. It adds a launch agent in `~/Library/LaunchAgents`.
+- The hub gets the `PATH` of the shell where you ran `--tray` or `--autostart`. Run it again after you change `PATH`.
+
+If something does not work, see `tray.log` and `hub.log` in the hub folder.
+
 ## Limits
 
-- The tray works only on Windows.
+- The tray works only on Windows and macOS.
 - If the hub falls back to a port other than the one of its app, **Open Hub** opens a browser tab, not the app.
 - The tray uses about 100 MB of memory, because it runs in PowerShell.
 - Some company machines block PowerShell scripts with a group policy. On those machines the tray does not start.
