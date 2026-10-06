@@ -247,7 +247,7 @@ A key press inside an iframe does not reach the hub page, so the app forwards th
 | App → hub | `hub:keydown` | `{key, code, ctrl, alt, shift, meta}` |
 
 1. `welcome.forward` lists the combos by name. Today they are `ctrl+alt+p`, `ctrl+alt+w`, `ctrl+alt+a`, `ctrl+alt+ArrowLeft`, `ctrl+alt+ArrowRight` and `alt+1` to `alt+N` for the first nine tabs (`ctrl+alt+1` to `ctrl+alt+N` on macOS, where `Option+<digit>` types a character). An app takes the list from `welcome`, not from this page.
-2. **Combo name.** The modifiers that are down, in the order `ctrl`, `alt`, `shift`, `meta`, joined by `+`, then the key. The key is `e.key` lowercased when that is `a`–`z` or `1`–`9`. Else, when `e.code` is `Key<A-Z>` or `Digit<1-9>`, it is that letter or digit lowercased, because macOS turns `Option+<key>` into another character. Else it is `e.key` as it is.
+2. **Combo name.** The modifiers that are down, in the order `ctrl`, `alt`, `shift`, `meta`, joined by `+`, then the key. The key is `e.key` lowercased when that is `a`–`z` or `1`–`9`. Else, when `e.code` is `Key<A-Z>` or `Digit<1-9>`, it is that letter or digit lowercased, because macOS turns `Option+<key>` into another character. Else it is `e.key` as it is. The `e.code` step is skipped when `getModifierState('AltGraph')` is true: the browser sets it when AltGr, or Ctrl+Alt on a layout with AltGr, types a character. So Polish AltGr+A is `ctrl+alt+ą`, not `ctrl+alt+a`, and the character reaches the app.
 3. The app forwards a press only when its combo name is in the list, and then prevents its default action. Every other key stays in the app.
 4. The hub runs the binding for that combo.
 

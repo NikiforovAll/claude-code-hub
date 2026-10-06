@@ -68,7 +68,8 @@ describe('key matrix', () => {
     it(row.name, { todo: row.todo }, () => {
       const hub = hubs[row.platform];
       assert.equal(hub.actionOf(eventOf(row)), row.expect, 'press on the hub page');
-      assert.equal(hub.actionOfForwarded(payloadOf(row)), row.expect, 'press forwarded from an app');
+      // The SDK never forwards an AltGr character; the SDK's own matrix test covers that path.
+      if (!row.altGraph) assert.equal(hub.actionOfForwarded(payloadOf(row)), row.expect, 'press forwarded from an app');
     });
   }
 });

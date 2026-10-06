@@ -6,6 +6,7 @@ The SDK follows semver. A new function or message is a minor version, a change t
 
 - `src/keys.js` holds `comboOf()`, the one rule that names a key press. The hub page, `client.js` and `stub.js` all use it, so the copies are gone. `/vendor/claude-hub-sdk.js` and the `sdk:sync` copies are `keys.js` followed by the client or the stub, still one classic script. It adds one global, `ClaudeHubKeys`. `ClaudeHub.comboOf` is the same function and stays self-contained, so its source text still runs on its own.
 - Server `bundle(file)` gives that one-script text for `client.js` or `stub.js`. `mount()` builds it once at startup.
+- `comboOf()` names a press by its character when `getModifierState('AltGraph')` is set, with no `e.code` fallback, so AltGr text (Polish AltGr+A is `ą`) is no longer Ctrl+Alt+A.
 
 ## 1.2.0
 

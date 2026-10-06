@@ -53,7 +53,8 @@ function payloadOf(row) {
 
 function eventOf(row) {
   const { ctrl, alt, shift, meta, ...rest } = payloadOf(row);
-  return { ...rest, ctrlKey: ctrl, altKey: alt, shiftKey: shift, metaKey: meta };
+  const getModifierState = (m) => m === 'AltGraph' && row.altGraph === true;
+  return { ...rest, ctrlKey: ctrl, altKey: alt, shiftKey: shift, metaKey: meta, getModifierState };
 }
 
 module.exports = { MATRIX, source, loadHubKeys, eventOf, payloadOf };

@@ -165,6 +165,16 @@ for (const platform of Object.keys(PLATFORMS)) describe(`key matrix in Chrome on
       await frame.evaluate(() => {
         window.addEventListener('keydown', (e) => (window.lastKey = { key: e.key, prevented: e.defaultPrevented }), { once: true });
       });
+      // CDP has no AltGraph modifier, so the app frame reports it for this press.
+      await frame.evaluate((on) => {
+        const proto = KeyboardEvent.prototype;
+        window.realGetModifierState ??= proto.getModifierState;
+        proto.getModifierState = on
+          ? function (m) {
+              return m === 'AltGraph' || window.realGetModifierState.call(this, m);
+            }
+          : window.realGetModifierState;
+      }, row.altGraph === true);
       await press(row);
       const kept = row.expect === 'text';
       assert.deepEqual(await frame.evaluate(() => window.lastKey), { key: row.key, prevented: !kept }, 'the press lands in the app');

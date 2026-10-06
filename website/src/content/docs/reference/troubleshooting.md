@@ -38,6 +38,7 @@ For another config dir, set `CLAUDE_CONFIG_DIR` to that dir first. See [Use more
 - A palette is open. While it is open, the tool keys do nothing. Press <kbd>Esc</kbd>.
 - The key also holds <kbd>Shift</kbd> or <kbd>Meta</kbd>. The tools send only the plain key to the hub.
 - It is <kbd>Ctrl+Alt+N</kbd>, <kbd>Ctrl+Alt+R</kbd>, or <kbd>Ctrl+Alt+S</kbd>. Kanban keeps these keys.
+- On your layout, <kbd>Ctrl+Alt</kbd> with that key types a character, for example `ą` on a Polish layout. See [AltGr layouts](/claude-code-hub/reference/shortcuts/).
 - Another program on your system uses the key, for example a window manager or a keyboard tool.
 
 ## The project palette is empty

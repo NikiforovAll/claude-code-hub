@@ -393,6 +393,13 @@ describe('keys', () => {
     assert.equal(comboOf({ ...ctrlAlt('K', 'KeyK'), shiftKey: true, metaKey: true }), 'ctrl+alt+shift+meta+k');
   });
 
+  it('names an AltGr character by the character', () => {
+    const altGr = (key, code) => ({ ...ctrlAlt(key, code), getModifierState: (m) => m === 'AltGraph' });
+    assert.equal(comboOf(altGr('ą', 'KeyA')), 'ctrl+alt+ą');
+    assert.equal(comboOf(altGr('w', 'KeyW')), 'ctrl+alt+w');
+    assert.equal(comboOf(ctrlAlt('ф', 'KeyA')), 'ctrl+alt+a');
+  });
+
   it('gives the same comboOf from the client, the stub and the global', () => {
     const env = fakeEnv({ framed: false });
     const events = [ctrlAlt('π', 'KeyP'), ctrlAlt('ArrowLeft', 'ArrowLeft'), { ...NO_MODS, key: '?', code: 'Slash' }];
