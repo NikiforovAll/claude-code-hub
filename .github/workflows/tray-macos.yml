@@ -13,10 +13,10 @@ jobs:
     runs-on: macos-latest
     timeout-minutes: 20
     env:
-      HUB: ${{ runner.temp }}/tray-hub
-      OUT: ${{ runner.temp }}/tray-out
+      HUB: ${{ github.workspace }}/tray-hub
+      OUT: ${{ github.workspace }}/tray-out
       PORTS: --port 3640 --kanban-port 3641 --marketplace-port 3642 --cost-port 3643 --memory-port 3644
-      TRAY: osascript -l JavaScript ${{ runner.temp }}/tray-hub/tray/mac/hub-tray.js
+      TRAY: osascript -l JavaScript ${{ github.workspace }}/tray-hub/tray/mac/hub-tray.js
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -85,4 +85,4 @@ jobs:
         if: always()
         with:
           name: tray-macos
-          path: ${{ runner.temp }}/tray-out
+          path: tray-out
