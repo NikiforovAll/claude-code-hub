@@ -473,6 +473,7 @@ function run(argv) {
     const other = Number.parseInt(readText(PID_FILE) || '', 10);
     if (Number.isInteger(other) && other !== myPid && processCommand(other, 'command').includes('hub-tray.js')) return;
     $(`${myPid}\n`).writeToFileAtomicallyEncodingError(PID_FILE, true, $.NSUTF8StringEncoding, null);
+    log(`tray started: pid ${myPid}`);
   }
 
   const app = $.NSApplication.sharedApplication;

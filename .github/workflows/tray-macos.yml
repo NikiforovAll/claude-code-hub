@@ -29,7 +29,7 @@ jobs:
       - name: Start the tray
         run: |
           node server.js --tray --hub-dir "$HUB" $PORTS
-          for i in $(seq 1 90); do [ -f "$HUB/hub.json" ] && break; sleep 2; done
+          for i in $(seq 1 45); do [ -f "$HUB/hub.json" ] && break; sleep 2; done
           node server.js --tray-status --hub-dir "$HUB" | tee "$OUT/status.txt"
           grep -q 'Tray: running' "$OUT/status.txt"
           grep -q 'Hub: running on port 3640' "$OUT/status.txt"
@@ -73,6 +73,18 @@ jobs:
           [ "$(pgrep -f hub-tray.js | wc -l)" -eq 1 ]
           node server.js --no-autostart --hub-dir "$HUB"
           [ ! -f "$plist" ]
+
+      - name: Diagnose
+        if: failure()
+        run: |
+          ls -la "$HUB" | tee "$OUT/hub-dir.txt"
+          cp "$HUB/tray/config.json" "$OUT/tray-config.json" || true
+          pid=$(cat "$HUB/tray.pid" 2>/dev/null || true)
+          [ -n "$pid" ] && sample "$pid" 3 -file "$OUT/tray-sample.txt" || true
+          [ -n "$pid" ] && kill "$pid" || true
+          rm -f "$HUB/tray.pid"
+          perl -e 'alarm 30; exec @ARGV' $TRAY > "$OUT/tray-foreground.txt" 2>&1 || true
+          cat "$OUT/tray-foreground.txt"
 
       - name: Clean up
         if: always()
