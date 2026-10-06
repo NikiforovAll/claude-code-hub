@@ -1,6 +1,7 @@
 // macOS tray, run by `osascript -l JavaScript`. In the JXA bridge a method with no arguments is
-// read as a property (`task.launch`), and an exception in an ObjC callback is dropped silently,
-// so every callback goes through guard().
+// read as a property (`task.launch`), a JS null object argument arrives as NSNull (pass `$()` for
+// nil), and an exception in an ObjC callback is dropped silently, so every callback goes through
+// guard().
 ObjC.import('Cocoa');
 ObjC.bindFunction('kill', ['int', ['int', 'int']]);
 
@@ -47,7 +48,7 @@ function readJson(p) {
 }
 
 function appendHandle(p) {
-  if (!exists(p)) fm.createFileAtPathContentsAttributes(p, null, null);
+  if (!exists(p)) fm.createFileAtPathContentsAttributes(p, $.NSData.data, $());
   const h = $.NSFileHandle.fileHandleForWritingAtPath(p);
   h.seekToEndOfFile;
   return h;
@@ -251,7 +252,7 @@ function toggleAutostart() {
   if (autostartOn()) {
     fm.removeItemAtPathError(config.launchAgent, null);
   } else {
-    fm.createDirectoryAtPathWithIntermediateDirectoriesAttributesError(dirname(config.launchAgent), true, null, null);
+    fm.createDirectoryAtPathWithIntermediateDirectoriesAttributesError(dirname(config.launchAgent), true, $(), null);
     fm.copyItemAtPathToPathError(`${TRAY_DIR}/mac/autostart.plist`, config.launchAgent, null);
   }
 }
