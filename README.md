@@ -157,6 +157,8 @@ The hub has no visible UI of its own. Use these shortcuts:
 
 <kbd>Alt</kbd>+<kbd>1</kbd> to <kbd>Alt</kbd>+<kbd>4</kbd> follow the tab order, so they change when you [choose the tools](#choose-the-tools).
 
+On macOS, every hub key is <kbd>Control</kbd>+<kbd>Option</kbd> with a key, the tool numbers too: <kbd>⌃⌥1</kbd> to <kbd>⌃⌥4</kbd>. <kbd>Option</kbd> with a digit types a character there, so the hub leaves it to the tools.
+
 In a palette, use <kbd>↑</kbd>/<kbd>↓</kbd> or <kbd>Tab</kbd> to move, <kbd>Enter</kbd> to select, and <kbd>Esc</kbd> to close.
 
 The shortcuts also work when focus is inside a tool. Kanban keeps <kbd>Ctrl</kbd>+<kbd>Alt</kbd>+<kbd>N</kbd> (new session), <kbd>Ctrl</kbd>+<kbd>Alt</kbd>+<kbd>R</kbd> (resume session), and <kbd>Ctrl</kbd>+<kbd>Alt</kbd>+<kbd>S</kbd> (previous session) for itself. From Kanban you can also jump to another tool for the selected session:

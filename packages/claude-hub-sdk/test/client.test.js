@@ -1,8 +1,5 @@
 const { describe, it } = require('node:test');
 const assert = require('node:assert/strict');
-const fs = require('node:fs');
-const path = require('node:path');
-const vm = require('node:vm');
 const { createClaudeHub, comboOf } = require('../src/client');
 const stub = require('../src/stub');
 
@@ -397,9 +394,7 @@ describe('keys', () => {
   });
 
   it('names combos the same as the hub page', () => {
-    const src = fs.readFileSync(path.join(__dirname, '../../../public/app.js'), 'utf8');
-    const fn = (name) => new RegExp(`^function ${name}\\(e\\) \\{[\\s\\S]*?^\\}`, 'm').exec(src)[0];
-    const hub = vm.runInNewContext(`${fn('bindingKey')}\n${fn('comboOf')}\ncomboOf`);
+    const hub = require('../../../test/helpers/hub-keys').loadHubKeys().comboOf;
     const events = [
       ctrlAlt('P', 'KeyP'),
       ctrlAlt('π', 'KeyP'),
@@ -441,6 +436,24 @@ describe('keys', () => {
     assert.equal(alone.hub.forwards(ctrlAlt('k', 'KeyK')), false);
     assert.deepEqual(alone.hub.forwardCombos(), []);
   });
+});
+
+describe('key matrix, app to hub', () => {
+  const { MATRIX, loadHubKeys, eventOf } = require('../../../test/helpers/hub-keys');
+  const hubs = { win: loadHubKeys(), mac: loadHubKeys({ platform: 'mac' }) };
+
+  for (const row of MATRIX.rows) {
+    it(row.name, { todo: row.todo }, async () => {
+      const hubKeys = hubs[row.platform];
+      const { env } = await connected();
+      env.fromHub(welcome({ forward: Object.keys(hubKeys.bindings()) }));
+      const press = env.key(eventOf(row));
+      const forwarded = env.sent().slice(1);
+      assert.equal(press.prevented, row.expect !== 'text', 'the app keeps the press');
+      assert.equal(forwarded.length, row.expect === 'text' ? 0 : 1);
+      if (forwarded.length) assert.equal(hubKeys.actionOfForwarded(forwarded[0]), row.expect);
+    });
+  }
 });
 
 describe('other messages', () => {

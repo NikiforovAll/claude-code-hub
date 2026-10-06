@@ -19,9 +19,19 @@ The hub has no visible controls. These keys drive it. They work while focus is i
 | <kbd>Ctrl+Alt+W</kbd> | Open or close the config-dir palette |
 | <kbd>Ctrl+Alt+A</kbd> | Open or close the app launcher |
 
-The <kbd>Alt</kbd>+number keys follow the tab order. The table shows the default order. The `apps` list in the [config file](/claude-code-hub/reference/configuration/#the-config-file) changes it, and a tool that is off has no number.
+The number keys follow the tab order. The table shows the default order. The `apps` list in the [config file](/claude-code-hub/reference/configuration/#the-config-file) changes it, and a tool that is off has no number.
 
-On macOS, use <kbd>Control+Option</kbd> for <kbd>Ctrl+Alt</kbd> and <kbd>Option</kbd> for <kbd>Alt</kbd>.
+## macOS
+
+On macOS, every hub key is <kbd>Control+Option</kbd> (⌃⌥) with a key, the tool numbers too:
+
+| Key | Action |
+| --- | --- |
+| <kbd>⌃⌥→</kbd> / <kbd>⌃⌥←</kbd> | Next or previous tool |
+| <kbd>⌃⌥1</kbd> … <kbd>⌃⌥9</kbd> | Go to a tool by its number |
+| <kbd>⌃⌥P</kbd>, <kbd>⌃⌥W</kbd>, <kbd>⌃⌥A</kbd> | Project palette, config-dir palette, app launcher |
+
+<kbd>Option</kbd> with a digit types a character on macOS, for example <kbd>Option+5</kbd> types `[` on a German layout. The hub does not bind it, so you can type these characters in every tool.
 
 ## Palettes
 

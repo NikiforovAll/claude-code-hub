@@ -10,6 +10,7 @@
     "start": "node server.js",
     "dev": "node server.js --open",
     "test": "node --test test/*.test.js packages/claude-hub-sdk/test/*.test.js",
+    "test:e2e": "node --test --test-concurrency=1 test/e2e/keys.e2e.mjs",
     "update": "bash scripts/update-submodules.sh",
     "update:check": "bash scripts/update-submodules.sh --check",
     "lint": "npx @biomejs/biome check public/app.js server.js packages/claude-hub-sdk && npm run check:escaping && npm run check:security-lib",
@@ -65,6 +66,7 @@
   ],
   "devDependencies": {
     "@biomejs/biome": "^2.4.10",
-    "husky": "^9.1.7"
+    "husky": "^9.1.7",
+    "playwright-core": "^1.63.0"
   }
 }

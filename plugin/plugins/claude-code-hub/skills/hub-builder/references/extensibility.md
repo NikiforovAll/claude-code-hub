@@ -40,7 +40,7 @@ Rules:
 
 - `path` is the folder with `hub-app.json`: absolute, or relative to the folder of `config.json`. The hub does not expand `~`.
 - A built-in id (`kanban`, `marketplace`, `cost`, `memory`) with a `path` runs that folder in place of the tool, with no second entry. A new id needs a `path` and runs as an extra tab.
-- Listed apps come first in list order, then the unlisted built-ins in default order. Tab order is also the `Alt+1`…`Alt+9` order.
+- Listed apps come first in list order, then the unlisted built-ins in default order. Tab order is also the `Alt+1`…`Alt+9` order (`⌃⌥1`…`⌃⌥9` on macOS).
 - `enabled: false` removes the app: no process, tab or port, and its actions and capabilities go to no one.
 
 ## The launch

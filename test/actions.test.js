@@ -1,11 +1,10 @@
 'use strict';
 
 const assert = require('node:assert/strict');
-const fs = require('node:fs');
-const path = require('node:path');
 const vm = require('node:vm');
 const { describe, it } = require('node:test');
 const { actionTable } = require('../lib/actions');
+const { source } = require('./helpers/hub-keys');
 
 const app = (id, handles) => ({ id, actions: { handles } });
 
@@ -56,10 +55,8 @@ describe('actionTable', () => {
 });
 
 describe('hub page params and url', () => {
-  const src = fs.readFileSync(path.join(__dirname, '..', 'public', 'app.js'), 'utf8');
-  const fn = (name) => new RegExp(`^function ${name}\\([^)]*\\) \\{[\\s\\S]*?^\\}`, 'm').exec(src)[0];
   const { badParams, fillUrl } = vm.runInNewContext(
-    `${fn('isPlainObject')}\n${fn('badParams')}\n${fn('fillUrl')}\n({ badParams, fillUrl })`,
+    `${source('isPlainObject')}\n${source('badParams')}\n${source('fillUrl')}\n({ badParams, fillUrl })`,
   );
   const declared = { session: 'string?', project: 'string' };
 

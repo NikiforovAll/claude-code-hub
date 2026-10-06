@@ -11,7 +11,10 @@ Claude Code Hub — a unified launcher that combines multiple Claude Code tools 
 ```bash
 npm start                # Start hub + all sub-apps (http://localhost:3540)
 npm run dev              # Start with auto-open browser
+npm run test:e2e         # Hub keys in Chrome (needs Chrome); by hand only, not in npm test, the hook or CI
 ```
+
+`test/fixtures/key-matrix.json` is the list of key presses and what each one must do. `npm test` runs it against the hub page and the SDK; `npm run test:e2e` presses it in Chrome against a scratch hub with fixture apps. A row with `todo` is a known bug. Add a row with each key change.
 
 The hub is usually already running on :3540. Check it with `curl -s -o /dev/null -w '%{http_code}' http://localhost:3540/api/config` (401 without the token still means it is up; add `?token=$(cat ~/.claude-hub/token)` to read it). Use it only for read-only checks. To test a fix, start a second hub on other ports (`--port`, `--marketplace-port`, `--kanban-port`, `--cost-port`, `--memory-port`) so the running one is not disturbed.
 
@@ -48,7 +51,7 @@ Every feature, in the hub or a sub-app, states its performance impact before you
 **Update check.** `lib/update-check.js` asks npm for `claude-code-hub@latest` on start. `GET /api/update` waits for a check in flight and answers `{version, update}`; the page shows a toast for it on load. The check is off in a git checkout and with `CLAUDE_HUB_NO_UPDATE_CHECK`, so a dev hub never shows it.
 
 **postMessage protocol (v1, stable)** enables cross-app communication. The spec is `website/src/content/docs/reference/protocol.md`; keep it in step with the code.
-- `hub:hello` / `hub:welcome` — the app says hello with the topics it subscribes to; the hub answers with `forward` (the combos it binds, the keys of `bindings()`: `ctrl+alt+p`, `ctrl+alt+w`, `ctrl+alt+a`, `ctrl+alt+ArrowLeft`, `alt+1` … `alt+N` for N enabled apps), `themes` and `actions`. The hub sends nothing else to an app until its hello. An app with no welcome after 2 s runs as if alone.
+- `hub:hello` / `hub:welcome` — the app says hello with the topics it subscribes to; the hub answers with `forward` (the combos it binds, the keys of `bindings()`: `ctrl+alt+p`, `ctrl+alt+w`, `ctrl+alt+a`, `ctrl+alt+ArrowLeft`, `alt+1` … `alt+N` for N enabled apps, `ctrl+alt+1` … on macOS because Option+digit types a character there), `themes` and `actions`. The hub sends nothing else to an app until its hello. An app with no welcome after 2 s runs as if alone.
 - `hub:event` — hub → sub-apps, a topic the app subscribed to: `theme.changed` (light/dark, color theme and vars) and `project.changed` (the hub owns the abs-path → encoded transform). Both are replayed on hello. A document the hub loaded from an action URL skips the `project.changed` replay once, so the link keeps its project.
 - `hub:publish` — app → hub, `{topic, payload}` for a topic in the app's manifest `publishes` (cck: `session.changed`). The hub keeps the last value, adds `encoded`/`projectName` when the payload has `project`, sends it as `hub:event` to subscribers except the sender, replays it after welcome and clears it on a config-dir switch. A hidden app gets only the last value of each topic it missed, when it comes on screen, before `hub:active`.
 - `hub:invoke` / `hub:result` / `hub:action` — an app calls a hub action; the hub routes it to the target app as `hub:action` or loads its URL

@@ -11,6 +11,9 @@ const liveApps = new Map();
 // Apps whose next document the hub loads from an action URL.
 const linkLoads = new Set();
 const HUB_PROTOCOLS = [1];
+// Option+digit types a character on macOS (Option+5 is '[' on German layouts), so the tab numbers
+// there are Control+Option+digit.
+const IS_MAC = /^Mac/i.test(navigator.userAgentData?.platform || navigator.platform || '');
 // {theme: 'dark'|'light', colorTheme: '<id>', colorThemes: {<configDir>: '<id>'}} — survives hub
 // reloads so late-loading iframes and fresh sessions get the last chosen theme. Light/dark is
 // global; the color theme is per config dir, and colorTheme is the last one picked anywhere, which
@@ -610,9 +613,19 @@ function bindings() {
   Object.keys(apps)
     .slice(0, 9)
     .forEach((id, i) => {
-      map[`alt+${i + 1}`] = { run: () => switchTab(id) };
+      map[tabCombo(i)] = { run: () => switchTab(id) };
     });
   return map;
+}
+
+function tabCombo(i) {
+  return `${IS_MAC ? 'ctrl+alt' : 'alt'}+${i + 1}`;
+}
+
+function comboLabel(combo) {
+  const keys = combo.split('+');
+  if (IS_MAC) return keys.map((k) => ({ ctrl: '⌃', alt: '⌥', shift: '⇧', meta: '⌘' })[k] ?? k.toUpperCase()).join('');
+  return keys.map((k) => ({ ctrl: 'Ctrl', alt: 'Alt', shift: 'Shift', meta: 'Win' })[k] ?? k.toUpperCase()).join('+');
 }
 
 // The SDK's comboOf() is a copy of this: modifiers in ctrl, alt, shift, meta order, joined by
@@ -988,7 +1001,7 @@ const PALETTE_MODES = {
       const stats = el('span', 'stats', s?.rss ? `${Math.round(s.rss / 1048576)} MB · ${s.cpu}%` : '');
       stats.title = 'Memory and CPU of the app process. Child processes are not counted. 100% is one core.';
       li.append(stats);
-      const key = row.id === activeApp ? 'active' : row.index < 9 ? `Alt+${row.index + 1}` : '';
+      const key = row.id === activeApp ? 'active' : row.index < 9 ? comboLabel(tabCombo(row.index)) : '';
       li.append(el('span', 'age', key));
       li.append(rowButton('palette-restart', '↻', 'r', 'Restart the app (Ctrl+R)', `Restart ${row.app.name}`));
     },
