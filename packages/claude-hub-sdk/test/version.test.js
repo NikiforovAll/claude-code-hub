@@ -12,6 +12,7 @@ const RELEASED = {
   '1.1.0': '0fed14faa670',
   '1.2.0': '62c7d9f477b2',
   '1.3.0': '4c9f3341a24d',
+  '1.4.0': '7d559a8888ce',
 };
 
 describe('version', () => {

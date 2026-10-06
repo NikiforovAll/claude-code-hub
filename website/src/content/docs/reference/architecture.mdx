@@ -79,7 +79,7 @@ The page code is the same in both modes. It calls `ClaudeHub.connect()` and uses
     { from: 1, to: 0, label: 'GET /vendor/claude-hub-sdk.js', detail: "the hub's client, served by mount()" },
     { from: 1, to: 0, label: 'GET /hub-config', detail: '{enabled: true, url: HUB_URL}' },
     { from: 1, to: 2, label: 'hub:hello', detail: '{protocol: [1], subscribes}, after load' },
-    { from: 2, to: 1, label: 'hub:welcome', detail: '{protocol: 1, forward, themes, actions}' },
+    { from: 2, to: 1, label: 'hub:welcome', detail: '{protocol: 1, forward, keys, themes, actions}' },
     { from: 2, to: 1, label: 'hub:event', detail: 'last theme.changed and project.changed' },
     { from: 2, to: 1, label: 'hub:active', detail: '{active}: is this tool on screen' },
   ]}
@@ -98,7 +98,7 @@ The page and the tools talk with `postMessage`. The hub accepts a message only f
 | Message | Direction | Content |
 | --- | --- | --- |
 | `hub:hello` | Tool to hub | The protocol versions and the topics the tool subscribes to |
-| `hub:welcome` | Hub to tool | The key combos the hub binds (for example `ctrl+alt+p` and `alt+1`), the color themes, and the actions that the tools handle |
+| `hub:welcome` | Hub to tool | The key combos the hub binds (for example `ctrl+alt+p` and `alt+1`), the combo of each hub action for the tools' help, the color themes, and the actions that the tools handle |
 | `hub:event` | Hub to tool | A subscribed topic: `theme.changed` (mode, color theme and colors) or `project.changed` (the project picked in the palette) |
 | `hub:invoke` | Tool to hub | Run an action, for example open a session in Cost |
 | `hub:result` | Hub to tool | The result of a `hub:invoke` |

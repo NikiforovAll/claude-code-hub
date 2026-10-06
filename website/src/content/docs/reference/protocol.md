@@ -110,7 +110,7 @@ The hub ships the SDK and hands it to each app it spawns, so the app runs the hu
 3. **Load it first.** The page loads `/vendor/claude-hub-sdk.js` as a classic script, the first element in `<body>`, with no `defer` or `async` ([Theme](#6-theme), rule 3).
 4. **Same API.** The stub and the client have the same functions. The hub's tests check this.
 
-The app's page code calls `ClaudeHub.connect()` and uses the returned object: `subscribe`, `publish`, `bindTheme`, `onThemes`, `onActive`, `onStatus`, `handle`, `invoke`, `can`, `forwards`, `closeGuard`, `openExternal` and `terminalToken`. It works the same with the stub and the client.
+The app's page code calls `ClaudeHub.connect()` and uses the returned object: `subscribe`, `publish`, `bindTheme`, `onThemes`, `onActive`, `onStatus`, `handle`, `invoke`, `can`, `forwards`, `forwardCombos`, `keyLabel`, `closeGuard`, `openExternal` and `terminalToken`. It works the same with the stub and the client.
 
 ### HTTP
 
@@ -142,7 +142,7 @@ Each message is `{type: 'hub:<name>', …payload}`, sent with `postMessage`.
 | Direction | Type | Payload |
 |---|---|---|
 | App → hub | `hub:hello` | `{protocol: [1], subscribes?: string[]}` |
-| Hub → app | `hub:welcome` | `{protocol: 1, forward: string[], themes: Theme[], actions: string[]}` |
+| Hub → app | `hub:welcome` | `{protocol: 1, forward: string[], keys?: {[action]: string \| null}, themes: Theme[], actions: string[]}` |
 
 1. The app sends `hello` after its own `load` event, once `/hub-config` resolves with `enabled: true` and its message listeners are in place. It sends it once per document.
 2. `protocol` lists the versions the app speaks. The hub answers with the highest version in both lists. When there is none, the hub does not answer, and the app works as an app with no `welcome` ([No welcome](#no-welcome)).
@@ -150,6 +150,7 @@ Each message is `{type: 'hub:<name>', …payload}`, sent with `postMessage`.
 4. After `welcome`, the hub sends the current state: a `hub:event` for each sticky topic in `subscribes` that has a value ([Events](#10-events)), and `hub:active`. An app gets no theme or project for a topic it did not subscribe to.
 5. `welcome` fields:
    - `forward`: the key combos the hub binds ([Keys](#8-keys)).
+   - `keys`: the combo of each hub action, for an app's help ([Keys](#8-keys), rule 5).
    - `themes`: the list for the theme picker ([Theme](#6-theme)).
    - `actions`: the actions that an enabled app handles ([Actions](#7-actions)).
 
@@ -250,6 +251,7 @@ A key press inside an iframe does not reach the hub page, so the app forwards th
 2. **Combo name.** The modifiers that are down, in the order `ctrl`, `alt`, `shift`, `meta`, joined by `+`, then the key. The key is `e.key` lowercased when that is `a`–`z` or `1`–`9`. Else, when `e.code` is `Key<A-Z>` or `Digit<1-9>`, it is that letter or digit lowercased, because macOS turns `Option+<key>` into another character. Else it is `e.key` as it is. The `e.code` step is skipped when `getModifierState('AltGraph')` is true: the browser sets it when AltGr, or Ctrl+Alt on a layout with AltGr, types a character. So Polish AltGr+A is `ctrl+alt+ą`, not `ctrl+alt+a`, and the character reaches the app.
 3. The app forwards a press only when its combo name is in the list, and then prevents its default action. Every other key stays in the app.
 4. The hub runs the binding for that combo.
+5. **Help.** `welcome.keys` maps each hub action to its combo, so an app's help shows the keys the user set. The actions are `hub.projectPicker`, `hub.configDirPicker`, `hub.appLauncher`, `hub.prevApp`, `hub.nextApp` and `hub.appByNumber`. The combo of `hub.appByNumber` is a pattern, such as `alt+{n}`, where `{n}` is the tab number. The value is `null` when no key runs the action. A hub older than this field sends no `keys`, and the app shows its default keys. The SDK's `keyLabel(action)` gives the keys in this system's names.
 
 An element that handles keys before the document sees them, such as a terminal, asks the SDK's `forwards(e)` and lets a forwarded key through.
 

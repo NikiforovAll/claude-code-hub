@@ -36,6 +36,7 @@
         can: (action) => !!standaloneFn(action),
         forwards: () => false,
         forwardCombos: () => [],
+        keyLabel: () => null,
         closeGuard() {},
         openExternal(url) {
           win.open(url, '_blank', 'noopener');

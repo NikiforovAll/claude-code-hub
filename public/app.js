@@ -3,7 +3,7 @@ let apps = {};
 let keymap = null;
 // config.json `keys`, {actionId: combo | null}, from /api/config.
 let userKeys = {};
-const { comboOf } = ClaudeHubKeys;
+const { comboOf, keyParts } = ClaudeHubKeys;
 let activeApp = null;
 // The app launcher's cursor starts here, so Ctrl+Alt+A then Enter goes back to the last tab.
 let previousApp = null;
@@ -480,6 +480,7 @@ function onHello(appId, data) {
     type: 'hub:welcome',
     protocol: Math.max(...common),
     forward: Object.keys(bindings()),
+    keys: actionKeys(),
     themes: hubThemes,
     actions: Object.keys(actions),
   });
@@ -634,7 +635,7 @@ function bindings() {
   const tabs = Object.keys(apps).length;
   const own = (b) => Object.hasOwn(userKeys, b.id);
   const expand = (action) => {
-    const combo = own(action) ? userKeys[action.id] : action.combo;
+    const combo = comboFor(action);
     if (!combo) return [];
     if (!action.count) return [[combo, { ...action, combo }]];
     return Array.from({ length: Math.min(action.count, tabs) }, (_, i) => {
@@ -648,6 +649,17 @@ function bindings() {
   return keymap;
 }
 
+function comboFor(action) {
+  return Object.hasOwn(userKeys, action.id) ? userKeys[action.id] : action.combo;
+}
+
+// Action id → its combo, hub.appByNumber as its {n} pattern, or null when no key runs it. What
+// welcome.keys lists for the apps' help.
+function actionKeys() {
+  const bound = new Set(Object.values(bindings()).map((b) => b.id));
+  return Object.fromEntries(hubActions().map((a) => [a.id, bound.has(a.id) ? comboFor(a) : null]));
+}
+
 function setApps(list) {
   apps = list;
   keymap = null;
@@ -658,9 +670,7 @@ function appNumberCombo(i) {
 }
 
 function comboLabel(combo) {
-  const keys = combo.split('+');
-  if (IS_MAC) return keys.map((k) => ({ ctrl: '⌃', alt: '⌥', shift: '⇧', meta: '⌘' })[k] ?? k.toUpperCase()).join('');
-  return keys.map((k) => ({ ctrl: 'Ctrl', alt: 'Alt', shift: 'Shift', meta: 'Win' })[k] ?? k.toUpperCase()).join('+');
+  return keyParts(combo, IS_MAC).join(IS_MAC ? '' : '+');
 }
 
 function cycleTab(delta) {
@@ -934,6 +944,16 @@ async function restartFromPalette(id) {
   switchTab(id);
 }
 
+async function copyAppUrl(id) {
+  const url = apps[id].url;
+  try {
+    await navigator.clipboard.writeText(url);
+    setPaletteHint(`Copied ${url}`);
+  } catch (err) {
+    setPaletteHint(`Could not copy ${url}: ${err.message}`);
+  }
+}
+
 // `typed` is the trimmed query, `q` its lowercase form for matching.
 const PALETTE_MODES = {
   project: {
@@ -999,7 +1019,7 @@ const PALETTE_MODES = {
   app: {
     placeholder: 'Search apps...',
     label: 'Switch app',
-    hint: 'Enter switch · Ctrl+R restart the app',
+    hint: 'Enter switch · Ctrl+C copy the URL · Ctrl+R restart the app',
     empty: 'No matching app',
     rows: (_typed, q) => appRows(q),
     load: loadAppStats,
@@ -1008,7 +1028,7 @@ const PALETTE_MODES = {
       return prev < 0 ? 0 : prev;
     },
     fillRow(li, row, q) {
-      li.append(appIcon(row.app), markedSpan('name', row.app.name, q));
+      li.append(appIcon(row.app), markedSpan('name', row.app.name, q), el('span', 'url', new URL(row.app.url).host));
       const s = palette.appStats?.[row.id];
       if (s?.slowMs) {
         const badge = el('span', 'slow', 'slow port');
@@ -1021,9 +1041,12 @@ const PALETTE_MODES = {
       const combo = appNumberCombo(row.index);
       const key = row.id === activeApp ? 'active' : combo ? comboLabel(combo) : '';
       li.append(el('span', 'age', key));
-      li.append(rowButton('palette-restart', '↻', 'r', 'Restart the app (Ctrl+R)', `Restart ${row.app.name}`));
+      li.append(
+        rowButton('palette-copy', '⧉', 'c', 'Copy the URL (Ctrl+C)', `Copy the URL of ${row.app.name}`),
+        rowButton('palette-restart', '↻', 'r', 'Restart the app (Ctrl+R)', `Restart ${row.app.name}`),
+      );
     },
-    rowKeys: { r: (row) => restartFromPalette(row.id) },
+    rowKeys: { c: (row) => copyAppUrl(row.id), r: (row) => restartFromPalette(row.id) },
     commit(row) {
       closePalette();
       switchTab(row.id);
@@ -1221,11 +1244,13 @@ function bindPalette() {
     } else if (e.key === 'ArrowUp' || (e.key === 'Tab' && e.shiftKey)) {
       e.preventDefault();
       movePaletteSel(-1);
-    } else if (e.ctrlKey && !e.altKey && !e.shiftKey && !e.metaKey && ['d', 'r'].includes(e.key.toLowerCase())) {
+    } else if (e.ctrlKey && !e.altKey && !e.shiftKey && !e.metaKey && ['c', 'd', 'r'].includes(e.key.toLowerCase())) {
+      const run = PALETTE_MODES[palette.mode].rowKeys?.[e.key.toLowerCase()];
+      // Ctrl+C with text selected in the input keeps the browser's copy.
+      if (e.key.toLowerCase() === 'c' && (!run || input.selectionStart !== input.selectionEnd)) return;
       // Ctrl+D would otherwise bookmark the page in Chrome and Firefox.
       // Ctrl+R would otherwise reload the hub page.
       e.preventDefault();
-      const run = PALETTE_MODES[palette.mode].rowKeys?.[e.key.toLowerCase()];
       const row = palette.rows[palette.sel];
       if (run && row && row.kind !== 'literal') run(row);
     }

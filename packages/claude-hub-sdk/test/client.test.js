@@ -1,6 +1,7 @@
 const { describe, it } = require('node:test');
 const assert = require('node:assert/strict');
 const { createClaudeHub, comboOf } = require('../src/client');
+const { keyParts } = require('../src/keys');
 const stub = require('../src/stub');
 
 const HUB = 'http://localhost:3540';
@@ -9,7 +10,13 @@ const CACHED = { 'claude-hub:vars': JSON.stringify(VARS) };
 const NO_MODS = { key: '', code: '', ctrlKey: false, altKey: false, shiftKey: false, metaKey: false };
 const ctrlAlt = (key, code) => ({ ...NO_MODS, key, code, ctrlKey: true, altKey: true });
 
-function fakeEnv({ framed = true, config = { enabled: true, url: HUB }, readyState = 'complete', storage = {} } = {}) {
+function fakeEnv({
+  framed = true,
+  config = { enabled: true, url: HUB },
+  readyState = 'complete',
+  storage = {},
+  platform = 'Win32',
+} = {}) {
   const listeners = {};
   const on = (type, fn) => {
     if (!listeners[type]) listeners[type] = [];
@@ -26,6 +33,7 @@ function fakeEnv({ framed = true, config = { enabled: true, url: HUB }, readySta
   const sheets = [];
   const win = {
     addEventListener: on,
+    navigator: { platform },
     fetch: async () => ({ json: async () => config }),
     localStorage: {
       getItem: (k) => (k in storage ? storage[k] : null),
@@ -429,6 +437,71 @@ describe('keys', () => {
     const alone = await connected({}, { config: { enabled: false } });
     assert.equal(alone.hub.forwards(ctrlAlt('k', 'KeyK')), false);
     assert.deepEqual(alone.hub.forwardCombos(), []);
+  });
+
+  it('names the keys of a combo for a help row', () => {
+    assert.deepEqual(keyParts('ctrl+alt+p', false), ['Ctrl', 'Alt', 'P']);
+    assert.deepEqual(keyParts('ctrl+alt+p', true), ['⌃', '⌥', 'P']);
+    assert.deepEqual(keyParts('ctrl+alt+ArrowLeft', false), ['Ctrl', 'Alt', '←']);
+    assert.deepEqual(keyParts('alt+{n}', false), ['Alt', '1…9']);
+    assert.deepEqual(keyParts('ctrl+shift+meta+F2', true), ['⌃', '⇧', '⌘', 'F2']);
+  });
+
+  it('gives keyLabel from welcome.keys', async () => {
+    const keys = { 'hub.projectPicker': 'ctrl+alt+o', 'hub.appByNumber': 'alt+{n}', 'hub.configDirPicker': null };
+    const { env, hub } = await connected();
+    assert.equal(hub.keyLabel('hub.projectPicker'), null, 'before welcome');
+    env.fromHub(welcome({ keys: { ...keys, 'hub.prevApp': 7 } }));
+    assert.deepEqual(hub.keyLabel('hub.projectPicker'), ['Ctrl', 'Alt', 'O']);
+    assert.deepEqual(hub.keyLabel('hub.appByNumber'), ['Alt', '1…9']);
+    assert.deepEqual(hub.keyLabel('hub.configDirPicker'), []);
+    assert.equal(hub.keyLabel('hub.prevApp'), null, 'not a combo');
+    assert.equal(hub.keyLabel('hub.nope'), null);
+    assert.equal(hub.keyLabel(['hub.projectPicker', 'hub.nope']), null);
+    assert.deepEqual(hub.keyLabel(['hub.projectPicker', 'hub.configDirPicker']), ['Ctrl', 'Alt', 'O']);
+
+    const mac = await connected({}, { platform: 'MacIntel' });
+    mac.env.fromHub(welcome({ keys }));
+    assert.deepEqual(mac.hub.keyLabel('hub.projectPicker'), ['⌃', '⌥', 'O']);
+    const alone = await connected({}, { config: { enabled: false } });
+    assert.equal(alone.hub.keyLabel('hub.projectPicker'), null);
+  });
+});
+
+describe('key labels, hub to app', () => {
+  const { MATRIX, loadHubKeys } = require('../../../test/helpers/hub-keys');
+
+  it('labels each hub action as the hub binds it', async () => {
+    const { env, hub } = await connected();
+    env.fromHub(welcome({ keys: loadHubKeys().actionKeys() }));
+    assert.deepEqual(hub.keyLabel('hub.prevApp'), ['Ctrl', 'Alt', '←']);
+    assert.deepEqual(hub.keyLabel(['hub.prevApp', 'hub.nextApp']), ['Ctrl', 'Alt', '←/→']);
+    assert.deepEqual(hub.keyLabel('hub.appByNumber'), ['Alt', '1…9']);
+  });
+
+  it('merges a shared row with one key gone, or different modifiers', async () => {
+    for (const [keys, label] of [
+      [{ 'hub.prevApp': null, 'hub.nextApp': 'ctrl+alt+ArrowRight' }, ['Ctrl', 'Alt', '→']],
+      [{ 'hub.prevApp': 'ctrl+alt+j', 'hub.nextApp': 'ctrl+alt+k' }, ['Ctrl', 'Alt', 'J/K']],
+      [{ 'hub.prevApp': 'ctrl+j', 'hub.nextApp': 'ctrl+alt+k' }, ['Ctrl', 'J/Alt+K']],
+      [{ 'hub.prevApp': 'alt+j', 'hub.nextApp': 'ctrl+alt+ArrowRight' }, ['Alt+J/Ctrl+Alt+→']],
+      [{ 'hub.prevApp': null, 'hub.nextApp': null }, []],
+    ]) {
+      const { env, hub } = await connected();
+      env.fromHub(welcome({ keys }));
+      assert.deepEqual(hub.keyLabel(['hub.prevApp', 'hub.nextApp']), label, JSON.stringify(keys));
+    }
+  });
+
+  it('labels a remap, and an action that lost its default combo has none', async () => {
+    const hubKeys = loadHubKeys({ keys: MATRIX.remap.keys });
+    const { env, hub } = await connected();
+    env.fromHub(welcome({ keys: hubKeys.actionKeys() }));
+    assert.deepEqual(hub.keyLabel('hub.projectPicker'), ['Ctrl', 'Alt', 'O']);
+    assert.deepEqual(hub.keyLabel('hub.nextApp'), ['Ctrl', 'Alt', 'A']);
+    assert.deepEqual(hub.keyLabel('hub.appLauncher'), [], 'nextApp took Ctrl+Alt+A');
+    assert.deepEqual(hub.keyLabel('hub.configDirPicker'), []);
+    assert.deepEqual(hub.keyLabel('hub.appByNumber'), ['Ctrl', 'Shift', '1…9']);
   });
 });
 

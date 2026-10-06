@@ -73,10 +73,11 @@ Under the hub, the SDK writes the hub's color variables, such as `--accent` and 
 | `forwards(e)` | True when the hub binds the key of this `keydown` event. The SDK forwards those keys from the document by itself. Ask this only in an element that takes keys before the document sees them, such as a terminal, and let those keys through |
 | `forwardCombos()` | The combos that `forwards(e)` matches, as strings such as `ctrl+alt+p`. Empty before welcome. Send it to a frame on another origin that takes keys, such as a terminal in its own process, so the frame can hand those keys back |
 | `ClaudeHub.comboOf(e)` | The combo string of a `keydown` event, in the form that `forwardCombos()` uses. A frame with no hub connection loads the SDK script to call it |
+| `keyLabel(action)` | The keys of a hub action for a help row, in this system's names: `['Ctrl', 'Alt', 'P']`, or `['⌃', '⌥', 'P']` on macOS. A list of actions shares one row, such as `['hub.prevApp', 'hub.nextApp']` → `['Ctrl', 'Alt', '←/→']`. `[]` when no key runs the action: hide the row. `null` before welcome, or from a hub that sends no `keys`: show the default keys. The user can change the hub's keys, so a help dialog reads them here, not from a fixed list. The actions are in [Keys](/claude-code-hub/reference/protocol/#8-keys), rule 5 |
 | `closeGuard(on)` | While `on` is true, the hub asks before the window closes. Use it while a key such as <kbd>Ctrl+W</kbd> can mean something in the app |
 | `openExternal(url)` | Opens an `http` or `https` URL in a new window. In the installed hub window, a framed page cannot open one itself |
 | `terminalToken()` | Resolves a fresh terminal token, or `null` alone or after 3 s. The hub answers only the `terminal` provider |
 
 ## Alone
 
-With the stub, `status` is `standalone`, `inHub` is false, `subscribe`, `publish`, `handle`, `bindTheme` and `closeGuard` do nothing, `forwards` is false, `forwardCombos` is empty, and `terminalToken` resolves `null`. `invoke` and `can` use the `standalone` option. `openExternal` opens a new tab.
+With the stub, `status` is `standalone`, `inHub` is false, `subscribe`, `publish`, `handle`, `bindTheme` and `closeGuard` do nothing, `forwards` is false, `forwardCombos` is empty, `keyLabel` is `null`, and `terminalToken` resolves `null`. `invoke` and `can` use the `standalone` option. `openExternal` opens a new tab.

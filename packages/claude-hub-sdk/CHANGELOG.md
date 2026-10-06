@@ -2,6 +2,11 @@
 
 The SDK follows semver. A new function or message is a minor version, a change that breaks an app is a major version. The protocol version is separate ([Versioning](https://nikiforovall.blog/claude-code-hub/reference/protocol/#versioning)).
 
+## 1.4.0
+
+- `hub.keyLabel(action)` gives the keys of a hub action from `welcome.keys`, as a help row shows them: `['Ctrl', 'Alt', 'P']`, or `['⌃', '⌥', 'P']` on macOS. A list of actions shares one row, merged by their common modifiers: `['Ctrl', 'Alt', '←/→']`. It gives `[]` when no key runs the action, and `null` before welcome, standalone, or for an action the hub did not list. The stub always gives `null`.
+- `ClaudeHubKeys.keyParts(combo, mac)` names the keys of a combo. The hub page uses it for the app launcher too.
+
 ## 1.3.0
 
 - `src/keys.js` holds `comboOf()`, the one rule that names a key press. The hub page, `client.js` and `stub.js` all use it, so the copies are gone. `/vendor/claude-hub-sdk.js` and the `sdk:sync` copies are `keys.js` followed by the client or the stub, still one classic script. It adds one global, `ClaudeHubKeys`. `ClaudeHub.comboOf` is the same function and stays self-contained, so its source text still runs on its own.

@@ -22,7 +22,17 @@ var ClaudeHubKeys = (() => {
     return [...mods, key].filter(Boolean).join('+');
   }
 
-  return { comboOf };
+  // The keys of a combo as a help row shows them: ['Ctrl', 'Alt', 'P'], or ['⌃', '⌥', 'P'] on macOS.
+  // The {n} of a numbered combo reads 1…9.
+  function keyParts(combo, mac) {
+    const mods = mac
+      ? { ctrl: '⌃', alt: '⌥', shift: '⇧', meta: '⌘' }
+      : { ctrl: 'Ctrl', alt: 'Alt', shift: 'Shift', meta: 'Win' };
+    const named = { '{n}': '1…9', ArrowLeft: '←', ArrowRight: '→', ArrowUp: '↑', ArrowDown: '↓' };
+    return combo.split('+').map((k) => mods[k] ?? named[k] ?? (k.length === 1 ? k.toUpperCase() : k));
+  }
+
+  return { comboOf, keyParts };
 })();
 
 if (typeof module === 'object' && module.exports) module.exports = ClaudeHubKeys;

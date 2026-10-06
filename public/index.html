@@ -272,6 +272,13 @@
 
     .palette-row .stats + .age { margin-left: 0; }
 
+    .palette-row .url {
+      color: var(--text-dim);
+      font-family: ui-monospace, monospace;
+      font-size: 12px;
+      align-self: center;
+    }
+
     .palette-row .slow {
       margin-left: 10px;
       padding: 0 6px;
@@ -307,6 +314,7 @@
     .palette-row.selected .palette-icon { color: var(--accent); }
 
     .palette-row .palette-remove,
+    .palette-row .palette-copy,
     .palette-row .palette-restart {
       margin-left: auto;
       padding: 0 6px;
@@ -322,13 +330,17 @@
 
     .palette-row:hover .palette-remove,
     .palette-row.selected .palette-remove,
+    .palette-row:hover .palette-copy,
+    .palette-row.selected .palette-copy,
     .palette-row:hover .palette-restart,
     .palette-row.selected .palette-restart { opacity: 1; }
 
     .palette-row .palette-remove:hover { color: #e5484d; }
 
-    .palette-row .age + .palette-restart { margin-left: 0; }
+    .palette-row .age + .palette-copy,
+    .palette-row .palette-copy + .palette-restart { margin-left: 0; }
 
+    .palette-row .palette-copy:hover,
     .palette-row .palette-restart:hover { color: var(--accent); }
 
     .palette-hint {

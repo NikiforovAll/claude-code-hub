@@ -8,7 +8,7 @@
   const WELCOME_WAIT_MS = 2000;
 
   // keys.js comes first in the served file. Required as a module, client.js loads it itself.
-  const { comboOf } = typeof ClaudeHubKeys === 'object' ? ClaudeHubKeys : require('./keys');
+  const { comboOf, keyParts } = typeof ClaudeHubKeys === 'object' ? ClaudeHubKeys : require('./keys');
 
   function isVars(v) {
     return (
@@ -26,6 +26,15 @@
   }
 
   const strings = (list) => new Set(Array.isArray(list) ? list.filter((s) => typeof s === 'string') : []);
+
+  const isMac = (win) => /^Mac/i.test(win.navigator?.userAgentData?.platform || win.navigator?.platform || '');
+
+  const comboMap = (keys) =>
+    new Map(
+      keys && typeof keys === 'object' && !Array.isArray(keys)
+        ? Object.entries(keys).filter(([, c]) => c === null || (typeof c === 'string' && c))
+        : [],
+    );
 
   function createClaudeHub(win) {
     const doc = win.document;
@@ -151,7 +160,11 @@
 
       function onWelcome(m) {
         if (m.protocol !== 1 || welcome) return;
-        welcome = { actions: strings(m.actions), themes: Array.isArray(m.themes) ? m.themes : [] };
+        welcome = {
+          actions: strings(m.actions),
+          keys: comboMap(m.keys),
+          themes: Array.isArray(m.themes) ? m.themes : [],
+        };
         forward = strings(m.forward);
         setStatus('live');
         if (welcome.themes.length) for (const fn of themesFns) fn(pickerThemes());
@@ -330,6 +343,21 @@
         forwards,
         // The combos forwards() matches, for a frame that tests keys with ClaudeHub.comboOf on its own.
         forwardCombos: () => (forward ? [...forward] : []),
+        // The keys of a hub action for a help row, in this system's names. A list of actions shares one
+        // row: ['Ctrl', 'Alt', '←/→']. [] when no key runs them; null before welcome, standalone, or
+        // for an action the hub did not list.
+        keyLabel(action) {
+          const ids = Array.isArray(action) ? action : [action];
+          if (!welcome || !ids.every((id) => welcome.keys.has(id))) return null;
+          const all = ids
+            .map((id) => welcome.keys.get(id))
+            .filter(Boolean)
+            .map((c) => keyParts(c, isMac(win)));
+          if (all.length < 2) return all[0] ?? [];
+          let n = 0;
+          while (n < all[0].length - 1 && all.every((p) => p.length - 1 > n && p[n] === all[0][n])) n++;
+          return [...all[0].slice(0, n), all.map((p) => p.slice(n).join('+')).join('/')];
+        },
         closeGuard(on) {
           post({ type: 'hub:closeGuard', on: !!on });
         },

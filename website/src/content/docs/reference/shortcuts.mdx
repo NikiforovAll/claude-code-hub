@@ -63,7 +63,7 @@ Add a `keys` block to the [config file](/claude-code-hub/reference/configuration
 - `null` turns the action's key off.
 - When you give an action the default key of another action, that other action has no key until you give it one.
 - The hub logs an entry and keeps the default for it when the entry is not valid, when another entry has the same key, or when a tool keeps that key, for example <kbd>Ctrl+Alt+N</kbd> in Kanban.
-- The app launcher shows the keys of the tool numbers you set.
+- The app launcher shows the keys of the tool numbers you set, and the help of each tool (<kbd>?</kbd>) shows the hub keys you set. A tool hides a hub row that has no key.
 - The keys inside each tool stay as they are. A key you give the hub does not reach the tool.
 
 ## Palettes
@@ -74,12 +74,13 @@ Add a `keys` block to the [config file](/claude-code-hub/reference/configuration
 | <kbd>↑</kbd> or <kbd>Shift+Tab</kbd> | Previous row |
 | <kbd>Enter</kbd> | Pick the selected row |
 | <kbd>Ctrl+D</kbd> | Config-dir palette: remove the selected dir from the list |
+| <kbd>Ctrl+C</kbd> | App launcher: copy the URL of the selected tool (when no text is selected in the search box) |
 | <kbd>Ctrl+R</kbd> | App launcher: restart the selected tool |
 | <kbd>Esc</kbd> | Close the palette |
 
 While a palette is open, the tool keys do nothing, so you can type a path that has digits in it.
 
-The app launcher lists the tools in tab order. When it opens, the tool you used before the current one is selected, so <kbd>Ctrl+Alt+A</kbd> then <kbd>Enter</kbd> goes back to it. A restart stops the tool's process and starts it again, then reloads its tab. A Kanban restart ends its embedded terminals, so when terminals are open the launcher asks you to press <kbd>Ctrl+R</kbd> a second time.
+The app launcher lists the tools in tab order, each with the host and port it runs on. When it opens, the tool you used before the current one is selected, so <kbd>Ctrl+Alt+A</kbd> then <kbd>Enter</kbd> goes back to it. A restart stops the tool's process and starts it again, then reloads its tab. A Kanban restart ends its embedded terminals, so when terminals are open the launcher asks you to press <kbd>Ctrl+R</kbd> a second time.
 
 ## From a Kanban session
 

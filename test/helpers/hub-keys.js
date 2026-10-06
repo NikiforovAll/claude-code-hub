@@ -4,8 +4,17 @@ const vm = require('node:vm');
 
 const SRC = fs.readFileSync(path.join(__dirname, '../../public/app.js'), 'utf8');
 const MATRIX = JSON.parse(fs.readFileSync(path.join(__dirname, '../fixtures/key-matrix.json'), 'utf8'));
-const FUNCTIONS = ['hubActions', 'bindings', 'setApps', 'appNumberCombo', 'comboLabel', 'handleForwardedKey'];
-const { comboOf } = require('../../packages/claude-hub-sdk/src/keys');
+const FUNCTIONS = [
+  'hubActions',
+  'bindings',
+  'comboFor',
+  'actionKeys',
+  'setApps',
+  'appNumberCombo',
+  'comboLabel',
+  'handleForwardedKey',
+];
+const { comboOf, keyParts } = require('../../packages/claude-hub-sdk/src/keys');
 
 function source(name) {
   const m = new RegExp(`^function ${name}\\([^)]*\\) \\{[\\s\\S]*?^\\}`, 'm').exec(SRC);
@@ -21,6 +30,7 @@ function loadHubKeys({ apps: appCount = MATRIX.apps, platform = 'win', keys = {}
   const ctx = {
     IS_MAC: platform === 'mac',
     comboOf,
+    keyParts,
     keymap: null,
     userKeys: keys,
     apps: Object.fromEntries(ids.map((id) => [id, {}])),
