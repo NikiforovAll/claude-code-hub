@@ -53,18 +53,20 @@ A version with `-` is a **prerelease**. Its GitHub release gets `--prerelease`, 
 
    Done when `npm ls claude-code-cost claude-code-kanban claude-code-marketplace claude-code-memory-explorer` shows the gate's versions, `npm pack --dry-run` lists `packages/claude-hub-sdk/src/client.js`, `server.js` and `stub.js`, and the push succeeded.
 
-5. **Tag.** Run `git tag v<version> && git push origin v<version>`. This starts the release run.
+5. **macOS tray.** If `git diff --name-only <last tag> HEAD -- tray lib/tray.js` lists files, run `gh workflow run tray-macos.yml --ref <branch>` and `gh run watch <run-id> --exit-status`. Stop on a failure. Done when the run is green or nothing under the tray changed.
 
-6. **GitHub release.** The hub's own commits are mostly bumps, so the notes cover the sub-apps. For each sub-app that moved (for example "Kanban (→ v4.28.0): …"), group the changes under Features (✨), Fixes (🐛) and Other. Describe what changed for a user, not raw commit messages. End with a Full Changelog compare link.
+6. **Tag.** Run `git tag v<version> && git push origin v<version>`. This starts the release run.
+
+7. **GitHub release.** The hub's own commits are mostly bumps, so the notes cover the sub-apps. For each sub-app that moved (for example "Kanban (→ v4.28.0): …"), group the changes under Features (✨), Fixes (🐛) and Other. Describe what changed for a user, not raw commit messages. End with a Full Changelog compare link.
    ```
    gh release create v<version> --title "v<version>" --notes "<notes>" [--prerelease]
    ```
 
-7. **Watch the run.**
+8. **Watch the run.**
    ```
    gh run list --workflow release.yml --limit 1
    gh run watch <run-id> --exit-status
    ```
    If it fails, fix the cause and run it again from the tag: `gh workflow run release.yml --ref v<version>`. The publish step skips a version that is already on npm. Done when the run is green and `npm view claude-code-hub@<version> version` prints the version.
 
-8. **Report** the GitHub release URL, the run URL and the published npm version.
+9. **Report** the GitHub release URL, the run URL and the published npm version.

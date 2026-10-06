@@ -24,11 +24,12 @@ The examples use the command of a [global install](/claude-code-hub/getting-star
 | `--host <addr>` | `127.0.0.1` | Bind address. See [Security](/claude-code-hub/reference/security/#reach-the-hub-from-another-machine). |
 | `--allowed-hosts <list>` | | Extra host names to accept, comma-separated |
 | `--open` | | Open the browser on start |
-| `--tray` | | Windows: run the hub from a [tray icon](/claude-code-hub/guides/tray/), then exit |
-| `--autostart` | | Windows: same as `--tray`, and start the tray when you log on |
-| `--no-autostart` | | Windows: stop starting the tray when you log on |
-| `--tray-status` | | Windows: show the config dir, autostart, and whether the tray and hub run |
-| `--app-id <id>` | | Windows, with `--tray` or `--autostart`: the [installed app](/claude-code-hub/guides/tray/#open-the-installed-app) that **Open Hub** starts |
+| `--detached` | | Keep running when stdin closes. The macOS tray uses it. |
+| `--tray` | | Windows, macOS: run the hub from a [tray icon](/claude-code-hub/guides/tray/), then exit |
+| `--autostart` | | Windows, macOS: same as `--tray`, and start the tray when you log on |
+| `--no-autostart` | | Windows, macOS: stop starting the tray when you log on |
+| `--tray-status` | | Windows, macOS: show the config dir, autostart, and whether the tray and hub run |
+| `--app-id <id>` | | Windows, macOS, with `--tray` or `--autostart`: the [installed app](/claude-code-hub/guides/tray/#open-the-installed-app) that **Open Hub** starts |
 
 A flag takes its value after a space or after `=`: `--port 4000` and `--port=4000` are the same.
 
@@ -119,7 +120,7 @@ The paths are for the default hub folder. With `--hub-dir` or `CLAUDE_HUB_DIR`, 
 | `~/.claude-hub/token` | The [hub token](/claude-code-hub/reference/security/#the-hub-token) |
 | `~/.claude-hub/plugin/` | The copy of the [hub plugin](#install-the-hub-plugin) that `--install` writes |
 | `~/.claude-hub/hub.json` | The process id and port of the running hub. A second hub for the same hub dir reads it, prints the running hub's URL and exits. |
-| `~/.claude-hub/tray/`, `hub.log`, `tray.log`, `tray.pid` | The [tray](/claude-code-hub/guides/tray/#files) files, on Windows, when you use `--tray` or `--autostart` |
+| `~/.claude-hub/tray/`, `hub.log`, `tray.log`, `tray.pid` | The [tray](/claude-code-hub/guides/tray/#files) files, on Windows and macOS, when you use `--tray` or `--autostart` |
 
 The hub also reads `~/.claude-hub/themes.json`, which you write. It holds your [custom color themes](/claude-code-hub/guides/themes/).
 

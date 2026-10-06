@@ -1,0 +1,86 @@
+name: Tray (macOS)
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  tray:
+    runs-on: macos-latest
+    timeout-minutes: 20
+    env:
+      HUB: ${{ runner.temp }}/tray-hub
+      OUT: ${{ runner.temp }}/tray-out
+      PORTS: --port 3640 --kanban-port 3641 --marketplace-port 3642 --cost-port 3643 --memory-port 3644
+      TRAY: osascript -l JavaScript ${{ runner.temp }}/tray-hub/tray/mac/hub-tray.js
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - run: mkdir -p "$OUT" ~/.claude
+
+      - name: Start the tray
+        run: |
+          node server.js --tray --hub-dir "$HUB" $PORTS
+          for i in $(seq 1 90); do [ -f "$HUB/hub.json" ] && break; sleep 2; done
+          node server.js --tray-status --hub-dir "$HUB" | tee "$OUT/status.txt"
+          grep -q 'Tray: running' "$OUT/status.txt"
+          grep -q 'Hub: running on port 3640' "$OUT/status.txt"
+          sleep 3
+          screencapture -x "$OUT/running.png"
+
+      - name: A second tray for the same hub dir exits
+        run: |
+          before=$(cat "$HUB/tray.pid")
+          node server.js --tray --hub-dir "$HUB" $PORTS
+          for i in $(seq 1 20); do [ "$(pgrep -f hub-tray.js | wc -l)" -eq 1 ] && break; sleep 0.5; done
+          [ "$(pgrep -f hub-tray.js | wc -l)" -eq 1 ]
+          [ "$(cat "$HUB/tray.pid")" = "$before" ]
+
+      - name: Self-test the menu while the hub runs
+        run: |
+          $TRAY --self-test --screenshot "$OUT/menu.png" | tee "$OUT/self-test-running.json"
+          jq -e '.ok and .steps[0].state == "running" and (.steps[0].items[0].title | startswith("Running on port 3640"))' "$OUT/self-test-running.json"
+          jq -e '[.steps[0].items[].title] | contains(["Open Hub", "Stop Hub", "Restart Hub", "Open log", "Open at Login", "Quit (stops the hub)"])' "$OUT/self-test-running.json"
+
+      - name: Stop, start and restart through the menu handlers
+        run: |
+          $TRAY --self-test --actions stop,start,restart,stop | tee "$OUT/self-test-actions.json"
+          got=$(jq -r '[.steps[] | .step + ":" + .state] | join(" ")' "$OUT/self-test-actions.json")
+          [ "$got" = "initial:running stop:stopped start:running restart:running stop:stopped" ] || { echo "$got"; exit 1; }
+          [ ! -f "$HUB/hub.json" ]
+          for i in $(seq 1 20); do grep -q 'hub exited' "$HUB/tray.log" && break; sleep 0.5; done
+          screencapture -x "$OUT/stopped.png"
+
+      - name: Autostart through launchd
+        run: |
+          node server.js --autostart --hub-dir "$HUB" $PORTS
+          label=$(node -p 'require("./lib/tray").launchAgentLabel(process.argv[1])' "$HUB")
+          plist=~/Library/LaunchAgents/$label.plist
+          plutil -lint "$plist"
+          node server.js --tray-status --hub-dir "$HUB" | tee -a "$OUT/status.txt" | grep -q "Autostart: on ($label)"
+          launchctl bootstrap gui/$(id -u) "$plist"
+          launchctl print gui/$(id -u)/$label | head -20
+          launchctl bootout gui/$(id -u)/$label || true
+          for i in $(seq 1 20); do [ "$(pgrep -f hub-tray.js | wc -l)" -eq 1 ] && break; sleep 0.5; done
+          [ "$(pgrep -f hub-tray.js | wc -l)" -eq 1 ]
+          node server.js --no-autostart --hub-dir "$HUB"
+          [ ! -f "$plist" ]
+
+      - name: Clean up
+        if: always()
+        run: |
+          [ -f "$HUB/tray.pid" ] && kill "$(cat "$HUB/tray.pid")" || true
+          pkill -f "server.js --hub-dir $HUB" || true
+          cp "$HUB"/*.log "$OUT"/ 2>/dev/null || true
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: tray-macos
+          path: ${{ runner.temp }}/tray-out
