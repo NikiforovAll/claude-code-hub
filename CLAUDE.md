@@ -16,7 +16,7 @@ npm run test:e2e         # Hub keys in Chrome (needs Chrome); by hand only, not 
 
 `test/fixtures/key-matrix.json` is the list of key presses and what each one must do. `npm test` runs it against the hub page and the SDK; `npm run test:e2e` presses it in Chrome against a scratch hub with fixture apps. A row with `todo` is a known bug. Add a row with each key change.
 
-The hub is usually already running on :3540. Check it with `curl -s -o /dev/null -w '%{http_code}' http://localhost:3540/api/config` (401 without the token still means it is up; add `?token=$(cat ~/.claude-hub/token)` to read it). Use it only for read-only checks. To test a fix, start a second hub on other ports (`--port`, `--marketplace-port`, `--kanban-port`, `--cost-port`, `--memory-port`) so the running one is not disturbed.
+The hub is usually already running on :3540. Check it with `curl -s -o /dev/null -w '%{http_code}' http://localhost:3540/api/config` (401 without the token still means it is up; add `?token=$(cat ~/.claude-hub/token)` to read it). Use it only for read-only checks. To test a fix, start a second hub on other ports (`--port`, `--marketplace-port`, `--kanban-port`, `--cost-port`, `--memory-port`) so the running one is not disturbed. Start it with `CCK_TERMINALS_FILE=<scratch path>`: its cck shares the config dir and would otherwise rewrite the real board's `terminals.json`.
 
 CLI flags: `--port <n>`, `--<id>-port <n>` (`kanban`, `marketplace`, `cost`, `memory`), `--hub-dir <path>`, `--pool-size <n>`, `--open`, `--detached` (do not stop when stdin closes), `--install`/`--uninstall` (with `--dir <config dir>`), `--tray`/`--autostart`/`--no-autostart`/`--tray-status` and `--app-id <id>` (Windows and macOS)
 
