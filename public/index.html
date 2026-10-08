@@ -24,6 +24,7 @@
       --surface-hover: #1f2a4a;
       --text: #e8e8ef;
       --text-dim: #8a8fa3;
+      --warn: #f5a524;
       --shadow: rgba(0, 0, 0, 0.55);
       --ghost-mix: 22%;
     }
@@ -39,6 +40,7 @@
       --surface-hover: #f1f1f4;
       --text: #18181b;
       --text-dim: #71717a;
+      --warn: #8a4b00;
       --shadow: rgba(0, 0, 0, 0.18);
       --ghost-mix: 10%;
     }
@@ -283,10 +285,29 @@
       margin-left: 10px;
       padding: 0 6px;
       border-radius: 4px;
-      color: #f5a524;
-      border: 1px solid #f5a524;
+      color: var(--warn);
+      border: 1px solid var(--warn);
       font-size: 11px;
     }
+
+    .palette-row .ver,
+    .palette-hint .ver {
+      color: var(--text-dim);
+      font-size: 12px;
+    }
+
+    .plugin-warn {
+      padding: 0 6px;
+      border: 1px solid var(--warn);
+      border-radius: 4px;
+      background: transparent;
+      color: var(--warn);
+      font: inherit;
+      font-size: 11px;
+      cursor: pointer;
+    }
+
+    .palette-hint .plugin-warn { border: none; padding: 0; font-size: 12px; }
 
     .palette-row.literal {
       border-top: 1px solid var(--border);

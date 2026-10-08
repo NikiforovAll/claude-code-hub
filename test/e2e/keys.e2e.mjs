@@ -42,11 +42,25 @@ function scratchHubDir(appPorts) {
     fs.writeFileSync(path.join(appDir, 'hub-app.json'), JSON.stringify({ manifest: 1, id, name: id, run: { entry: 'server.js' } }));
     fs.writeFileSync(path.join(appDir, 'server.js'), `require(${JSON.stringify(FIXTURE)});\n`);
   }
+  // e2e1 ships a plugin at 1.0.0 and the config dir has 0.9.0, so its row shows the ⚠.
+  const e2e1 = path.join(dir, 'e2e1');
+  fs.writeFileSync(path.join(e2e1, 'package.json'), JSON.stringify({ version: '2.0.0' }));
+  const plugin = { id: 'e2e@e2e', path: 'plugin', install: 'e2e --install' };
+  fs.writeFileSync(
+    path.join(e2e1, 'hub-app.json'),
+    JSON.stringify({ manifest: 1, id: 'e2e1', name: 'e2e1', run: { entry: 'server.js' }, plugin }),
+  );
+  fs.mkdirSync(path.join(e2e1, 'plugin', '.claude-plugin'), { recursive: true });
+  fs.writeFileSync(path.join(e2e1, 'plugin', '.claude-plugin', 'plugin.json'), JSON.stringify({ version: '1.0.0' }));
+  fs.mkdirSync(path.join(dir, 'claude', 'plugins'), { recursive: true });
+  fs.writeFileSync(
+    path.join(dir, 'claude', 'plugins', 'installed_plugins.json'),
+    JSON.stringify({ version: 2, plugins: { 'e2e@e2e': [{ scope: 'user', version: '0.9.0' }] } }),
+  );
   const apps = [
     ...IDS.map((id, i) => ({ id, path: id, port: appPorts[i] })),
     ...APPS.map(({ id }) => ({ id, enabled: false })),
   ];
-  fs.mkdirSync(path.join(dir, 'claude'));
   fs.writeFileSync(path.join(dir, 'config.json'), JSON.stringify({ apps }, null, 2));
   const token = crypto.randomBytes(32).toString('hex');
   fs.writeFileSync(path.join(dir, 'token'), `${token}\n`);
@@ -206,16 +220,34 @@ for (const { platform, rows, keys, remapped } of SUITES) describe(`key matrix${r
 });
 
 describe('app launcher', () => {
+  const { version } = require('../../package.json');
   let context;
   before(async () => {
     context = await openHub('win');
+    await page.evaluate(() => openPalette('app'));
+    await waitFor(() => page.locator('#palette-list .ver').count(), 'the app versions');
   });
   after(() => context?.close());
 
-  it('shows the hub version in its footer', async () => {
-    const { version } = require('../../package.json');
-    await page.evaluate(() => openPalette('app'));
+  it('shows the hub version and its plugin in its footer', async () => {
     const hint = await page.locator('#palette-hint').textContent();
-    assert.ok(hint.startsWith(`Claude Code Hub ${version} · `), hint);
+    assert.ok(hint.startsWith(`Claude Code Hub ${version} · ⚠ plugin not installed · `), hint);
+  });
+
+  it("shows an app's version and a ⚠ for a plugin that is not the shipped version", async () => {
+    const row = page.locator('#palette-list .palette-row', { hasText: 'e2e1' });
+    assert.equal(await row.locator('.ver').textContent(), '2.0.0');
+    const badge = row.locator('.plugin-warn');
+    assert.equal(await badge.textContent(), '⚠ plugin 0.9.0');
+    assert.match(await badge.getAttribute('title'), /e2e@e2e 0\.9\.0 is installed, this version ships 1\.0\.0\.\nClick to copy: e2e --install --dir /);
+    assert.equal(await page.locator('#palette-list .palette-row', { hasText: 'e2e2' }).locator('.ver, .plugin-warn').count(), 0);
+  });
+
+  it('copies the install command on a click and keeps the palette open', async () => {
+    await context.grantPermissions(['clipboard-read', 'clipboard-write']);
+    await page.locator('#palette-list .palette-row', { hasText: 'e2e1' }).locator('.plugin-warn').click();
+    await waitFor(async () => (await page.locator('#palette-hint').textContent()).startsWith('Copied e2e --install --dir '), 'the copy');
+    assert.equal((await hubState()).palette, 'app');
+    assert.match(await page.evaluate(() => navigator.clipboard.readText()), /^e2e --install --dir "/);
   });
 });

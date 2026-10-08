@@ -37,6 +37,8 @@ const missed = new Map();
 const MAX_EVENT_CHARS = 16 * 1024;
 // The config dir the hub falls back to (~/.claude). Stays out of the window title.
 let defaultConfigDir = null;
+// The app launcher's footer: the hub version from /api/config and its plugin from /api/apps/stats.
+const hubInfo = { version: null, plugin: null };
 // mode: 'project' (Ctrl+Alt+P), 'configDir' (Ctrl+Alt+W) or 'app' (Ctrl+Alt+A). One widget, three row sources.
 const palette = {
   open: false,
@@ -229,7 +231,7 @@ async function init() {
   const res = await fetch('/api/config');
   const config = await res.json();
   userKeys = config.keys ?? {};
-  if (config.version) PALETTE_MODES.app.hint = `Claude Code Hub ${config.version} · ${PALETTE_MODES.app.hint}`;
+  hubInfo.version = config.version ?? null;
   setApps(config.apps);
   defaultConfigDir = config.defaultConfigDir ?? null;
   activeConfigDir = config.activeConfigDir ?? null;
@@ -817,7 +819,9 @@ function relAge(ts) {
 }
 
 async function loadAppStats() {
-  palette.appStats = await sendJson('GET', '/api/apps/stats');
+  const { hub, apps: appStats } = await sendJson('GET', '/api/apps/stats');
+  palette.appStats = appStats;
+  hubInfo.plugin = hub.plugin;
 }
 
 async function loadConfigDirs() {
@@ -921,8 +925,45 @@ function rowButton(className, glyph, key, title, label) {
   return btn;
 }
 
-function setPaletteHint(text) {
-  document.getElementById('palette-hint').textContent = text;
+// `fromMode` marks the mode's own hint, which the mode's load may redraw; a message in its place stays.
+function setPaletteHint(content, fromMode = false) {
+  palette.modeHint = fromMode;
+  document.getElementById('palette-hint').replaceChildren(...[].concat(content));
+}
+
+// The plugin in the active config dir: its version, or a ⚠ that copies the install command.
+function pluginNode(p) {
+  const problem = {
+    missing: 'plugin not installed',
+    disabled: `plugin ${p.installed} is off`,
+    mismatch: `plugin ${p.installed}`,
+  }[p.state];
+  if (!problem) return el('span', 'ver', `plugin ${p.installed}`);
+  const cause = {
+    missing: `${p.id} is not installed in this config dir.`,
+    disabled: `${p.id} ${p.installed} is disabled. Enable it with /plugin in Claude Code.`,
+    mismatch: `${p.id} ${p.installed} is installed, this version ships ${p.bundled}.`,
+  }[p.state];
+  const fix = p.state === 'disabled' ? '' : `\nClick to copy: ${p.installCommand}\nThen restart open sessions.`;
+  const badge = el('button', 'plugin-warn', `⚠ ${problem}`);
+  badge.type = 'button';
+  badge.title = cause + fix;
+  badge.setAttribute('aria-label', cause);
+  if (p.state !== 'disabled')
+    badge.addEventListener('click', (e) => {
+      e.stopPropagation();
+      copyToHint(p.installCommand);
+    });
+  return badge;
+}
+
+async function copyToHint(text) {
+  try {
+    await navigator.clipboard.writeText(text);
+    setPaletteHint(`Copied ${text}`);
+  } catch (err) {
+    setPaletteHint(`Could not copy ${text}: ${err.message}`);
+  }
 }
 
 // The terminal provider answers 409 with a terminal count; the second Ctrl+R on the same app sends force.
@@ -945,14 +986,8 @@ async function restartFromPalette(id) {
   switchTab(id);
 }
 
-async function copyAppUrl(id) {
-  const url = apps[id].url;
-  try {
-    await navigator.clipboard.writeText(url);
-    setPaletteHint(`Copied ${url}`);
-  } catch (err) {
-    setPaletteHint(`Could not copy ${url}: ${err.message}`);
-  }
+function copyAppUrl(id) {
+  return copyToHint(apps[id].url);
 }
 
 // `typed` is the trimmed query, `q` its lowercase form for matching.
@@ -1020,7 +1055,12 @@ const PALETTE_MODES = {
   app: {
     placeholder: 'Search apps...',
     label: 'Switch app',
-    hint: 'Enter switch · Ctrl+C copy the URL · Ctrl+R restart the app',
+    get hint() {
+      const keys = 'Enter switch · Ctrl+C copy the URL · Ctrl+R restart the app';
+      if (!hubInfo.version) return keys;
+      const plugin = hubInfo.plugin ? [pluginNode(hubInfo.plugin), ' · '] : [];
+      return [`Claude Code Hub ${hubInfo.version} · `, ...plugin, keys];
+    },
     empty: 'No matching app',
     rows: (_typed, q) => appRows(q),
     load: loadAppStats,
@@ -1031,6 +1071,8 @@ const PALETTE_MODES = {
     fillRow(li, row, q) {
       li.append(appIcon(row.app), markedSpan('name', row.app.name, q), el('span', 'url', new URL(row.app.url).host));
       const s = palette.appStats?.[row.id];
+      if (s?.version) li.append(el('span', 'ver', s.version));
+      if (s?.plugin) li.append(pluginNode(s.plugin));
       if (s?.slowMs) {
         const badge = el('span', 'slow', 'slow port');
         badge.title = `Its port delays requests by up to ${(s.slowMs / 1000).toFixed(1)} s. Restart (Ctrl+R) moves it to a new port.`;
@@ -1109,7 +1151,7 @@ function openPalette(mode) {
   input.value = '';
   input.placeholder = spec.placeholder;
   document.querySelector('#palette .palette-box').setAttribute('aria-label', spec.label);
-  setPaletteHint(spec.hint ?? '');
+  setPaletteHint(spec.hint ?? '', true);
   document.getElementById('palette').hidden = false;
   // Ctrl+Alt+P usually arrives forwarded from a focused iframe. Without inert the sub-app can keep
   // or take focus back, and then Escape is handled inside it — the palette stays open and only the
@@ -1120,7 +1162,9 @@ function openPalette(mode) {
   // Stale-while-revalidate: the cached list renders instantly, recency refreshes when this lands.
   Promise.resolve(spec.load?.())
     .then(() => {
-      if (palette.open && palette.mode === mode) renderPalette();
+      if (!palette.open || palette.mode !== mode) return;
+      if (palette.modeHint) setPaletteHint(spec.hint ?? '', true);
+      renderPalette();
     })
     .catch((err) => {
       if (err.status === 401) showErrorToast('Could not load the list', err);

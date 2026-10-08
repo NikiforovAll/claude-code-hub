@@ -60,7 +60,7 @@ After a server change, restart the app: `Ctrl+Alt+A`, select it, `Ctrl+R`. After
 
 ## The manifest
 
-`hub-app.json` declares how to run the app and what it offers: `manifest: 1`, `id`, `name`, `icon` (a Lucide name), `run.entry` (inside the folder; a path into `node_modules` is fine), `run.defaultPort`, `loading.verbs`, `publishes`, `actions.handles`, `provides`. The hub reads it before the app runs and skips the app, with a log line, when it breaks a rule. Page: `extensibility/reference/manifest/`.
+`hub-app.json` declares how to run the app and what it offers: `manifest: 1`, `id`, `name`, `icon` (a Lucide name), `run.entry` (inside the folder; a path into `node_modules` is fine), `run.defaultPort`, `loading.verbs`, `publishes`, `actions.handles`, `provides`, `keys.keeps`, `plugin` (`{id, path, install}` of a Claude Code plugin the app ships; the app launcher shows its state). The hub reads it before the app runs and skips the app, with a log line, when it breaks a rule. Page: `extensibility/reference/manifest/`.
 
 The npm packages of the built-in tools do not ship `hub-app.json`. A patch or fork starts from the tool's manifest in its GitHub repo and changes `id`, `name` and `run.entry`. Page for what each built-in declares: `extensibility/reference/built-in/`.
 

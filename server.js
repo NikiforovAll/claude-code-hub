@@ -19,6 +19,8 @@ const { createPortHealth } = require('./lib/port-health');
 const { readRegistry, themeConfig } = require('./lib/themes');
 const { createUpdateCheck } = require('./lib/update-check');
 const { liveHub, removeRecord, writeRecord } = require('./lib/hub-record');
+const { HUB_PLUGIN } = require('./lib/install');
+const { pluginStatus } = require('./lib/plugin-status');
 const { version: HUB_VERSION } = require('./package.json');
 
 function getArg(name) {
@@ -1000,14 +1002,19 @@ const STATS_TIMEOUT_MS = 1000;
 app.get('/api/apps/stats', async (_req, res) => {
   res.setHeader('Cache-Control', 'no-store');
   const pool = activePool();
+  const dir = hubConfig.activeConfigDir;
+  const plugin = (p) => (p ? pluginStatus(dir, p) : null);
   const entries = await Promise.all(
     ENABLED_APPS.map(async (a) => {
       const child = pool?.children.get(a.id);
       const slowMs = (child && portHealth.flagged(child)?.worstMs) ?? null;
-      return [a.id, { ...(await stats(child, STATS_TIMEOUT_MS)), slowMs }];
+      return [
+        a.id,
+        { ...(await stats(child, STATS_TIMEOUT_MS)), slowMs, version: a.version, plugin: plugin(a.plugin) },
+      ];
     }),
   );
-  res.json(Object.fromEntries(entries));
+  res.json({ hub: { version: HUB_VERSION, plugin: plugin(HUB_PLUGIN) }, apps: Object.fromEntries(entries) });
 });
 
 // Restarting the terminal provider ends its live terminals, so that takes force: true.

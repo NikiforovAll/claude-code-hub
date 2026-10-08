@@ -94,6 +94,12 @@ describe('app manifests', () => {
     assert.deepEqual(Object.keys(kanban.provides).sort(), ['projects', 'terminal']);
   });
 
+  it('kanban names its plugin, and the plugin manifest is where it says', () => {
+    const { plugin } = loadApp(KANBAN, { log: () => {} });
+    assert.equal(plugin.id, 'claude-code-kanban@claude-code-kanban');
+    assert.ok(fs.existsSync(plugin.manifest), plugin.manifest);
+  });
+
   it('kanban keeps its session keys', () => {
     assert.deepEqual(loadApp(KANBAN, { log: () => {} }).keeps, ['ctrl+alt+n', 'ctrl+alt+r', 'ctrl+alt+s']);
   });
@@ -153,6 +159,18 @@ describe('manifestError', () => {
     assert.match(manifestError({ ...ok, publishes: ['project.changed'] }, 'cost', root), /the hub's/);
     assert.match(manifestError({ ...ok, publishes: ['hub.trace'] }, 'cost', root), /the hub's/);
   });
+
+  it('accepts a plugin and rejects a bad id, path or install command', () => {
+    const plugin = { id: 'x@y', path: 'plugin/x', install: 'x --install' };
+    const err = (p) => manifestError({ ...ok, plugin: { ...plugin, ...p } }, 'cost', root);
+    assert.equal(err({}), null);
+    assert.match(err({ id: 'x' }), /plugin.id/);
+    assert.match(err({ path: undefined }), /plugin.path is missing/);
+    assert.match(err({ path: '../x' }), /outside/);
+    assert.match(err({ path: '.' }), /outside/);
+    assert.match(err({ install: '' }), /plugin.install/);
+    assert.match(manifestError({ ...ok, plugin: 'x' }, 'cost', root), /plugin.id/);
+  });
 });
 
 describe('loadApp', () => {
@@ -195,6 +213,8 @@ describe('loadApp', () => {
     const app = loadApp(COST, { hubRoot, resolve: () => path.join(pkgRoot, 'package.json'), log });
     assert.deepEqual(app, {
       id: 'cost',
+      version: null,
+      plugin: undefined,
       entry: path.join(pkgRoot, 'server.js'),
       port: 3543,
       name: 'Cost',
@@ -212,6 +232,19 @@ describe('loadApp', () => {
     submodule();
     assert.equal(loadApp(COST, { hubRoot, resolve: noPackage, log }), null);
     assert.match(logs[0], /hub-app.json: not found\. cost is skipped/);
+  });
+
+  it("reads the app's version and where its plugin manifest is", () => {
+    const plugin = { id: 'cost@cost', path: 'plugin/cost', install: 'claude-code-cost --install' };
+    const root = submodule({ ...COST_MANIFEST, plugin });
+    fs.writeFileSync(path.join(root, 'package.json'), '{"version":"1.3.0"}');
+    const app = loadApp(COST, { hubRoot, resolve: noPackage, log });
+    assert.equal(app.version, '1.3.0');
+    assert.deepEqual(app.plugin, {
+      id: 'cost@cost',
+      manifest: path.join(root, 'plugin', 'cost', '.claude-plugin', 'plugin.json'),
+      install: 'claude-code-cost --install',
+    });
   });
 
   it('prefers a checked-out submodule and reads its manifest', () => {

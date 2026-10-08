@@ -38,6 +38,7 @@ description: Every field of hub-app.json and the validation rules.
 | `actions.handles` | No | The actions the app handles. See [Actions](#actions) |
 | `provides` | No | The capabilities the app provides. See [Capabilities](#capabilities) |
 | `keys.keeps` | No | The combos the app uses for its own commands. See [Kept keys](#kept-keys) |
+| `plugin` | No | The Claude Code plugin the app ships. See [Plugin](#plugin) |
 
 ## Actions
 
@@ -72,6 +73,26 @@ Each field is a path on the provider's own origin that starts with `/`. With no 
 
 The hub does not bind a kept combo. Kanban keeps <kbd>Ctrl+Alt+N</kbd>, <kbd>Ctrl+Alt+R</kbd> and <kbd>Ctrl+Alt+S</kbd>.
 
+## Plugin
+
+`plugin` names the Claude Code plugin that your app ships, so the app launcher (<kbd>Ctrl+Alt+A</kbd>) can show its state in the active config dir:
+
+```json
+"plugin": {
+  "id": "claude-code-kanban@claude-code-kanban",
+  "path": "plugin/plugins/claude-code-kanban",
+  "install": "claude-code-kanban --install --yes"
+}
+```
+
+| Field | Meaning |
+| --- | --- |
+| `id` | The plugin id, `<name>@<marketplace>`, as `installed_plugins.json` records it |
+| `path` | The plugin folder, relative to the app folder. The hub reads the version from `.claude-plugin/plugin.json` in it |
+| `install` | The command that installs the plugin. It must take `--dir <config dir>`, which the hub adds for a config dir other than `~/.claude` |
+
+The launcher shows the installed version. When the plugin is not installed, is disabled, or is not the version in `path`, it shows a ⚠, and a click copies the install command.
+
 ## Validation
 
 The hub skips the app, with a log line, when:
@@ -90,6 +111,10 @@ The hub skips the app, with a log line, when:
 | `keys is not an object` | `keys` is an array or a value |
 | `keys.keeps is not an array` | `keys.keeps` is not a list |
 | `keys.keeps combo ... is not a combo name` | A kept combo breaks the [combo rule](#kept-keys) |
+| `plugin.id is not <name>@<marketplace>` | `plugin.id` is missing or has no `@` |
+| `plugin.path is missing` | `plugin` has no `path` |
+| `plugin.path is outside the app directory` | `plugin.path` points outside the folder, or at the folder itself |
+| `plugin.install is missing` | `plugin` has no `install` command |
 
 The hub skips one action, and keeps the app, when the name starts with `hub.`, `url` has a `#` or is not a string, `mode` is not `url` or `message`, or a param type is not `string` or `string?`.
 
