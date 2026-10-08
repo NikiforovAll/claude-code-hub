@@ -204,3 +204,18 @@ for (const { platform, rows, keys, remapped } of SUITES) describe(`key matrix${r
     });
   }
 });
+
+describe('app launcher', () => {
+  let context;
+  before(async () => {
+    context = await openHub('win');
+  });
+  after(() => context?.close());
+
+  it('shows the hub version in its footer', async () => {
+    const { version } = require('../../package.json');
+    await page.evaluate(() => openPalette('app'));
+    const hint = await page.locator('#palette-hint').textContent();
+    assert.ok(hint.startsWith(`Claude Code Hub ${version} · `), hint);
+  });
+});

@@ -893,6 +893,7 @@ app.get('/api/config', (_req, res) => {
     keys: USER_KEYS,
     activeConfigDir: hubConfig.activeConfigDir,
     defaultConfigDir,
+    version: HUB_VERSION,
   });
 });
 

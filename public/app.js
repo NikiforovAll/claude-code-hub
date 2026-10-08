@@ -229,6 +229,7 @@ async function init() {
   const res = await fetch('/api/config');
   const config = await res.json();
   userKeys = config.keys ?? {};
+  if (config.version) PALETTE_MODES.app.hint = `Claude Code Hub ${config.version} · ${PALETTE_MODES.app.hint}`;
   setApps(config.apps);
   defaultConfigDir = config.defaultConfigDir ?? null;
   activeConfigDir = config.activeConfigDir ?? null;
