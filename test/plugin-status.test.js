@@ -3,9 +3,11 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
-const { pluginStatus } = require('../lib/plugin-status');
+const { pluginChecker, bundledVersion } = require('../lib/plugin-status');
 
-describe('pluginStatus', () => {
+const pluginStatus = (dir, plugin) => pluginChecker(dir)(plugin);
+
+describe('pluginChecker', () => {
   let dir;
   let plugin;
   const write = (file, data) => {
@@ -17,8 +19,13 @@ describe('pluginStatus', () => {
 
   beforeEach(() => {
     dir = fs.mkdtempSync(path.join(os.tmpdir(), 'hub-plugin-'));
-    plugin = { id: 'x@y', manifest: path.join(dir, 'shipped', 'plugin.json'), install: 'x --install' };
-    write(plugin.manifest, { version: '1.0.0' });
+    write(path.join(dir, 'shipped', '.claude-plugin', 'plugin.json'), { version: '1.0.0' });
+    plugin = { id: 'x@y', bundled: bundledVersion(path.join(dir, 'shipped')), install: 'x --install' };
+  });
+
+  it('reads the shipped version from the plugin folder', () => {
+    assert.equal(plugin.bundled, '1.0.0');
+    assert.equal(bundledVersion(path.join(dir, 'none')), null);
   });
 
   afterEach(() => fs.rmSync(dir, { recursive: true, force: true }));

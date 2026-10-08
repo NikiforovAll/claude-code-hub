@@ -49,6 +49,7 @@ const palette = {
   sel: 0,
   query: '',
   confirmRestart: null,
+  message: null,
 };
 
 function loadThemeState() {
@@ -925,35 +926,42 @@ function rowButton(className, glyph, key, title, label) {
   return btn;
 }
 
-// `fromMode` marks the mode's own hint, which the mode's load may redraw; a message in its place stays.
-function setPaletteHint(content, fromMode = false) {
-  palette.modeHint = fromMode;
+// The footer shows palette.message, set by an action, else the mode's hint.
+function drawPaletteHint() {
+  const content = palette.message ?? PALETTE_MODES[palette.mode].hint ?? '';
   document.getElementById('palette-hint').replaceChildren(...[].concat(content));
+}
+
+function setPaletteHint(message) {
+  palette.message = message;
+  drawPaletteHint();
 }
 
 // The plugin in the active config dir: its version, or a ⚠ that copies the install command.
 function pluginNode(p) {
   const problem = {
-    missing: 'plugin not installed',
-    disabled: `plugin ${p.installed} is off`,
-    mismatch: `plugin ${p.installed}`,
+    missing: { label: 'plugin not installed', cause: `${p.id} is not installed in this config dir.` },
+    disabled: {
+      label: `plugin ${p.installed} is off`,
+      cause: `${p.id} ${p.installed} is disabled. Enable it with /plugin in Claude Code.`,
+      noCopy: true,
+    },
+    mismatch: {
+      label: `plugin ${p.installed}`,
+      cause: `${p.id} ${p.installed} is installed, this version ships ${p.bundled}.`,
+    },
   }[p.state];
   if (!problem) return el('span', 'ver', `plugin ${p.installed}`);
-  const cause = {
-    missing: `${p.id} is not installed in this config dir.`,
-    disabled: `${p.id} ${p.installed} is disabled. Enable it with /plugin in Claude Code.`,
-    mismatch: `${p.id} ${p.installed} is installed, this version ships ${p.bundled}.`,
-  }[p.state];
-  const fix = p.state === 'disabled' ? '' : `\nClick to copy: ${p.installCommand}\nThen restart open sessions.`;
-  const badge = el('button', 'plugin-warn', `⚠ ${problem}`);
+  const badge = el('button', 'plugin-warn', `⚠ ${problem.label}`);
   badge.type = 'button';
-  badge.title = cause + fix;
-  badge.setAttribute('aria-label', cause);
-  if (p.state !== 'disabled')
-    badge.addEventListener('click', (e) => {
-      e.stopPropagation();
-      copyToHint(p.installCommand);
-    });
+  badge.title = problem.cause;
+  badge.setAttribute('aria-label', problem.cause);
+  if (problem.noCopy) return badge;
+  badge.title += `\nClick to copy: ${p.installCommand}\nThen restart open sessions.`;
+  badge.addEventListener('click', (e) => {
+    e.stopPropagation();
+    copyToHint(p.installCommand);
+  });
   return badge;
 }
 
@@ -984,10 +992,6 @@ async function restartFromPalette(id) {
   closePalette();
   replaceIframe(id);
   switchTab(id);
-}
-
-function copyAppUrl(id) {
-  return copyToHint(apps[id].url);
 }
 
 // `typed` is the trimmed query, `q` its lowercase form for matching.
@@ -1089,7 +1093,7 @@ const PALETTE_MODES = {
         rowButton('palette-restart', '↻', 'r', 'Restart the app (Ctrl+R)', `Restart ${row.app.name}`),
       );
     },
-    rowKeys: { c: (row) => copyAppUrl(row.id), r: (row) => restartFromPalette(row.id) },
+    rowKeys: { c: (row) => copyToHint(apps[row.id].url), r: (row) => restartFromPalette(row.id) },
     commit(row) {
       closePalette();
       switchTab(row.id);
@@ -1148,10 +1152,11 @@ function openPalette(mode) {
   palette.query = '';
   palette.sel = null;
   palette.confirmRestart = null;
+  palette.message = null;
   input.value = '';
   input.placeholder = spec.placeholder;
   document.querySelector('#palette .palette-box').setAttribute('aria-label', spec.label);
-  setPaletteHint(spec.hint ?? '', true);
+  drawPaletteHint();
   document.getElementById('palette').hidden = false;
   // Ctrl+Alt+P usually arrives forwarded from a focused iframe. Without inert the sub-app can keep
   // or take focus back, and then Escape is handled inside it — the palette stays open and only the
@@ -1163,7 +1168,7 @@ function openPalette(mode) {
   Promise.resolve(spec.load?.())
     .then(() => {
       if (!palette.open || palette.mode !== mode) return;
-      if (palette.modeHint) setPaletteHint(spec.hint ?? '', true);
+      drawPaletteHint();
       renderPalette();
     })
     .catch((err) => {

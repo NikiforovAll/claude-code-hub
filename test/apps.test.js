@@ -97,7 +97,7 @@ describe('app manifests', () => {
   it('kanban names its plugin, and the plugin manifest is where it says', () => {
     const { plugin } = loadApp(KANBAN, { log: () => {} });
     assert.equal(plugin.id, 'claude-code-kanban@claude-code-kanban');
-    assert.ok(fs.existsSync(plugin.manifest), plugin.manifest);
+    assert.match(plugin.bundled, /^\d+\.\d+\.\d+/);
   });
 
   it('kanban keeps its session keys', () => {
@@ -234,17 +234,15 @@ describe('loadApp', () => {
     assert.match(logs[0], /hub-app.json: not found\. cost is skipped/);
   });
 
-  it("reads the app's version and where its plugin manifest is", () => {
+  it("reads the app's version and the version of the plugin it ships", () => {
     const plugin = { id: 'cost@cost', path: 'plugin/cost', install: 'claude-code-cost --install' };
     const root = submodule({ ...COST_MANIFEST, plugin });
     fs.writeFileSync(path.join(root, 'package.json'), '{"version":"1.3.0"}');
+    fs.mkdirSync(path.join(root, 'plugin', 'cost', '.claude-plugin'), { recursive: true });
+    fs.writeFileSync(path.join(root, 'plugin', 'cost', '.claude-plugin', 'plugin.json'), '{"version":"0.4.0"}');
     const app = loadApp(COST, { hubRoot, resolve: noPackage, log });
     assert.equal(app.version, '1.3.0');
-    assert.deepEqual(app.plugin, {
-      id: 'cost@cost',
-      manifest: path.join(root, 'plugin', 'cost', '.claude-plugin', 'plugin.json'),
-      install: 'claude-code-cost --install',
-    });
+    assert.deepEqual(app.plugin, { id: 'cost@cost', bundled: '0.4.0', install: 'claude-code-cost --install' });
   });
 
   it('prefers a checked-out submodule and reads its manifest', () => {
