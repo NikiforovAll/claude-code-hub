@@ -94,7 +94,7 @@ The hub ships `packages/claude-hub-sdk/src` in its npm package and hands it to e
 
 ## Website
 
-`website/` — Astro + Starlight landing and docs, published at https://nikiforovall.blog/claude-code-hub/. It shares its design kit (`src/kit/`, `src/components/`) with the four sub-app sites; keep the copies the same. Screenshots come from `~/dev/claude-code-hub-demo` (`node export-site.mjs hub`). `.github/workflows/pages.yml` deploys it after a stable release, or when run by hand. See `website/README.md`.
+`website/` — Astro + Starlight landing and docs, published at https://nikiforovall.blog/claude-code-hub/. It shares its design kit (`src/kit/`, `src/components/`) with the four sub-app sites; keep the copies the same. Screenshots come from `~/dev/claude-code-hub-demo` (`node export-site.mjs hub`). In every repo, `website/public/shots` is in Git LFS, so a clone needs `git lfs` (the husky hooks call it, and `pre-push` uploads the files). `pages.yml` pulls the files through a cache, because LFS downloads count against the owner's monthly bandwidth. `.github/workflows/pages.yml` deploys it after a stable release, or when run by hand. See `website/README.md`.
 
 ## Release
 
