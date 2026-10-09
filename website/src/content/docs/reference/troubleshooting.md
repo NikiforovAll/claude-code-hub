@@ -5,13 +5,15 @@ description: Find the symptom, then apply the fix.
 
 ## The page shows a locked screen
 
-The browser has no hub token cookie. Open the URL from the startup banner, the one with `?token=`. If you lost the banner, the token is in `~/.claude-hub/token`:
+The browser has no hub token cookie. Open the URL from the startup banner, the one with `?token=`, or paste the token into the field on the locked screen and click **Unlock**. If you lost the banner, the token is in `~/.claude-hub/token`:
 
 ```text
 http://localhost:3540/?token=<contents of ~/.claude-hub/token>
 ```
 
 If you deleted the token file, the hub made a new token at its last start. Use the URL from that banner.
+
+If the token changes while the page is open, an action fails with a "hub token rejected" message. Open the URL with `?token=` again, or click **Reload** and paste the token on the locked screen.
 
 ## The hub opened on a different port
 
@@ -21,7 +23,9 @@ An app you installed from the old port opens the old address. Start the hub on t
 
 ## A tool shows an error or a blank page
 
-The hub starts each tool again if it exits, up to 5 times in 60 seconds. After that it logs `[<tool>] gave up after 5 restarts in 60s`. Read the lines above it in the hub terminal, each prefixed with the tool name, for the cause. Then restart the hub.
+The hub starts each tool again if it exits, up to 5 times in 60 seconds. After that it logs `[<tool>] gave up after 5 restarts in 60s`. Read the lines above it in the hub terminal, each prefixed with the tool name, for the cause. Then open the app launcher (<kbd>Ctrl+Alt+A</kbd>), select the tool and press <kbd>Ctrl+R</kbd>. This restart does not count toward the limit, and the rest of the hub keeps running.
+
+If a tool answers slowly while it is idle, its row in the app launcher may show a **slow port** badge. Some loopback ports on Windows delay requests. Press <kbd>Ctrl+R</kbd> on that row to move the tool to a new port.
 
 ## Kanban shows no live agent activity
 

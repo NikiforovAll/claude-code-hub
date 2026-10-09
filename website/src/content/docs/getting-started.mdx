@@ -40,7 +40,7 @@ Type "q" or "exit" to stop the server
 
 The default port is 3540. If it is busy, the hub uses a free port and prints it in the banner. The tools have their own default ports, 3541 to 3544, with the same fallback. See [CLI and configuration](/claude-code-hub/reference/configuration/).
 
-To stop the hub, type `q` or `exit` in its terminal, or press <kbd>Ctrl+C</kbd>. The hub stops the four tools too.
+To stop the hub, type `q` or `exit` in its terminal, or press <kbd>Ctrl+C</kbd> or <kbd>Ctrl+D</kbd>. The hub also stops when its terminal closes, unless you start it with `--detached`. The hub stops the four tools too.
 
 ## The screen
 

@@ -9,13 +9,17 @@ Press <kbd>Ctrl+Alt+P</kbd> to open the project palette. The project you pick go
 
 The palette lists the projects that Claude Code has sessions for in the active config dir, with the most recently used project at the top. Each row shows the folder name, the parent path, and how long ago you last used it.
 
+A git repo and its linked worktrees share one row. When you pick it, the tools get the repo with its worktrees, so Cost, for example, counts the spend of all of them together.
+
 Type to filter. The palette ranks the matches in this order:
 
 1. The folder name is the text you typed.
 2. The folder name starts with it.
 3. A word in the folder name starts with it, for example `api` in `billing-api`.
 4. The folder name contains it.
-5. The parent path contains it.
+5. A folder in the parent path is the text you typed.
+6. The parent path contains it.
+7. The name of one of the repo's worktrees contains it.
 
 If nothing matches, the palette tries the letters in order with gaps, so `cch` finds `claude-code-hub`.
 
