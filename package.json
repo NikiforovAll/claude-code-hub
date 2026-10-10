@@ -1,6 +1,6 @@
 {
   "name": "claude-code-hub",
-  "version": "1.10.1",
+  "version": "1.11.0",
   "description": "Unified hub for Claude Code tools — Marketplace + Kanban in one PWA",
   "main": "server.js",
   "bin": {
