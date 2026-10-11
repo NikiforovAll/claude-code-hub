@@ -1,6 +1,7 @@
 ---
 import SiteLayout from '../kit/SiteLayout.astro';
 import ModeToggle from '../kit/ModeToggle.astro';
+import ThemeDial from '../kit/ThemeDial.astro';
 import Lightbox from '../kit/Lightbox.astro';
 import FamilyFooter from '../kit/FamilyFooter.astro';
 import { family, url } from '../kit/family';
@@ -19,15 +20,16 @@ const GITHUB = 'https://github.com/NikiforovAll/claude-code-hub';
     <header class="nav">
       <a class="mark" href={url()}>Claude Code Hub</a>
       <nav aria-label="Site">
-        <a href={url('extensions/')}>Extensions</a>
         <a href={DOCS}>Docs</a>
-        <a href={GITHUB}>GitHub</a>
         <details class="family">
           <summary>Apps</summary>
           <ul>
             {family.map((s) => <li><a href={s.href}>{s.name}</a></li>)}
           </ul>
         </details>
+        <a href={url('extensions/')}>Extensions</a>
+        <a href={GITHUB}>GitHub</a>
+        <ThemeDial compact />
         <ModeToggle />
       </nav>
     </header>
@@ -125,6 +127,17 @@ const GITHUB = 'https://github.com/NikiforovAll/claude-code-hub';
   @media (max-width: 40rem) {
     .nav nav {
       gap: 0.875rem;
+    }
+  }
+  @media (max-width: 30rem) {
+    .nav {
+      flex-wrap: wrap;
+    }
+    .nav nav {
+      position: relative;
+    }
+    .nav :global(.dial-pop) {
+      position: static;
     }
   }
 </style>
