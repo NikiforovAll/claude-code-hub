@@ -40,13 +40,17 @@ The hub ships a Claude Code plugin with the `hub-builder` skill. The skill helps
 ```bash
 claude-code-hub --install [--dir <config dir>]
 claude-code-hub --uninstall [--dir <config dir>]
+claude-code-hub ext install <app id> [--dir <config dir>]
 ```
 
 | Flag | Default | Action |
 | --- | --- | --- |
-| `--install` | | Install or update the plugin in one config dir, then exit |
-| `--uninstall` | | Remove the plugin from one config dir, then exit |
+| `--install` | | Install or update the hub plugin and the plugins of the enabled built-in apps (today Kanban's) in one config dir, then exit |
+| `--uninstall` | | Remove the hub plugin from one config dir, then exit. App plugins stay |
+| `ext install <app id>` | | Install or update the plugin of one app, built-in or extension, then exit. The app launcher's ⚠ copies this command |
 | `--dir <path>` | `CLAUDE_CONFIG_DIR`, else `~/.claude` | The config dir to install into or remove from |
+
+The hub does not update plugins by itself. After a hub update, run `claude-code-hub --install` again in each config dir to update the hub plugin and Kanban's plugin. The app launcher shows a ⚠ on a plugin that is older than the one its app ships.
 
 The install copies the plugin to `plugin/` in the hub folder and registers that copy in the config dir. Run it once for each config dir, and again after you update the hub. Start a new Claude Code session to load the skill. The uninstall keeps the copy, because other config dirs can use it.
 

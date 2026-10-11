@@ -1,6 +1,6 @@
 ---
 name: hub-builder
-description: Build on and extend Claude Code Hub. Use when the user wants to patch or fork a built-in tool (Kanban, Cost, Marketplace, Memory), write a new app for a hub tab, connect apps through topics and actions, make a custom color theme, configure the hub (flags, config dirs, token, hub keyboard shortcuts), or fix a hub problem.
+description: Build on and extend Claude Code Hub. Use when the user wants to patch or fork a built-in tool (Kanban, Cost, Marketplace, Memory), write a new app for a hub tab, find, install, manage or develop an Extension (`claude-code-hub ext`), connect apps through topics and actions, make a custom color theme, configure the hub (flags, config dirs, token, hub keyboard shortcuts), or fix a hub problem.
 ---
 
 # Hub builder
@@ -18,6 +18,7 @@ The files under `references/` ship with the installed hub, so they match its ver
 | Case | Page |
 |---|---|
 | Extend the hub: patch or fork a built-in tool, write a new app, configure the `apps` entry, the manifest, the SDK, topics, actions, capabilities | [`references/extensibility.md`](references/extensibility.md). It names the docs page for each part |
+| Find, install, manage or develop an Extension (`claude-code-hub ext`) | [`references/extensions.md`](references/extensions.md) |
 | The wire messages of the hub protocol | `reference/protocol/`, then `reference/architecture/` for processes and ports |
 | Start the hub, open it with its token, install it as an app | `getting-started/` |
 | Flags, environment variables, `config.json`, the files the hub writes | `reference/configuration/` |

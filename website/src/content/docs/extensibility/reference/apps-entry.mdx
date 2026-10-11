@@ -30,6 +30,7 @@ The `apps` list in `config.json` (in the hub folder, `~/.claude-hub` by default)
 | `port` | integer | Optional. The proxy port, 1 to 65535. See [Ports](#ports) |
 | `hidden` | boolean | Optional. `true` keeps the app out of the tab keys: it gets no <kbd>Alt</kbd>+number key and <kbd>Ctrl+Alt+Left</kbd>/<kbd>Right</kbd> skip it. It still runs, shows in the app launcher, and opens from the launcher or an action |
 | `deferredStart` | boolean | Optional. `true` does not start the app with the hub. Start it from the app launcher with <kbd>Ctrl+S</kbd> or its **▶** button |
+| `source` | string | Written by [`ext install`](/claude-code-hub/extensibility/extensions/). It marks the entry as an extension. `"local"` is a folder on this machine, and the app launcher shows a **linked** badge. The hub does not use it to run the app |
 
 ### Rules
 

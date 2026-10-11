@@ -1,0 +1,167 @@
+---
+import Shell from '../../extensions/Shell.astro';
+import { url } from '../../kit/family';
+import { loadExtensions, onSite } from '../../extensions/load';
+
+const extensions = await loadExtensions();
+---
+
+<Shell
+  title="Extensions · Claude Code Hub"
+  description="Apps that run in Claude Code Hub next to the built-in tools. Each one is reviewed before it is listed here."
+>
+  <section class="head">
+    <h1>Extensions</h1>
+    <p class="lede">
+      Apps that run in the hub next to the four built-in tools. Official extensions install from their latest code;
+      every other extension was reviewed at a fixed commit before it was listed.
+      <a href={url('extensibility/extensions/')}>Read how extensions work</a>.
+    </p>
+  </section>
+
+  <ul class="grid">
+    {
+      extensions.map((x) => (
+        <li class="card">
+          <a class="card-link" href={url(`extensions/${x.id}/`)}>
+            <span class="preview">
+              {x.screenshots[0] ? (
+                <img src={onSite(x.screenshots[0].src)} alt="" loading="lazy" decoding="async" />
+              ) : (
+                <span class="no-shot" aria-hidden="true">{x.name}</span>
+              )}
+            </span>
+            <span class="title">
+              <span class="name">{x.name}</span>
+              {x.official && <span class="badge">Official</span>}
+            </span>
+            <span class="tagline">{x.tagline}</span>
+            {x.tags.length > 0 && (
+              <span class="tags">
+                {x.tags.map((t) => <span class="tag">{t}</span>)}
+              </span>
+            )}
+          </a>
+          {x.homepage && <a class="home" href={x.homepage}>{x.name} has its own page</a>}
+        </li>
+      ))
+    }
+  </ul>
+</Shell>
+
+<style>
+  .head {
+    max-width: 44rem;
+  }
+  h1 {
+    margin: 0;
+    font: 600 clamp(2.5rem, 6vw, 4.5rem) / 1 var(--font-display);
+    letter-spacing: -0.025em;
+  }
+  .lede {
+    margin: 1.25rem 0 0;
+    font-size: 1.125rem;
+    color: var(--c-ink2);
+  }
+  .grid {
+    margin: clamp(2rem, 5vw, 3.5rem) 0 0;
+    padding: 0;
+    list-style: none;
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(min(100%, 20rem), 1fr));
+    gap: 1rem;
+  }
+  .card {
+    display: flex;
+    flex-direction: column;
+    background: var(--c-surface);
+    border: 1px solid var(--c-border);
+    border-radius: 0.625rem;
+    overflow: hidden;
+  }
+  .card-link {
+    flex: 1;
+    display: grid;
+    align-content: start;
+    gap: 0.375rem;
+    padding: 0 1.25rem 1.25rem;
+    color: inherit;
+    text-decoration: none;
+  }
+  .preview {
+    margin: 0 -1.25rem 0.875rem;
+    aspect-ratio: 16 / 10;
+    overflow: hidden;
+    border-bottom: 1px solid var(--c-border);
+    background: var(--c-elevated);
+  }
+  .preview img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    object-position: top left;
+  }
+  .no-shot {
+    height: 100%;
+    display: grid;
+    place-items: center;
+    font: 600 clamp(2rem, 5vw, 3rem) / 1 var(--font-display);
+    letter-spacing: -0.025em;
+    color: var(--c-ink3);
+  }
+  .card-link:hover {
+    background: var(--c-hover);
+  }
+  .card-link:focus-visible,
+  .home:focus-visible {
+    outline: 2px solid var(--c-accent);
+    outline-offset: -2px;
+  }
+  .home {
+    padding: 0.75rem 1.25rem;
+    border-top: 1px solid var(--c-border);
+    font: 500 0.8125rem var(--font-mono);
+    color: var(--c-ink2);
+    text-decoration: none;
+  }
+  .home:hover {
+    color: var(--c-ink1);
+    background: var(--c-hover);
+  }
+  .home::after {
+    content: ' →';
+  }
+  .title {
+    display: flex;
+    align-items: center;
+    gap: 0.625rem;
+  }
+  .name {
+    font: 600 1.25rem/1.2 var(--font-display);
+  }
+  .badge {
+    font: 500 0.6875rem/1 var(--font-mono);
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    padding: 0.25rem 0.5rem;
+    border-radius: 999px;
+    color: var(--c-accent-ink);
+    border: 1px solid currentColor;
+  }
+  .tagline {
+    color: var(--c-ink2);
+  }
+  .tags {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.375rem;
+    margin-top: 0.375rem;
+  }
+  .tag {
+    font: 500 0.75rem/1 var(--font-mono);
+    padding: 0.3125rem 0.5rem;
+    border-radius: 0.25rem;
+    color: var(--c-ink3);
+    background: var(--c-elevated);
+  }
+</style>

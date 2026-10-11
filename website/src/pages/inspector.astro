@@ -60,7 +60,7 @@ const setup = [
         <details class="family">
           <summary>Apps</summary>
           <ul>
-            {family.map((s) => <li><a href={s.href} aria-current={s.id === 'inspector' ? 'page' : undefined}>{s.name}</a></li>)}
+            {family.map((s) => <li><a href={s.href}>{s.name}</a></li>)}
           </ul>
         </details>
         <ModeToggle />
@@ -135,8 +135,9 @@ const setup = [
     </main>
 
     <FamilyFooter
-      current="inspector"
+      current="hub"
       links={[
+        { label: 'Extensions', href: url('extensions/') },
         { label: 'Docs', href: DOCS },
         { label: 'GitHub', href: SOURCE },
       ]}

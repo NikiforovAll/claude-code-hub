@@ -4,6 +4,25 @@
   "name": "Inspector",
   "icon": "scan-search",
   "run": { "entry": "server.js", "defaultPort": 3545 },
+  "requires": { "node": "20.0.0" },
+  "listing": {
+    "tagline": "One Claude Code session, turn by turn",
+    "description": "Reads a session transcript and shows each prompt, the tool calls that followed it, and the tokens they used. See where the context grew, where it was compacted, and which call failed. Open a session in Kanban and the Inspector opens it too.",
+    "tags": ["sessions", "debugging", "tokens"],
+    "screenshots": [
+      {
+        "url": "https://nikiforovall.blog/claude-code-hub/shots/extensibility/inspector-hub.webp",
+        "alt": "The Inspector in the hub: a chart of the context size per turn with a compaction line, the first turns with their tool calls, and the skills and MCP tools that the session used"
+      },
+      {
+        "url": "https://nikiforovall.blog/claude-code-hub/shots/extensibility/inspector-errors.webp",
+        "alt": "The Inspector with Errors only on: the turns with a failed tool call, and the detail panel with one failed call and its output"
+      }
+    ],
+    "author": "NikiforovAll",
+    "homepage": "https://nikiforovall.blog/claude-code-hub/inspector/",
+    "license": "MIT"
+  },
   "loading": {
     "verbs": ["Reading the transcript…", "Counting tokens per turn…", "Matching tool calls to results…"]
   },

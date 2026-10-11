@@ -1,0 +1,147 @@
+import fs from 'node:fs';
+import path from 'node:path';
+import { createRequire } from 'node:module';
+
+// Astro bundles this module, so paths come from the website folder the build runs in, not from import.meta.url.
+const SITE = process.cwd();
+const REGISTRY = path.join(SITE, 'src', 'content', 'extensions');
+const CACHE = path.join(SITE, 'node_modules', '.cache', 'extensions');
+const { manifestError } = createRequire(path.join(SITE, 'package.json'))('../lib/apps.js');
+
+const SOURCE_RE = /^github:([\w.-]+)\/([\w.-]+)(?:\/(.+))?$/;
+const SHA_RE = /^[0-9a-f]{40}$/;
+
+export interface Extension {
+  id: string;
+  name: string;
+  official: boolean;
+  order: number;
+  tagline: string;
+  description?: string;
+  tags: string[];
+  screenshots: { src: string; alt: string }[];
+  author?: string;
+  homepage?: string;
+  license?: string;
+  requires: { hub?: string; node?: string; apps?: string[] };
+  plugin?: string;
+  source: string;
+  sha: string;
+  pinned: boolean;
+  tree: string;
+  install: string[];
+}
+
+// EXTENSIONS_LOCAL=<id>=<dir>,… reads those extensions from local folders (relative to website/), to preview a
+// manifest before its commit is pushed. The deploy build does not set it.
+function localDirs(): Map<string, string> {
+  const pairs = (process.env.EXTENSIONS_LOCAL ?? '').split(',').filter(Boolean);
+  return new Map(pairs.map((p) => p.split('=', 2) as [string, string]).map(([id, dir]) => [id, path.resolve(SITE, dir)]));
+}
+
+// A file of the extension at a commit, or null when it does not exist. Cached by SHA, because a commit never changes.
+async function readAt(src: { owner: string; repo: string; subdir: string }, sha: string, rel: string, local?: string) {
+  if (local) {
+    const file = path.join(local, rel);
+    return fs.existsSync(file) ? fs.readFileSync(file, 'utf8') : null;
+  }
+  const key = path.join(CACHE, src.owner, src.repo, sha, src.subdir, rel);
+  if (fs.existsSync(key)) return fs.readFileSync(key, 'utf8');
+  if (fs.existsSync(`${key}.missing`)) return null;
+  const url = `https://raw.githubusercontent.com/${src.owner}/${src.repo}/${sha}/${[src.subdir, rel].filter(Boolean).join('/')}`;
+  const res = await fetch(url);
+  fs.mkdirSync(path.dirname(key), { recursive: true });
+  if (res.status === 404) {
+    fs.writeFileSync(`${key}.missing`, '');
+    return null;
+  }
+  if (!res.ok) throw new Error(`${url}: ${res.status}`);
+  const text = await res.text();
+  fs.writeFileSync(key, text);
+  return text;
+}
+
+// The commit at the tip of the default branch. Kept per process, so a dev server asks once, not on every page view.
+const heads = new Map<string, Promise<string>>();
+function head(owner: string, repo: string): Promise<string> {
+  const key = `${owner}/${repo}`;
+  if (!heads.has(key)) {
+    const token = process.env.GITHUB_TOKEN;
+    const sha = fetch(`https://api.github.com/repos/${key}/commits/HEAD`, {
+      headers: { Accept: 'application/vnd.github.sha', ...(token && { Authorization: `Bearer ${token}` }) },
+    }).then(async (res) => {
+      const text = (await res.text()).trim();
+      if (!res.ok || !SHA_RE.test(text)) throw new Error(`${key}: default branch head: ${res.status} ${text.slice(0, 200)}`);
+      return text;
+    });
+    sha.catch(() => heads.delete(key));
+    heads.set(key, sha);
+  }
+  return heads.get(key)!;
+}
+
+async function loadOne(file: string, local: Map<string, string>): Promise<Extension> {
+  const id = path.basename(file, '.json');
+  const entry = JSON.parse(fs.readFileSync(path.join(REGISTRY, file), 'utf8'));
+  const m = SOURCE_RE.exec(entry.source ?? '');
+  if (!m) throw new Error(`${file}: source is not github:<owner>/<repo>[/<dir>]`);
+  const pinned = entry.sha !== undefined;
+  if (pinned && !SHA_RE.test(entry.sha)) throw new Error(`${file}: sha is not a full commit SHA`);
+  // Only an official extension follows its default branch: every other one was reviewed at the commit it pins.
+  if (!pinned && entry.official !== true) throw new Error(`${file}: sha is missing`);
+  const src = { owner: m[1], repo: m[2], subdir: m[3] ?? '' };
+  const sha: string = pinned ? entry.sha : await head(src.owner, src.repo);
+  const dir = local.get(id);
+  const raw = await readAt(src, sha, 'hub-app.json', dir);
+  if (raw === null) throw new Error(`${file}: no hub-app.json at ${entry.source}@${sha}`);
+  const manifest = JSON.parse(raw);
+  // The manifest is checked against a folder that does not exist, so containment is a check of the path text.
+  const err = manifestError(manifest, id, path.resolve(SITE, '.extension-root'));
+  if (err) throw new Error(`${file}: ${err}`);
+  const listing = manifest.listing ?? {};
+  if (!listing.tagline) throw new Error(`${file}: listing.tagline is missing`);
+  const pkg = JSON.parse((await readAt(src, sha, 'package.json', dir)) ?? '{}');
+  const at = (rel: string) => `https://raw.githubusercontent.com/${src.owner}/${src.repo}/${sha}/${[src.subdir, rel].filter(Boolean).join('/')}`;
+  const clone = [src.repo, src.subdir].filter(Boolean).join('/');
+  return {
+    id,
+    name: manifest.name ?? id,
+    official: entry.official === true,
+    order: typeof entry.order === 'number' ? entry.order : Number.MAX_SAFE_INTEGER,
+    tagline: listing.tagline,
+    description: listing.description,
+    tags: listing.tags ?? [],
+    screenshots: (listing.screenshots ?? []).map((s: { path?: string; url?: string; alt: string }) => ({ src: s.url ?? at(s.path!), alt: s.alt })),
+    author: listing.author,
+    homepage: listing.homepage,
+    license: listing.license,
+    requires: manifest.requires ?? {},
+    plugin: manifest.plugin?.name,
+    source: entry.source,
+    sha,
+    pinned,
+    tree: `https://github.com/${src.owner}/${src.repo}/tree/${pinned ? sha : 'HEAD'}/${src.subdir}`,
+    install: [
+      `git clone https://github.com/${src.owner}/${src.repo}`,
+      ...(pinned ? [`git -C ${src.repo} checkout ${sha}`] : []),
+      ...(Object.keys(pkg.dependencies ?? {}).length ? [`npm install --prefix ${clone}`] : []),
+      `claude-code-hub ext install ${clone}`,
+    ],
+  };
+}
+
+async function load(): Promise<Extension[]> {
+  const local = localDirs();
+  const files = fs.readdirSync(REGISTRY).filter((f) => f.endsWith('.json'));
+  const all = await Promise.all(files.map((f) => loadOne(f, local)));
+  return all.sort((a, b) => a.order - b.order || Number(b.official) - Number(a.official) || a.name.localeCompare(b.name));
+}
+
+// An image on this site loads by path, so a dev server or preview shows a shot before it is deployed.
+export function onSite(src: string): string {
+  const home = new URL(import.meta.env.BASE_URL, import.meta.env.SITE).href;
+  return src.startsWith(home) ? new URL(src).pathname : src;
+}
+
+let loading: Promise<Extension[]> | undefined;
+export const loadExtensions = () => (import.meta.env.DEV ? load() : (loading ??= load()));

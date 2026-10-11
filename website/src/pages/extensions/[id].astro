@@ -1,0 +1,235 @@
+---
+import Shell from '../../extensions/Shell.astro';
+import Keys from '../../kit/Keys.astro';
+import { url } from '../../kit/family';
+import { loadExtensions, onSite, type Extension } from '../../extensions/load';
+
+export async function getStaticPaths() {
+  return (await loadExtensions()).map((x) => ({ params: { id: x.id }, props: { x } }));
+}
+
+const { x } = Astro.props as { x: Extension };
+const { requires } = x;
+const needs = [
+  requires.hub && `Claude Code Hub ${requires.hub} or later`,
+  requires.node && `Node.js ${requires.node} or later`,
+  ...(requires.apps ?? []).map((id) => `the ${id} app enabled in the hub`),
+].filter(Boolean) as string[];
+const facts = [
+  ['Author', x.author],
+  ['License', x.license],
+  ['Requires', needs.join(', ')],
+  ['Claude Code plugin', x.plugin],
+].filter(([, v]) => v);
+const ld = {
+  '@context': 'https://schema.org',
+  '@type': 'SoftwareApplication',
+  name: x.name,
+  description: x.description ?? x.tagline,
+  applicationCategory: 'DeveloperApplication',
+  operatingSystem: 'Windows, macOS, Linux',
+  url: new URL(url(`extensions/${x.id}/`), Astro.site).href,
+  ...(x.author && { author: { '@type': 'Person', name: x.author } }),
+  ...(x.license && { license: `https://spdx.org/licenses/${x.license}.html` }),
+  ...(x.screenshots[0] && { screenshot: x.screenshots[0].src }),
+};
+---
+
+<Shell title={`${x.name} · Claude Code Hub extension`} description={x.tagline}>
+  <script type="application/ld+json" set:html={JSON.stringify(ld).replace(/</g, '\\u003c')} />
+  <a class="back" href={url('extensions/')}>All extensions</a>
+
+  <section class="head">
+    <h1>
+      {x.name}
+      {x.official && <span class="badge">Official</span>}
+    </h1>
+    <p class="lede">{x.tagline}</p>
+    {x.description && <p class="description">{x.description}</p>}
+    {
+      x.tags.length > 0 && (
+        <p class="tags">
+          {x.tags.map((t) => <span class="tag">{t}</span>)}
+        </p>
+      )
+    }
+  </section>
+
+  <div class="body">
+    <section aria-labelledby="install">
+      <h2 id="install">Install</h2>
+      <pre><code>{x.install.join('\n')}</code></pre>
+      <p>
+        <Keys text="Restart the hub, then start the app from the app launcher ([Ctrl+Alt+A])." />
+        {x.plugin && <> <code>ext install</code> also installs the {x.plugin} plugin in your active Claude config dir.</>}
+      </p>
+    </section>
+
+    <section aria-labelledby="about">
+      <h2 id="about">About</h2>
+      <dl>
+        {
+          facts.map(([k, v]) => (
+            <>
+              <dt>{k}</dt>
+              <dd>{v}</dd>
+            </>
+          ))
+        }
+        <dt>Source</dt>
+        <dd><a href={x.tree}>{x.source.replace(/^github:/, '')} {x.pinned ? `at ${x.sha.slice(0, 7)}` : 'on its default branch'}</a></dd>
+        {
+          x.homepage && (
+            <>
+              <dt>Home page</dt>
+              <dd><a href={x.homepage}>{x.homepage}</a></dd>
+            </>
+          )
+        }
+      </dl>
+    </section>
+  </div>
+
+  {
+    x.screenshots.length > 0 && (
+      <section class="shots" aria-label="Screenshots">
+        {x.screenshots.map((s) => (
+          <button type="button" class="shot" data-lightbox aria-label={`Enlarge: ${s.alt}`}>
+            <img src={onSite(s.src)} alt={s.alt} loading="lazy" decoding="async" />
+          </button>
+        ))}
+      </section>
+    )
+  }
+</Shell>
+
+<style>
+  .back {
+    font: 500 0.875rem var(--font-mono);
+    color: var(--c-ink2);
+    text-decoration: none;
+  }
+  .back::before {
+    content: '← ';
+  }
+  .back:hover {
+    color: var(--c-ink1);
+  }
+  .head {
+    margin-top: 1.5rem;
+    max-width: 44rem;
+  }
+  h1 {
+    margin: 0;
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.5rem 1rem;
+    font: 600 clamp(2.5rem, 6vw, 4.5rem) / 1 var(--font-display);
+    letter-spacing: -0.025em;
+  }
+  .badge {
+    font: 500 0.75rem/1 var(--font-mono);
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    padding: 0.3125rem 0.625rem;
+    border-radius: 999px;
+    color: var(--c-accent-ink);
+    border: 1px solid currentColor;
+  }
+  .lede {
+    margin: 1.25rem 0 0;
+    font-size: 1.25rem;
+    color: var(--c-ink1);
+  }
+  .description {
+    margin: 0.75rem 0 0;
+    color: var(--c-ink2);
+  }
+  .tags {
+    margin: 1rem 0 0;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.375rem;
+  }
+  .tag {
+    font: 500 0.75rem/1 var(--font-mono);
+    padding: 0.3125rem 0.5rem;
+    border-radius: 0.25rem;
+    color: var(--c-ink3);
+    background: var(--c-elevated);
+  }
+  .body {
+    margin-top: clamp(2.5rem, 5vw, 3.5rem);
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(min(100%, 22rem), 1fr));
+    gap: 2rem clamp(2rem, 5vw, 4rem);
+  }
+  h2 {
+    margin: 0 0 1rem;
+    font: 600 1.625rem/1.2 var(--font-display);
+  }
+  pre {
+    margin: 0 0 1rem;
+    padding: 0.875rem 1rem;
+    background: var(--c-elevated);
+    border: 1px solid var(--c-border);
+    border-radius: 0.375rem;
+    font-size: 0.875rem;
+    white-space: pre-wrap;
+    overflow-wrap: anywhere;
+  }
+  .body p {
+    margin: 0;
+    color: var(--c-ink2);
+    font-size: 0.9375rem;
+  }
+  dl {
+    margin: 0;
+    display: grid;
+    grid-template-columns: max-content 1fr;
+    gap: 0.5rem 1.5rem;
+  }
+  dt {
+    font: 500 0.8125rem/1.65 var(--font-mono);
+    color: var(--c-ink3);
+  }
+  dd {
+    margin: 0;
+    min-width: 0;
+    overflow-wrap: anywhere;
+  }
+  .shots {
+    margin-top: clamp(3rem, 6vw, 4.5rem);
+    display: grid;
+    gap: 2rem;
+  }
+  .shot {
+    display: block;
+    width: 100%;
+    padding: 0;
+    border: 1px solid var(--c-border);
+    border-radius: 0.625rem;
+    overflow: hidden;
+    background: var(--c-surface);
+    cursor: zoom-in;
+  }
+  .shot:focus-visible,
+  .back:focus-visible {
+    outline: 2px solid var(--c-accent);
+    outline-offset: 3px;
+  }
+  .shot img {
+    width: 100%;
+    height: auto;
+  }
+  @media (max-width: 30rem) {
+    dl {
+      grid-template-columns: 1fr;
+      gap: 0.125rem;
+    }
+    dd {
+      margin-bottom: 0.625rem;
+    }
+  }
+</style>

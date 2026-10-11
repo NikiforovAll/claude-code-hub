@@ -15,6 +15,8 @@ The hub runs each tool from a folder. An entry in `config.json` can point a tool
 
 Start with a patch. When the patch gets large or breaks on each upgrade, go to a fork. When the tool you want does a different job, write a new app.
 
+To share a new app, or to ship it with a Claude Code plugin, make it an [extension](/claude-code-hub/extensibility/extensions/). `claude-code-hub ext install <dir>` adds it to the hub and installs its plugin.
+
 ## Point the hub at your folder
 
 Each way ends with an entry in the `apps` list of `config.json`:

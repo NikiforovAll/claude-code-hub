@@ -39,6 +39,8 @@ description: Every field of hub-app.json and the validation rules.
 | `provides` | No | The capabilities the app provides. See [Capabilities](#capabilities) |
 | `keys.keeps` | No | The combos the app uses for its own commands. See [Kept keys](#kept-keys) |
 | `plugin` | No | The Claude Code plugin the app ships. See [Plugin](#plugin) |
+| `requires` | No | The lowest hub and Node versions, and the apps that must be on. See [Requires](#requires) |
+| `listing` | No | What the Extensions page shows. See [Listing](#listing) |
 
 ## Actions
 
@@ -75,23 +77,69 @@ The hub does not bind a kept combo. Kanban keeps <kbd>Ctrl+Alt+N</kbd>, <kbd>Ctr
 
 ## Plugin
 
-`plugin` names the Claude Code plugin that your app ships, so the app launcher (<kbd>Ctrl+Alt+A</kbd>) can show its state in the active config dir:
+`plugin` names the Claude Code plugin that your app ships, so the hub can install it and the app launcher (<kbd>Ctrl+Alt+A</kbd>) can show its state in the active config dir:
 
 ```json
 "plugin": {
-  "id": "claude-code-kanban@claude-code-kanban",
-  "path": "plugin/plugins/claude-code-kanban",
+  "marketplace": "plugin",
+  "name": "claude-code-kanban",
   "install": "claude-code-kanban --install --yes"
 }
 ```
 
 | Field | Meaning |
 | --- | --- |
-| `id` | The plugin id, `<name>@<marketplace>`, as `installed_plugins.json` records it |
-| `path` | The plugin folder, relative to the app folder. The hub reads the version from `.claude-plugin/plugin.json` in it |
-| `install` | The command that installs the plugin. It must take `--dir <config dir>`, which the hub adds for a config dir other than `~/.claude` |
+| `marketplace` | The marketplace folder, relative to the app folder. It holds `.claude-plugin/marketplace.json` |
+| `name` | The plugin's name in `marketplace.json`. The plugin id is `<name>@<marketplace name>`, and the hub reads the version from the plugin's `source` folder |
+| `install` | Optional. The command that installs the plugin, when your app needs more than the claude CLI's marketplace and plugin install. The hub gives it the config dir in `CLAUDE_CONFIG_DIR`, except for `~/.claude`, where the variable stays unset. A command that starts with a `bin` of your `package.json` runs that bin through Node, so it works when your app comes with the hub and is not on `PATH` |
 
-The launcher shows the installed version. When the plugin is not installed, is disabled, or is not the version in `path`, it shows a ⚠, and a click copies the install command.
+`claude-code-hub ext install <id>` installs the plugin in a config dir (`--dir`, else `CLAUDE_CONFIG_DIR`, else `~/.claude`). With no `install`, it registers the marketplace folder and installs the plugin with the claude CLI.
+
+The launcher shows the installed version. When the plugin is not installed, is disabled, or is not the version the app ships, it shows a ⚠, and a click copies the `ext install` command for the active config dir.
+
+## Requires
+
+`requires` states what an [extension](/claude-code-hub/extensibility/extensions/) needs:
+
+```json
+"requires": { "hub": "1.12.0", "node": "22.13.0", "apps": ["kanban"] }
+```
+
+| Field | Meaning |
+| --- | --- |
+| `hub` | The lowest hub version, `x.y.z` |
+| `node` | The lowest Node version, `x.y.z` |
+| `apps` | The ids of the apps that must be enabled in the hub |
+
+`ext install <dir>` and `ext update` stop when the hub or Node is older, or when an app in `apps` is off.
+
+## Listing
+
+`listing` is what the [Extensions](/claude-code-hub/extensions/) page shows for an extension. The hub does not use it. Every text field is plain text.
+
+```json
+"listing": {
+  "tagline": "One Claude Code session, turn by turn",
+  "description": "Reads a session transcript and shows each prompt, its tool calls and their token use.",
+  "tags": ["sessions", "debugging"],
+  "screenshots": [{ "url": "https://example.com/shots/turns.webp", "alt": "The turns of one session" }],
+  "author": "NikiforovAll",
+  "homepage": "https://nikiforovall.blog/claude-code-hub/inspector/",
+  "license": "MIT"
+}
+```
+
+| Field | Rule |
+| --- | --- |
+| `tagline` | 80 characters or fewer. The Extensions page needs it |
+| `description` | 500 characters or fewer |
+| `tags` | Up to 5. Lowercase letters, digits and `-` |
+| `screenshots` | Up to 4. Each has `alt` and one of `path` (a file in the extension folder) or `url` (an `https://` link). PNG, JPEG or WebP |
+| `author` | 60 characters or fewer |
+| `homepage` | An `https://` URL |
+| `license` | An SPDX id, for example `MIT` |
+
+Text fields must not contain `<` or `>`.
 
 ## Validation
 
@@ -111,10 +159,21 @@ The hub skips the app, with a log line, when:
 | `keys is not an object` | `keys` is an array or a value |
 | `keys.keeps is not an array` | `keys.keeps` is not a list |
 | `keys.keeps combo ... is not a combo name` | A kept combo breaks the [combo rule](#kept-keys) |
-| `plugin.id is not <name>@<marketplace>` | `plugin.id` is missing or has no `@` |
-| `plugin.path is missing` | `plugin` has no `path` |
-| `plugin.path is outside the app directory` | `plugin.path` points outside the folder, or at the folder itself |
-| `plugin.install is missing` | `plugin` has no `install` command |
+| `plugin is not an object` | `plugin` is an array or a value |
+| `plugin.marketplace is not a path` | `plugin.marketplace` is missing or not a string |
+| `plugin.marketplace is outside the app directory` | `plugin.marketplace` points outside the folder |
+| `plugin.name is not a plugin name` | `plugin.name` is missing or has characters other than letters, digits, `_`, `.` and `-` |
+| `plugin.install is not a command` | `plugin.install` is empty or not a string |
+| `.../marketplace.json does not list plugin "<name>"` | No plugin in `marketplace.json` has that `name`. Other `marketplace.json` lines: the file is missing, its `name` is not valid, or the plugin's `source` is not a folder inside the app folder |
+| `requires is not an object` | `requires` is an array or a value |
+| `requires.<hub or node> is not a version x.y.z` | A version is not three numbers |
+| `requires.apps is not a list of app ids` | `requires.apps` is not a list, or an item breaks the id rule |
+| `listing is not an object` | `listing` is an array or a value |
+| `listing.<field> is not plain text of <n> characters or fewer` | `tagline`, `description` or `author` is empty, too long, not a string, or has `<` or `>` |
+| `listing.tags is not a list of up to 5 lowercase tags` | `tags` breaks the tag rule |
+| `listing.screenshots ...` | A screenshot has no `alt`, has both or neither of `path` and `url`, is not PNG, JPEG or WebP, has a `url` that is not `https://`, or a `path` outside the folder. Or there are more than 4 |
+| `listing.homepage is not an https URL` | `homepage` does not start with `https://` |
+| `listing.license is not an SPDX id` | `license` has characters other than letters, digits, `.`, `+` and `-` |
 
 The hub skips one action, and keeps the app, when the name starts with `hub.`, `url` has a `#` or is not a string, `mode` is not `url` or `message`, or a param type is not `string` or `string?`.
 

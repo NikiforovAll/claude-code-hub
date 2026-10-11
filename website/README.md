@@ -20,6 +20,7 @@ Run from this folder. Node 22.12 or later.
 - `src/kit/` and `src/components/` are the design kit: layout, themes, `Shot`, `Lightbox`, `Keys`. The same kit is in the Kanban, Marketplace, Cost and Memory Diagnoser sites. Keep the copies the same.
 - `public/shots/` holds the screenshots. Theme shots are named `themes/<palette>-<view>-<mode>.webp`, and pages find them by that name. To update a shot, replace the file and keep its name.
 - `public/og.png` is the 1200×630 image for link previews.
+- `src/content/extensions/<id>.json` is the extension registry: `{source, sha, official, order}`, added by pull request. The pages list entries by `order` (lowest first, entries without it last), then official ones, then by name. An official entry may leave out `sha`: the build then reads the commit at the tip of the repo's default branch (one GitHub API call per repo, with `GITHUB_TOKEN` when it is set), and its install commands clone the latest code. The build reads each `hub-app.json` from GitHub at that commit (cached in `node_modules/.cache/extensions`), checks it with the hub's `manifestError`, and makes `/extensions/`, `/extensions/<id>/` (`src/extensions/`) and `/extensions.json`, the index that the hub-builder skill reads. The build fails when a manifest cannot be read or has no `listing.tagline`. To preview a manifest that is not pushed yet, set `EXTENSIONS_LOCAL=<id>=<dir>,…` with folders relative to `website/`, for example `EXTENSIONS_LOCAL=inspector=../examples/inspector,swarm=../cck/extensions/swarm npm run dev`.
 
 ## Deploy
 

@@ -1,0 +1,137 @@
+---
+title: Extensions
+description: Package a hub app with its Claude Code plugin, and add it to the hub with one command.
+---
+
+An extension is a hub app that the hub does not ship. It is a folder with a `hub-app.json`, and it can ship one Claude Code plugin. `claude-code-hub ext` adds it to the hub, installs its plugin and removes both again.
+
+Use an extension when you want to share a [new app](/claude-code-hub/extensibility/new-app/), or when your app needs a skill or a hook in Claude Code to work.
+
+The [Extensions page](/claude-code-hub/extensions/) lists the official extensions, which install from their latest code, and the reviewed ones, each pinned to the commit that was reviewed, with the commands that install each one. Agents read the same list as JSON at [`/claude-code-hub/extensions.json`](/claude-code-hub/extensions.json).
+
+## Layout
+
+The folder that holds `hub-app.json` is the extension root. Every path in the manifest starts from the root and must stay inside it.
+
+```text
+<root>/
+├── hub-app.json                      run.entry, plugin, requires
+├── package.json                      optional: dependencies and bins
+├── …                                 the app
+└── plugin/                           optional: a Claude Code marketplace
+    ├── .claude-plugin/marketplace.json
+    └── plugins/<name>/
+        ├── .claude-plugin/plugin.json
+        └── skills/ hooks/ …
+```
+
+Claude Code installs a plugin by copying its folder into its plugin cache. So code that a skill or a hook runs must be inside the plugin folder. The app can be inside the plugin folder too, so that the plugin also works with no hub.
+
+The built-in Kanban tool has the same layout: its root holds `plugin/plugins/claude-code-kanban`.
+
+## The manifest
+
+An extension's `hub-app.json` is a normal [app manifest](/claude-code-hub/extensibility/reference/manifest/). Two fields matter most to an extension:
+
+```json
+{
+  "manifest": 1,
+  "id": "swarm",
+  "name": "Swarm",
+  "run": { "entry": "plugin/plugins/kanban-delm-swarm/viewer/server.js", "defaultPort": 3546 },
+  "plugin": { "marketplace": "plugin", "name": "kanban-delm-swarm" },
+  "requires": { "node": "22.13.0", "apps": ["kanban"] }
+}
+```
+
+- [`plugin`](/claude-code-hub/extensibility/reference/manifest/#plugin) names the plugin in the extension's own marketplace.
+- [`requires`](/claude-code-hub/extensibility/reference/manifest/#requires) sets the lowest hub and Node versions, and the apps that must be on.
+
+The `id` must not be a built-in id (`kanban`, `marketplace`, `cost`, `memory`).
+
+## Add an extension
+
+```bash
+claude-code-hub ext install <dir>
+```
+
+The command:
+
+1. Reads `hub-app.json` in `<dir>` and checks it.
+2. Checks the `id` and `requires`.
+3. Installs the plugin in one config dir: `--dir`, else `CLAUDE_CONFIG_DIR`, else `~/.claude`.
+4. Adds an entry to the `apps` list in `config.json`.
+
+When a check or the plugin install fails, the command stops and does not change `config.json`.
+
+The entry points at `<dir>`, so the hub runs the app from that folder and copies nothing:
+
+```json
+{ "id": "swarm", "path": "C:/dev/swarm", "source": "local", "deferredStart": true }
+```
+
+Run `npm install` in `<dir>` first when the app has dependencies. Then restart the hub. An extension does not start with the hub: start it from the app launcher (<kbd>Ctrl+Alt+A</kbd>) with <kbd>Ctrl+S</kbd>. Its row in the launcher has a **linked** badge.
+
+## Install the plugin in another config dir
+
+The hub runs an extension once, for every config dir. Claude Code loads a plugin per config dir. To install the plugin in another config dir, give the id:
+
+```bash
+claude-code-hub ext install swarm --dir ~/.claude-work
+```
+
+With an id the hub runs, `ext install` installs only the plugin. This also works for a built-in tool, for example `ext install kanban`. When the plugin of the active config dir is missing, off or not the version the app ships, the app launcher shows a ⚠ on the app's row. A click copies this command.
+
+`ext install` is safe to run again. It updates a plugin that is already installed.
+
+## Change an extension
+
+- **App code.** Restart the app: <kbd>Ctrl+R</kbd> on its row in the app launcher.
+- **Plugin.** Claude Code runs the copy in its cache, so an edit in `<dir>` does not reach it. Run `ext update`, then start a new Claude Code session:
+
+  ```bash
+  claude-code-hub ext update swarm
+  ```
+
+  `ext update` installs the plugin again, also when its version did not change.
+
+- **Manifest.** Restart the hub.
+
+## Commands
+
+```bash
+claude-code-hub ext <command> [--hub-dir <path>] [--dir <config dir>]
+```
+
+| Command | Action |
+| --- | --- |
+| `ext install <dir>` | Add the extension in `<dir>` to the hub and install its plugin. When the hub already runs `<dir>`, install only the plugin |
+| `ext install <id>` | Install or update the plugin of an app the hub runs, built-in or extension |
+| `ext list` | List the extensions with their folder and the state of their plugin in the config dir |
+| `ext update <id>` | Install the plugin of an extension again |
+| `ext remove <id>` | Remove the plugin and its marketplace from the config dir, and the entry from `config.json`. The folder stays |
+
+| Option | Default | Meaning |
+| --- | --- | --- |
+| `--hub-dir <path>` | `CLAUDE_HUB_DIR`, else `~/.claude-hub` | The hub folder with `config.json` |
+| `--dir <path>` | `CLAUDE_CONFIG_DIR`, else `~/.claude` | The config dir for the plugin steps |
+
+`ext update` and `ext remove` work only on an entry that `ext install` added. Restart the hub after `ext install <dir>` and `ext remove`.
+
+## The plugin install
+
+With no `install` command in the manifest, the hub runs the same steps as for its own plugin:
+
+```bash
+claude plugin marketplace add "<root>/<marketplace>"
+claude plugin marketplace update <marketplace name>
+claude plugin install <name>@<marketplace name>
+```
+
+The marketplace name comes from the extension's `marketplace.json`. Pick a name that no other marketplace uses. When a marketplace with that name is already registered from another folder, `ext install` stops and prints the command that removes it.
+
+An extension that needs more steps sets [`plugin.install`](/claude-code-hub/extensibility/reference/manifest/#plugin) to its own command.
+
+## Trust
+
+An extension runs as you, with no sandbox. It can read the hub token and every file you can read, and its plugin can run hooks in each Claude Code session. Add only an extension whose source you trust, the same as a Claude Code plugin.
