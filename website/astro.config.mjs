@@ -6,6 +6,7 @@ export default defineConfig({
 	site: 'https://nikiforovall.blog',
 	base: '/claude-code-hub',
 	devToolbar: { enabled: false },
+	compressHTML: false,
 	integrations: [
 		starlight({
 			title: 'Claude Code Hub',
