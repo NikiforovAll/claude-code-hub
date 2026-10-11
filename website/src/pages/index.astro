@@ -83,14 +83,9 @@ const setup = [
     body: 'It starts the four tools and opens the browser. To get a window with no browser UI, install the page as an app.',
   },
   {
-    title: 'Install the Kanban hooks',
-    cmd: 'npx claude-code-kanban --install',
-    body: 'Optional. The hooks give Kanban the live agent log, subagents, and waiting-for-you badges. Run it once for each config dir.',
-  },
-  {
-    title: 'Install the hub plugin',
+    title: 'Install the plugins',
     cmd: 'claude-code-hub --install',
-    body: 'Optional. The plugin adds the hub-builder skill to Claude Code, so an agent can extend the hub, make a color theme, or fix a hub problem. Run it once for each config dir.',
+    body: "Optional. Kanban's plugin gives the board the live agent log, subagents, and waiting-for-you badges. The hub plugin adds the hub-builder skill, so an agent can extend the hub, make a color theme, or fix a hub problem. Run it once for each config dir, and again after a hub update.",
   },
 ];
 
@@ -176,7 +171,7 @@ const windows = [
             and keep the session in the same window. <a href="https://nikiforovall.blog/claude-code-kanban/">Read the Kanban docs</a>.
           </p>
           <p class="aside">
-            The live agent log, subagents, and waiting-for-you badges need the Kanban hooks, step 3 of the setup below.
+            The live agent log, subagents, and waiting-for-you badges need Kanban's plugin, step 3 of the setup below.
           </p>
         </div>
         <div class="items">

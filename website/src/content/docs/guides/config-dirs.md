@@ -42,10 +42,10 @@ When the hub starts, it adds one dir to the list if it is not there already: the
 
 ## Hooks for each dir
 
-Kanban's hooks and status line are installed in one config dir. A dir without them shows tasks and sessions, but no live agent activity. To install them for a dir, run:
+Kanban's plugin is installed in one config dir. A dir without it shows tasks and sessions, but no live agent activity. To install it for a dir, run:
 
 ```bash
-CLAUDE_CONFIG_DIR=~/.claude-work npx claude-code-kanban --install
+claude-code-hub --install --dir ~/.claude-work
 ```
 
 ## Where the list is saved

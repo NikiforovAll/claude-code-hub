@@ -29,13 +29,13 @@ If a tool answers slowly while it is idle, its row in the app launcher may show 
 
 ## Kanban shows no live agent activity
 
-The Kanban hooks are not installed in the active config dir. Run:
+Kanban's plugin is not installed in the active config dir. Run:
 
 ```bash
-npx claude-code-kanban --install
+claude-code-hub --install
 ```
 
-For another config dir, set `CLAUDE_CONFIG_DIR` to that dir first. See [Use more than one config dir](/claude-code-hub/guides/config-dirs/#hooks-for-each-dir).
+For another config dir, add `--dir <config dir>`. See [Use more than one config dir](/claude-code-hub/guides/config-dirs/#hooks-for-each-dir).
 
 ## A shortcut does nothing
 
