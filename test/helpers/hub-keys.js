@@ -13,6 +13,7 @@ const FUNCTIONS = [
   'appNumberCombo',
   'comboLabel',
   'handleForwardedKey',
+  'tabIds',
 ];
 const { comboOf, keyParts } = require('../../packages/claude-hub-sdk/src/keys');
 
@@ -24,7 +25,8 @@ function source(name) {
 
 // The hub page's keymap, run with its UI calls replaced by a log of the action they stand for.
 // keys is config.json `keys` as the server hands it over, already checked.
-function loadHubKeys({ apps: appCount = MATRIX.apps, platform = 'win', keys = {} } = {}) {
+// hidden lists app ids with `hidden: true`; appByNumber:<n> names the visible app it switched to.
+function loadHubKeys({ apps: appCount = MATRIX.apps, platform = 'win', keys = {}, hidden = [] } = {}) {
   const ids = Array.from({ length: appCount }, (_, i) => `app${i + 1}`);
   const ran = [];
   const ctx = {
@@ -33,10 +35,10 @@ function loadHubKeys({ apps: appCount = MATRIX.apps, platform = 'win', keys = {}
     keyParts,
     keymap: null,
     userKeys: keys,
-    apps: Object.fromEntries(ids.map((id) => [id, {}])),
+    apps: Object.fromEntries(ids.map((id) => [id, hidden.includes(id) ? { hidden: true } : {}])),
     togglePalette: (mode) => ran.push({ project: 'hub.projectPicker', configDir: 'hub.configDirPicker', app: 'hub.appLauncher' }[mode]),
     cycleTab: (delta) => ran.push(delta < 0 ? 'hub.prevApp' : 'hub.nextApp'),
-    switchTab: (id) => ran.push(`hub.appByNumber:${Object.keys(ctx.apps).indexOf(id) + 1}`),
+    switchTab: (id) => ran.push(`hub.appByNumber:${ctx.k.tabIds().indexOf(id) + 1}`),
   };
   vm.runInNewContext(`${FUNCTIONS.map(source).join('\n')}\nthis.k = { ${FUNCTIONS.join(', ')} };`, ctx);
   const run = (fn) => {
@@ -46,6 +48,7 @@ function loadHubKeys({ apps: appCount = MATRIX.apps, platform = 'win', keys = {}
   };
   return {
     ...ctx.k,
+    apps: ctx.apps,
     actionOf: (e) => run(() => ctx.k.bindings()[comboOf(e)]?.run()),
     actionOfForwarded: (payload) => run(() => ctx.k.handleForwardedKey(payload)),
   };

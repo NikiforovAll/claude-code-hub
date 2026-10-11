@@ -1,6 +1,7 @@
 const { describe, it } = require('node:test');
 const assert = require('node:assert/strict');
-const { MATRIX, ROW_SETS, loadHubKeys, eventOf, payloadOf } = require('./helpers/hub-keys');
+const vm = require('node:vm');
+const { MATRIX, ROW_SETS, source, loadHubKeys, eventOf, payloadOf } = require('./helpers/hub-keys');
 const { HUB_ACTIONS } = require('../lib/keymap');
 
 const PALETTE_AND_ARROWS = ['ctrl+alt+p', 'ctrl+alt+w', 'ctrl+alt+a', 'ctrl+alt+ArrowLeft', 'ctrl+alt+ArrowRight'];
@@ -54,6 +55,22 @@ describe('hub keymap', () => {
     assert.deepEqual(Object.keys(hub.bindings()).slice(-2), ['alt+1', 'alt+2']);
     assert.equal(hub.actionOf(eventOf({ key: '3', code: 'Digit3', mods: ['alt'] })), 'text');
     assert.equal(hub.actionOf(eventOf({ key: '2', code: 'Digit2', mods: ['alt'] })), 'hub.appByNumber:2');
+  });
+
+  it('gives a hidden app no number key and skips it in the arrow cycle', () => {
+    const hub = loadHubKeys({ apps: 4, hidden: ['app2'] });
+    assert.deepEqual([...hub.tabIds()], ['app1', 'app3', 'app4']);
+    assert.deepEqual(Object.keys(hub.bindings()).slice(-3), ['alt+1', 'alt+2', 'alt+3']);
+    assert.equal(hub.actionOf(eventOf({ key: '4', code: 'Digit4', mods: ['alt'] })), 'text');
+
+    const went = [];
+    const ctx = { apps: hub.apps, activeApp: 'app1', switchTab: (id) => went.push(id) };
+    vm.runInNewContext(`${source('tabIds')}\n${source('cycleTab')}\nthis.cycleTab = cycleTab;`, ctx);
+    ctx.cycleTab(1);
+    ctx.activeApp = 'app2';
+    ctx.cycleTab(1);
+    ctx.cycleTab(-1);
+    assert.deepEqual(went, ['app3', 'app1', 'app4']);
   });
 
   it('keeps the palette keys working while the palette is open', () => {

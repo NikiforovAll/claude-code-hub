@@ -255,6 +255,7 @@ function childEnv(pool, name) {
     CLAUDE_CONFIG_DIR: pool.dir,
     CLAUDE_HUB: '1',
     HUB_URL: `http://localhost:${hubPort}`,
+    CLAUDE_HUB_DIR: HUB_DIR,
     HOST: net.BIND_HOST,
     ALLOWED_HOSTS: net.ALLOWED_HOSTS,
     HUB_SDK_SERVER,
@@ -324,15 +325,26 @@ function spawnApp(pool, name, cmd, args) {
 // Asked for by the user, so it does not count toward MAX_RESTARTS and it brings back an app that gave up.
 async function restartApp(pool, app) {
   const { id } = app;
-  const old = pool.children.get(id);
-  pool.children.delete(id);
-  delete pool.ports[id];
   pool.restarts[id] = [];
-  if (old) await killChild(old);
+  pool.stopped.delete(id);
+  await killApp(pool, id);
   if (pool.retired) return false;
   const child = spawnOne(pool, app);
   await withTimeout(child.ready, 20000);
   return !!pool.ports[id];
+}
+
+async function stopApp(pool, { id }) {
+  pool.stopped.add(id);
+  await killApp(pool, id);
+}
+
+// Out of pool.children before the kill, so the exit handler does not restart it.
+async function killApp(pool, id) {
+  const old = pool.children.get(id);
+  pool.children.delete(id);
+  delete pool.ports[id];
+  if (old) await killChild(old);
 }
 
 function killPool(pool) {
@@ -365,7 +377,8 @@ async function ensurePool(dir) {
   if (pools.size >= POOL_SIZE) await evictPools(dir);
   pool = pools.get(dir);
   if (pool) return pool.ready;
-  pool = { dir, children: new Map(), ports: {}, restarts: {}, retired: false };
+  const stopped = new Set(ENABLED_APPS.filter((a) => a.deferredStart).map((a) => a.id));
+  pool = { dir, children: new Map(), ports: {}, restarts: {}, stopped, retired: false };
   pools.set(dir, pool);
   spawnChildren(pool);
   const ready = [...pool.children.values()].map((c) => c.ready);
@@ -457,7 +470,7 @@ function spawnOne(pool, app) {
 }
 
 function spawnChildren(pool) {
-  for (const a of ENABLED_APPS) spawnOne(pool, a);
+  for (const a of ENABLED_APPS) if (!pool.stopped.has(a.id)) spawnOne(pool, a);
 }
 
 const publicPorts = Object.fromEntries(ENABLED_APPS.map((a) => [a.id, a.port]));
@@ -507,7 +520,7 @@ async function waitForPort(name, deadline) {
     const pool = activePool();
     const port = pool?.ports[name];
     if (port) return port;
-    if (pool?.children.get(name)?.gaveUp) return null;
+    if (pool?.children.get(name)?.gaveUp || pool?.stopped.has(name)) return null;
     const remaining = deadline - Date.now();
     if (remaining <= 0) return null;
     await Promise.race([pool?.children.get(name)?.ready, delay(Math.min(remaining, 250))]);
@@ -515,10 +528,14 @@ async function waitForPort(name, deadline) {
 }
 
 function noPortReason(name) {
-  const child = activePool()?.children.get(name);
+  const pool = activePool();
+  if (pool?.stopped.has(name)) {
+    return { headline: 'is stopped', detail: `Start ${name} from the app launcher`, final: true };
+  }
+  const child = pool?.children.get(name);
   if (child?.gaveUp) {
     const detail = `${name} exited after ${MAX_RESTARTS} restarts in ${RESTART_WINDOW_MS / 1000}s. The hub stopped restarting it`;
-    return { headline: 'stopped', detail };
+    return { headline: 'stopped', detail, final: true };
   }
   return { headline: 'is starting', detail: `${name} is starting` };
 }
@@ -529,25 +546,29 @@ const escapeHtml = (s) => String(s).replace(/[&<>"']/g, (c) => `&#${c.charCodeAt
 // hand. The cap is small because the server already waited NAV_PORT_WAIT_MS before serving this,
 // and each reload re-spends that wait. sessionStorage throws when site data is blocked, and a page
 // whose only job is to reload must still reload there.
-function retryPage(name, headline, detail) {
-  return `<!doctype html><html><head><meta charset="utf-8"><title>${escapeHtml(name)}</title>
-<style>:root{color-scheme:light dark}body{font:14px system-ui,sans-serif;margin:0;display:grid;place-items:center;height:100vh}
-div{text-align:center;opacity:.7}code{font-size:12px;opacity:.6}</style>
-</head><body><div><p id="m">${escapeHtml(name)} ${escapeHtml(headline)}…</p><p><code>${escapeHtml(detail)}</code></p></div>
-<script>
+const RETRY_SCRIPT = `<script>
 let n = 0;
 const k = 'hub-retry:' + location.pathname;
 try { n = +(sessionStorage.getItem(k) || 0); sessionStorage.setItem(k, n + 1); } catch {}
 if (n < 3) setTimeout(() => location.reload(), 1000);
 else { try { sessionStorage.removeItem(k); } catch {} document.getElementById('m').textContent = 'not responding'; }
-</script></body></html>`;
+</script>`;
+
+// A final page (an app stopped by the user or given up on) does not reload: only the user brings that app back.
+function retryPage(name, { headline, detail, final }) {
+  return `<!doctype html><html><head><meta charset="utf-8"><title>${escapeHtml(name)}</title>
+<style>:root{color-scheme:light dark}body{font:14px system-ui,sans-serif;margin:0;display:grid;place-items:center;height:100vh}
+div{text-align:center;opacity:.7}code{font-size:12px;opacity:.6}</style>
+</head><body><div><p id="m">${escapeHtml(name)} ${escapeHtml(headline)}${final ? '' : '…'}</p><p><code>${escapeHtml(detail)}</code></p></div>
+${final ? '' : RETRY_SCRIPT}</body></html>`;
 }
 
-function sendUnavailable(req, res, name, status, detail, headline) {
+function sendUnavailable(req, res, name, status, reason) {
   if (res.destroyed || res.headersSent) return;
+  const { detail } = reason;
   if (isNavigation(req)) {
     res.writeHead(status, { 'Retry-After': '1', 'Content-Type': 'text/html; charset=utf-8' });
-    res.end(retryPage(name, headline, detail));
+    res.end(retryPage(name, reason));
     return;
   }
   // The sub-app's own callers hand the body to .json(): plain text surfaces as a SyntaxError
@@ -735,8 +756,7 @@ function proxyHandler(name) {
     for (let attempt = 1; !res.destroyed; attempt++) {
       const childPort = await waitForPort(name, budget.deadline);
       if (!childPort) {
-        const { headline, detail } = noPortReason(name);
-        sendUnavailable(req, res, name, 503, detail, headline);
+        sendUnavailable(req, res, name, 503, noPortReason(name));
         return;
       }
       if (req.headers.origin) {
@@ -747,12 +767,12 @@ function proxyHandler(name) {
       });
       if (!err) return;
       if (body === null || !RETRYABLE.has(err.code)) {
-        sendUnavailable(req, res, name, 502, err.message, 'did not respond');
+        sendUnavailable(req, res, name, 502, { headline: 'did not respond', detail: err.message });
         return;
       }
       const next = await afterConnectFailure(name, childPort, err, attempt, budget);
       if (!next.wait) {
-        sendUnavailable(req, res, name, 503, next.detail, next.headline);
+        sendUnavailable(req, res, name, 503, next);
         return;
       }
       await delay(next.wait);
@@ -871,6 +891,7 @@ function appsConfig() {
         loading: a.loading,
         publishes: a.publishes,
       };
+      if (a.hidden) entry.hidden = true;
       if (TERMINAL_TOKEN && a.id === TERMINAL_APP.id) entry.terminalToken = TERMINAL_TOKEN;
       return [a.id, entry];
     }),
@@ -1010,18 +1031,25 @@ app.get('/api/apps/stats', async (_req, res) => {
       const slowMs = (child && portHealth.flagged(child)?.worstMs) ?? null;
       return [
         a.id,
-        { ...(await stats(child, STATS_TIMEOUT_MS)), slowMs, version: a.version, plugin: plugin(a.plugin) },
+        {
+          ...(await stats(child, STATS_TIMEOUT_MS)),
+          slowMs,
+          stopped: !!pool?.stopped.has(a.id),
+          version: a.version,
+          plugin: plugin(a.plugin),
+        },
       ];
     }),
   );
   res.json({ hub: { plugin: plugin(HUB_PLUGIN) }, apps: Object.fromEntries(entries) });
 });
 
-// Restarting the terminal provider ends its live terminals, so that takes force: true.
+// Restarting or stopping the terminal provider ends its live terminals, so that takes force: true.
+// Start and restart are the same call: both kill the app's process if it has one and spawn it.
 const restarting = new Set();
-app.post('/api/apps/:id/restart', async (req, res) => {
+app.post('/api/apps/:id/:op(restart|start|stop)', async (req, res) => {
   const pool = activePool();
-  const { id } = req.params;
+  const { id, op } = req.params;
   const target = ENABLED_APPS.find((a) => a.id === id);
   if (!pool || !target) {
     res.status(404).json({ error: 'Unknown app' });
@@ -1029,7 +1057,7 @@ app.post('/api/apps/:id/restart', async (req, res) => {
   }
   const key = `${pool.dir}\n${id}`;
   if (restarting.has(key)) {
-    res.status(409).json({ error: `${target.name} is already restarting` });
+    res.status(409).json({ error: `${target.name} is already restarting or stopping` });
     return;
   }
   restarting.add(key);
@@ -1041,8 +1069,11 @@ app.post('/api/apps/:id/restart', async (req, res) => {
         return;
       }
     }
-    console.log(`[${id}] restart asked for by the hub page`);
-    if (await restartApp(pool, target)) res.json({ ok: true });
+    console.log(`[${id}] ${op} asked for by the hub page`);
+    if (op === 'stop') {
+      await stopApp(pool, target);
+      res.json({ ok: true });
+    } else if (await restartApp(pool, target)) res.json({ ok: true });
     else res.status(503).json({ error: `${target.name} did not start` });
   } finally {
     restarting.delete(key);

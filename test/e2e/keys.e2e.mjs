@@ -231,7 +231,7 @@ describe('app launcher', () => {
 
   it('shows the hub version and its plugin in its footer', async () => {
     const hint = await page.locator('#palette-hint').textContent();
-    assert.ok(hint.startsWith(`Claude Code Hub ${version} · ⚠ plugin not installed · `), hint);
+    assert.ok(hint.startsWith(`Hub ${version} · ⚠ plugin not installed · `), hint);
   });
 
   it("shows an app's version and a ⚠ for a plugin that is not the shipped version", async () => {

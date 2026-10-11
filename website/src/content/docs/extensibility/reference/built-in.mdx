@@ -117,4 +117,4 @@ Kanban provides both capabilities. To take one over, see [Capabilities](/claude-
 
 ### `terminal`
 
-Kanban runs the embedded terminal. `GET /api/terminals` answers `{sessions: [...]}`, one entry for each open terminal. While the list is not empty, the hub keeps that set of apps in its pool when you switch config dirs. `POST /api/apps/kanban/restart` answers `409` while Kanban has open terminals, unless the body has `force: true`.
+Kanban runs the embedded terminal. `GET /api/terminals` answers `{sessions: [...]}`, one entry for each open terminal. While the list is not empty, the hub keeps that set of apps in its pool when you switch config dirs. `POST /api/apps/kanban/restart` and `POST /api/apps/kanban/stop` answer `409` while Kanban has open terminals, unless the body has `force: true`.

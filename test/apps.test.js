@@ -31,6 +31,22 @@ describe('selectApps', () => {
     assert.equal(apps.find((a) => a.id === 'memory').port, undefined);
   });
 
+  it('carries hidden and deferredStart only when the entry sets them to true', () => {
+    const { apps } = selectApps([
+      { id: 'cost', hidden: true, deferredStart: true },
+      { id: 'memory', hidden: 'yes', deferredStart: 1 },
+    ]);
+    assert.deepEqual(
+      apps.map((a) => [a.id, a.hidden, a.deferredStart]),
+      [
+        ['cost', true, true],
+        ['memory', false, false],
+        ['kanban', false, false],
+        ['marketplace', false, false],
+      ],
+    );
+  });
+
   it('adds an unknown id that has a path, resolved against the base', () => {
     const base = path.resolve('/hub');
     const { apps, unknown } = selectApps([{ id: 'kanban' }, { id: 'board', path: 'forks/board', port: 4545 }], base);
@@ -38,7 +54,7 @@ describe('selectApps', () => {
       apps.map((a) => a.id),
       ['kanban', 'board', 'marketplace', 'cost', 'memory'],
     );
-    assert.deepEqual(apps[1], { id: 'board', port: 4545, path: path.join(base, 'forks', 'board') });
+    assert.deepEqual(apps[1], { id: 'board', port: 4545, path: path.join(base, 'forks', 'board'), hidden: false, deferredStart: false });
     assert.deepEqual(unknown, []);
   });
 
@@ -218,6 +234,8 @@ describe('loadApp', () => {
       entry: path.join(pkgRoot, 'server.js'),
       port: 3543,
       name: 'Cost',
+      hidden: false,
+      deferredStart: false,
       icon: 'coins',
       loading: COST_MANIFEST.loading,
       actions: COST_MANIFEST.actions,

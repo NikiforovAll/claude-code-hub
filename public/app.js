@@ -48,7 +48,7 @@ const palette = {
   rows: [],
   sel: 0,
   query: '',
-  confirmRestart: null,
+  confirmOp: null,
   message: null,
 };
 
@@ -243,7 +243,8 @@ async function init() {
   applyHubTheme();
   buildIframes();
   const saved = storedTab();
-  switchTab(apps[saved] ? saved : Object.keys(apps)[0]);
+  const tabs = tabIds();
+  switchTab(tabs.includes(saved) ? saved : (tabs[0] ?? Object.keys(apps)[0]));
   listenMessages();
   listenKeys();
   bindPalette();
@@ -306,16 +307,17 @@ function hideToast(toast) {
 }
 
 // Null on success. A 409 with live terminals asks for force: true on the next call.
-async function requestRestart(id, force) {
+// op is restart or stop.
+async function requestAppOp(id, op, force) {
   try {
-    await sendJson('POST', `/api/apps/${encodeURIComponent(id)}/restart`, { force });
+    await sendJson('POST', `/api/apps/${encodeURIComponent(id)}/${op}`, { force });
     return null;
   } catch (err) {
     const name = apps[id]?.name ?? id;
     const n = err.status === 409 && err.data?.terminals;
-    if (!n) return { message: `${name} did not restart: ${err.message}` };
+    if (!n) return { message: `${name} did not ${op}: ${err.message}` };
     const them = n === 1 ? 'it' : 'them';
-    return { terminals: n, message: `${name} has ${n} live terminal${n === 1 ? '' : 's'}. A restart ends ${them}.` };
+    return { terminals: n, message: `${name} has ${n} live terminal${n === 1 ? '' : 's'}. A ${op} ends ${them}.` };
   }
 }
 
@@ -432,12 +434,19 @@ function makeIframe(id) {
   return iframe;
 }
 
+// A hidden app (`hidden` in config.json) has no tab keys, so its frame loads only when the
+// launcher or an action opens it.
+function tabIds() {
+  return Object.keys(apps).filter((id) => !apps[id].hidden);
+}
+
+function addIframe(id) {
+  iframes[id] = makeIframe(id);
+  document.getElementById('iframe-container').appendChild(iframes[id]);
+}
+
 function buildIframes() {
-  const container = document.getElementById('iframe-container');
-  for (const id of Object.keys(apps)) {
-    iframes[id] = makeIframe(id);
-    container.appendChild(iframes[id]);
-  }
+  for (const id of tabIds()) addIframe(id);
 }
 
 const TAB_KEY = 'hub-tab';
@@ -452,6 +461,7 @@ function storedTab() {
 
 function switchTab(appId) {
   if (!apps[appId]) return;
+  if (!iframes[appId]) addIframe(appId);
   if (appId !== activeApp) previousApp = activeApp;
   activeApp = appId;
   try {
@@ -624,7 +634,7 @@ function hubActions() {
     {
       id: 'hub.appByNumber',
       combo: `${IS_MAC ? 'ctrl+alt' : 'alt'}+{n}`,
-      run: (i) => switchTab(Object.keys(apps)[i]),
+      run: (i) => switchTab(tabIds()[i]),
       count: 9,
     },
   ];
@@ -636,7 +646,7 @@ function hubActions() {
 // that has it by default.
 function bindings() {
   if (keymap) return keymap;
-  const tabs = Object.keys(apps).length;
+  const tabs = tabIds().length;
   const own = (b) => Object.hasOwn(userKeys, b.id);
   const expand = (action) => {
     const combo = comboFor(action);
@@ -678,10 +688,9 @@ function comboLabel(combo) {
 }
 
 function cycleTab(delta) {
-  const ids = Object.keys(apps);
+  const ids = tabIds();
   const idx = ids.indexOf(activeApp);
-  const next = ids[(idx + delta + ids.length) % ids.length];
-  switchTab(next);
+  switchTab(idx < 0 ? ids.at(delta > 0 ? 0 : -1) : ids[(idx + delta + ids.length) % ids.length]);
 }
 
 function listenKeys() {
@@ -881,6 +890,26 @@ const APP_ICONS = {
     ['circle', { cx: 12, cy: 12, r: 3 }],
     ['path', { d: 'm16 16-1.9-1.9' }],
   ],
+  network: [
+    ['rect', { x: 16, y: 16, width: 6, height: 6, rx: 1 }],
+    ['rect', { x: 2, y: 16, width: 6, height: 6, rx: 1 }],
+    ['rect', { x: 9, y: 2, width: 6, height: 6, rx: 1 }],
+    ['path', { d: 'M5 16v-3a1 1 0 0 1 1-1h12a1 1 0 0 1 1 1v3' }],
+    ['path', { d: 'M12 12V8' }],
+  ],
+};
+
+const ROW_ICONS = {
+  copy: [
+    ['rect', { width: 14, height: 14, x: 8, y: 8, rx: 2 }],
+    ['path', { d: 'M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2' }],
+  ],
+  restart: [
+    ['path', { d: 'M21 12a9 9 0 1 1-9-9c2.52 0 4.93 1 6.74 2.74L21 8' }],
+    ['path', { d: 'M21 3v5h-5' }],
+  ],
+  start: [['polygon', { points: '6 3 20 12 6 21 6 3' }]],
+  stop: [['rect', { width: 18, height: 18, x: 3, y: 3, rx: 2 }]],
 };
 
 const SVG_NS = 'http://www.w3.org/2000/svg';
@@ -891,9 +920,7 @@ function svgNode(tag, attrs) {
   return node;
 }
 
-function appIcon(app) {
-  const shapes = APP_ICONS[app.icon];
-  if (!shapes) return el('span', 'palette-icon letter', (app.name || '?').slice(0, 1).toUpperCase());
+function lucideSvg(shapes) {
   const svg = svgNode('svg', {
     viewBox: '0 0 24 24',
     fill: 'none',
@@ -904,13 +931,20 @@ function appIcon(app) {
     'aria-hidden': 'true',
   });
   svg.append(...shapes.map(([tag, attrs]) => svgNode(tag, attrs)));
+  return svg;
+}
+
+function appIcon(app) {
+  const shapes = APP_ICONS[app.icon];
+  if (!shapes) return el('span', 'palette-icon letter', (app.name || '?').slice(0, 1).toUpperCase());
   const box = el('span', 'palette-icon');
-  box.append(svg);
+  box.append(lucideSvg(shapes));
   return box;
 }
 
 function appRows(q) {
-  const list = Object.entries(apps).map(([id, a], i) => ({ kind: 'app', id, app: a, index: i }));
+  const tabs = tabIds();
+  const list = Object.entries(apps).map(([id, a]) => ({ kind: 'app', id, app: a, index: tabs.indexOf(id) }));
   if (!q) return list;
   const hit = list.filter((r) => r.app.name.toLowerCase().includes(q) || r.id.includes(q));
   return hit.length ? hit : list.filter((r) => subseq(r.app.name.toLowerCase(), q));
@@ -918,7 +952,8 @@ function appRows(q) {
 
 // A click on the button runs the mode's rowKeys entry for `key`, the same as Ctrl+<key>.
 function rowButton(className, glyph, key, title, label) {
-  const btn = el('button', className, glyph);
+  const btn = el('button', `palette-btn ${className}`);
+  btn.append(ROW_ICONS[glyph] ? lucideSvg(ROW_ICONS[glyph]) : glyph);
   btn.type = 'button';
   btn.title = title;
   btn.setAttribute('aria-label', label);
@@ -974,23 +1009,41 @@ async function copyToHint(text) {
   }
 }
 
-// The terminal provider answers 409 with a terminal count; the second Ctrl+R on the same app sends force.
-async function restartFromPalette(id) {
-  const force = palette.confirmRestart === id;
-  palette.confirmRestart = null;
-  setPaletteHint(`Restarting ${apps[id]?.name ?? id}…`);
-  const failed = await withPaletteBusy(() => requestRestart(id, force));
+function toggleFromPalette(id) {
+  return appOpFromPalette(id, palette.appStats?.[id]?.stopped ? 'start' : 'stop');
+}
+
+const APP_OPS = {
+  restart: { key: 'R', verb: 'Restarting' },
+  start: { key: 'S', verb: 'Starting' },
+  stop: { key: 'S', verb: 'Stopping' },
+};
+
+// The terminal provider answers 409 with a terminal count; the same key again on the same app sends force.
+async function appOpFromPalette(id, op) {
+  const confirm = `${op}\n${id}`;
+  const force = palette.confirmOp === confirm;
+  palette.confirmOp = null;
+  const name = apps[id]?.name ?? id;
+  setPaletteHint(`${APP_OPS[op].verb} ${name}…`);
+  const failed = await withPaletteBusy(() => requestAppOp(id, op, force));
   if (failed?.terminals) {
-    palette.confirmRestart = id;
-    setPaletteHint(`${failed.message} Press Ctrl+R again to restart.`);
+    palette.confirmOp = confirm;
+    setPaletteHint(`${failed.message} Press Ctrl+${APP_OPS[op].key} again to ${op}.`);
     return;
   }
   if (failed) {
     setPaletteHint(failed.message);
     return;
   }
+  if (iframes[id]) replaceIframe(id);
+  if (op === 'stop') {
+    if (palette.appStats) palette.appStats[id] = { ...palette.appStats[id], stopped: true, rss: 0 };
+    setPaletteHint(`Stopped ${name}`);
+    renderPalette();
+    return;
+  }
   closePalette();
-  replaceIframe(id);
   switchTab(id);
 }
 
@@ -1060,10 +1113,10 @@ const PALETTE_MODES = {
     placeholder: 'Search apps...',
     label: 'Switch app',
     get hint() {
-      const keys = 'Enter switch · Ctrl+C copy the URL · Ctrl+R restart the app';
+      const keys = 'Enter switch · Ctrl+C copy URL · Ctrl+R restart · Ctrl+S start/stop';
       if (!hubInfo.version) return keys;
       const plugin = hubInfo.plugin ? [pluginNode(hubInfo.plugin), ' · '] : [];
-      return [`Claude Code Hub ${hubInfo.version} · `, ...plugin, keys];
+      return [`Hub ${hubInfo.version} · `, ...plugin, keys];
     },
     empty: 'No matching app',
     rows: (_typed, q) => appRows(q),
@@ -1082,18 +1135,26 @@ const PALETTE_MODES = {
         badge.title = `Its port delays requests by up to ${(s.slowMs / 1000).toFixed(1)} s. Restart (Ctrl+R) moves it to a new port.`;
         li.append(badge);
       }
-      const stats = el('span', 'stats', s?.rss ? `${Math.round(s.rss / 1048576)} MB · ${s.cpu}%` : '');
+      const usage = s?.rss ? `${Math.round(s.rss / 1048576)} MB · ${s.cpu}%` : '';
+      const stats = el('span', 'stats', s?.stopped ? 'stopped' : usage);
       stats.title = 'Memory and CPU of the app process. Child processes are not counted. 100% is one core.';
       li.append(stats);
       const combo = appNumberCombo(row.index);
-      const key = row.id === activeApp ? 'active' : combo ? comboLabel(combo) : '';
+      const key = row.id === activeApp ? 'active' : combo ? comboLabel(combo) : row.app.hidden ? 'hidden' : '';
       li.append(el('span', 'age', key));
       li.append(
-        rowButton('palette-copy', '⧉', 'c', 'Copy the URL (Ctrl+C)', `Copy the URL of ${row.app.name}`),
-        rowButton('palette-restart', '↻', 'r', 'Restart the app (Ctrl+R)', `Restart ${row.app.name}`),
+        rowButton('palette-copy', 'copy', 'c', 'Copy the URL (Ctrl+C)', `Copy the URL of ${row.app.name}`),
+        rowButton('palette-restart', 'restart', 'r', 'Restart the app (Ctrl+R)', `Restart ${row.app.name}`),
+        s?.stopped
+          ? rowButton('palette-toggle', 'start', 's', 'Start the app (Ctrl+S)', `Start ${row.app.name}`)
+          : rowButton('palette-toggle', 'stop', 's', 'Stop the app (Ctrl+S)', `Stop ${row.app.name}`),
       );
     },
-    rowKeys: { c: (row) => copyToHint(apps[row.id].url), r: (row) => restartFromPalette(row.id) },
+    rowKeys: {
+      c: (row) => copyToHint(apps[row.id].url),
+      r: (row) => appOpFromPalette(row.id, 'restart'),
+      s: (row) => toggleFromPalette(row.id),
+    },
     commit(row) {
       closePalette();
       switchTab(row.id);
@@ -1151,7 +1212,7 @@ function openPalette(mode) {
   palette.mode = mode;
   palette.query = '';
   palette.sel = null;
-  palette.confirmRestart = null;
+  palette.confirmOp = null;
   palette.message = null;
   input.value = '';
   input.placeholder = spec.placeholder;
@@ -1294,12 +1355,18 @@ function bindPalette() {
     } else if (e.key === 'ArrowUp' || (e.key === 'Tab' && e.shiftKey)) {
       e.preventDefault();
       movePaletteSel(-1);
-    } else if (e.ctrlKey && !e.altKey && !e.shiftKey && !e.metaKey && ['c', 'd', 'r'].includes(e.key.toLowerCase())) {
+    } else if (
+      e.ctrlKey &&
+      !e.altKey &&
+      !e.shiftKey &&
+      !e.metaKey &&
+      ['c', 'd', 'r', 's'].includes(e.key.toLowerCase())
+    ) {
       const run = PALETTE_MODES[palette.mode].rowKeys?.[e.key.toLowerCase()];
       // Ctrl+C with text selected in the input keeps the browser's copy.
       if (e.key.toLowerCase() === 'c' && (!run || input.selectionStart !== input.selectionEnd)) return;
       // Ctrl+D would otherwise bookmark the page in Chrome and Firefox.
-      // Ctrl+R would otherwise reload the hub page.
+      // Ctrl+R would otherwise reload the hub page, and Ctrl+S save it.
       e.preventDefault();
       const row = palette.rows[palette.sel];
       if (run && row && row.kind !== 'literal') run(row);
