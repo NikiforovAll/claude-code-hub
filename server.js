@@ -21,6 +21,7 @@ const { createUpdateCheck } = require('./lib/update-check');
 const { liveHub, removeRecord, writeRecord } = require('./lib/hub-record');
 const { HUB_PLUGIN } = require('./lib/install');
 const { pluginChecker } = require('./lib/plugin-status');
+const { serializeConfig, writeConfigFile } = require('./lib/hub-config');
 const { version: HUB_VERSION } = require('./package.json');
 
 function getArg(name) {
@@ -70,16 +71,25 @@ if (TRAY_FLAG) {
   }).then((ok) => process.exit(ok ? 0 : 1));
 }
 
-if (process.argv.includes('--install') || process.argv.includes('--uninstall')) {
-  const { runInstall, runUninstall } = require('./lib/install');
+function cliConfigDir() {
   const dir = getArg('dir') || process.env.CLAUDE_CONFIG_DIR || '~/.claude';
-  let configDir;
   try {
-    configDir = canonicalDir(dir);
+    return canonicalDir(dir);
   } catch {
     console.error(`Config dir not found: ${dir}`);
     process.exit(1);
   }
+}
+
+if (process.argv[2] === 'ext') {
+  const { runExt } = require('./lib/ext');
+  const ok = runExt(process.argv.slice(3), { hubDir: HUB_DIR, configDir: cliConfigDir, hubVersion: HUB_VERSION });
+  process.exit(ok ? 0 : 1);
+}
+
+if (process.argv.includes('--install') || process.argv.includes('--uninstall')) {
+  const { runInstall, runUninstall } = require('./lib/install');
+  const configDir = cliConfigDir();
   const ok = process.argv.includes('--install')
     ? runInstall({ hubDir: HUB_DIR, configDir })
     : runUninstall({ configDir });
@@ -138,17 +148,17 @@ function resolveHubConfig() {
   return { config, raw, fallback };
 }
 
-function serializeConfig(config) {
-  return `${JSON.stringify(config, null, 2)}\n`;
-}
-
 function writeHubConfig(config) {
-  fs.mkdirSync(path.dirname(HUB_CONFIG_FILE), { recursive: true });
-  fs.writeFileSync(HUB_CONFIG_FILE, serializeConfig(config));
+  writeConfigFile(HUB_CONFIG_FILE, config);
 }
 
+// `ext` and hand edits change the other keys while the hub runs, so a save keeps the file's copy of them.
 function saveHubConfig() {
-  writeHubConfig(hubConfig);
+  let saved = hubConfig;
+  try {
+    saved = JSON.parse(fs.readFileSync(HUB_CONFIG_FILE, 'utf8'));
+  } catch {}
+  writeHubConfig({ ...saved, configDirs: hubConfig.configDirs, activeConfigDir: hubConfig.activeConfigDir });
 }
 
 const hubConfig = loadHubConfig();
@@ -1035,6 +1045,7 @@ app.get('/api/apps/stats', async (_req, res) => {
           ...(await stats(child, STATS_TIMEOUT_MS)),
           slowMs,
           stopped: !!pool?.stopped.has(a.id),
+          linked: a.linked,
           version: a.version,
           plugin: plugin(a.plugin),
         },

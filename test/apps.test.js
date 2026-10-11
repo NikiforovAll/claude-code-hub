@@ -3,7 +3,7 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
-const { APPS, selectApps, loadApp, manifestError, conflicts } = require('../lib/apps');
+const { APPS, selectApps, loadApp, manifestError, resolvePlugin, conflicts } = require('../lib/apps');
 
 const COST = APPS.find((a) => a.id === 'cost');
 const KANBAN = APPS.find((a) => a.id === 'kanban');
@@ -54,8 +54,26 @@ describe('selectApps', () => {
       apps.map((a) => a.id),
       ['kanban', 'board', 'marketplace', 'cost', 'memory'],
     );
-    assert.deepEqual(apps[1], { id: 'board', port: 4545, path: path.join(base, 'forks', 'board'), hidden: false, deferredStart: false });
+    assert.deepEqual(apps[1], {
+      id: 'board',
+      port: 4545,
+      path: path.join(base, 'forks', 'board'),
+      hidden: false,
+      deferredStart: false,
+      linked: false,
+    });
     assert.deepEqual(unknown, []);
+  });
+
+  it('marks an entry with source "local" as linked', () => {
+    const { apps } = selectApps([{ id: 'swarm', path: '/dev/swarm', source: 'local' }, { id: 'board', path: 'b', source: 'github:o/r' }]);
+    assert.deepEqual(
+      apps.slice(0, 2).map((a) => [a.id, a.linked]),
+      [
+        ['swarm', true],
+        ['board', false],
+      ],
+    );
   });
 
   it('runs a built-in app from its path and keeps an absolute path as is', () => {
@@ -176,16 +194,69 @@ describe('manifestError', () => {
     assert.match(manifestError({ ...ok, publishes: ['hub.trace'] }, 'cost', root), /the hub's/);
   });
 
-  it('accepts a plugin and rejects a bad id, path or install command', () => {
-    const plugin = { id: 'x@y', path: 'plugin/x', install: 'x --install' };
-    const err = (p) => manifestError({ ...ok, plugin: { ...plugin, ...p } }, 'cost', root);
+  it('accepts a plugin named by marketplace and name, and rejects a bad one', () => {
+    const err = (p) => manifestError({ ...ok, plugin: { marketplace: 'plugin', name: 'x', ...p } }, 'cost', root);
     assert.equal(err({}), null);
-    assert.match(err({ id: 'x' }), /plugin.id/);
-    assert.match(err({ path: undefined }), /plugin.path is missing/);
-    assert.match(err({ path: '../x' }), /outside/);
-    assert.match(err({ path: '.' }), /outside/);
-    assert.match(err({ install: '' }), /plugin.install/);
-    assert.match(manifestError({ ...ok, plugin: 'x' }, 'cost', root), /plugin.id/);
+    assert.equal(err({ install: 'x --install' }), null);
+    assert.match(manifestError({ ...ok, plugin: 'x' }, 'cost', root), /plugin is not an object/);
+    assert.match(manifestError({ ...ok, plugin: { id: 'x@y', path: 'plugin/x', install: 'x' } }, 'cost', root), /plugin.marketplace/);
+    assert.match(err({ marketplace: '../plugin' }), /plugin.marketplace is outside/);
+    assert.match(err({ marketplace: 5 }), /plugin.marketplace is not a path/);
+    assert.match(err({ name: 'a b' }), /plugin.name/);
+    assert.match(err({ name: undefined }), /plugin.name/);
+    assert.match(err({ install: '' }), /plugin.install is not a command/);
+  });
+
+  it('accepts minimum versions and app ids in requires, and rejects anything else', () => {
+    const err = (requires) => manifestError({ ...ok, requires }, 'cost', root);
+    assert.equal(err({ hub: '1.12.0', node: '22.13.0', apps: ['kanban'] }), null);
+    assert.equal(err({}), null);
+    assert.match(err([]), /requires is not an object/);
+    assert.match(err({ hub: '1.12' }), /requires.hub is not a version/);
+    assert.match(err({ node: ['22.13.0'] }), /requires.node is not a version/);
+    assert.match(err({ apps: 'kanban' }), /requires.apps/);
+    assert.match(err({ apps: ['Kanban'] }), /requires.apps/);
+  });
+});
+
+describe('resolvePlugin', () => {
+  let root;
+  beforeEach(() => {
+    root = fs.mkdtempSync(path.join(os.tmpdir(), 'hub-plugin-'));
+  });
+  afterEach(() => fs.rmSync(root, { recursive: true, force: true }));
+
+  const market = (json) => {
+    fs.mkdirSync(path.join(root, 'plugin', '.claude-plugin'), { recursive: true });
+    fs.writeFileSync(path.join(root, 'plugin', '.claude-plugin', 'marketplace.json'), JSON.stringify(json));
+  };
+
+  it('derives the id and folder from marketplace.json, and the default install from the app id', () => {
+    market({ name: 'claude-code-swarm', plugins: [{ name: 'kanban-delm-swarm', source: './plugins/kanban-delm-swarm' }] });
+    assert.deepEqual(resolvePlugin({ marketplace: 'plugin', name: 'kanban-delm-swarm' }, root, 'swarm'), {
+      id: 'kanban-delm-swarm@claude-code-swarm',
+      dir: path.join(root, 'plugin', 'plugins', 'kanban-delm-swarm'),
+      bundled: null,
+      marketplace: { dir: path.join(root, 'plugin'), name: 'claude-code-swarm' },
+      install: 'claude-code-hub ext plugin swarm',
+      custom: false,
+    });
+    const own = resolvePlugin({ marketplace: 'plugin', name: 'kanban-delm-swarm', install: 'swarm --install' }, root, 'swarm');
+    assert.equal(own.install, 'swarm --install');
+    assert.equal(own.custom, true);
+  });
+
+  it('throws when marketplace.json is missing, does not list the plugin or points outside the root', () => {
+    const resolve = () => resolvePlugin({ marketplace: 'plugin', name: 'x' }, root, 'cost');
+    assert.throws(resolve, /marketplace.json: not found/);
+    market({ name: 'm', plugins: [{ name: 'y', source: './plugins/y' }] });
+    assert.throws(resolve, /does not list plugin "x"/);
+    market({ name: 'm', plugins: [{ name: 'x', source: { source: 'github', repo: 'o/r' } }] });
+    assert.throws(resolve, /is not a folder/);
+    market({ name: 'm', plugins: [{ name: 'x', source: '../../elsewhere' }] });
+    assert.throws(resolve, /outside the app directory/);
+    market({ plugins: [] });
+    assert.throws(resolve, /name is not a marketplace name/);
   });
 });
 
@@ -236,6 +307,7 @@ describe('loadApp', () => {
       name: 'Cost',
       hidden: false,
       deferredStart: false,
+      linked: false,
       icon: 'coins',
       loading: COST_MANIFEST.loading,
       actions: COST_MANIFEST.actions,
@@ -252,15 +324,22 @@ describe('loadApp', () => {
     assert.match(logs[0], /hub-app.json: not found\. cost is skipped/);
   });
 
-  it("reads the app's version and the version of the plugin it ships", () => {
-    const plugin = { id: 'cost@cost', path: 'plugin/cost', install: 'claude-code-cost --install' };
-    const root = submodule({ ...COST_MANIFEST, plugin });
+  it("reads the app's version and the plugin that marketplace.json lists, and skips the app when it lists none", () => {
+    const root = submodule({ ...COST_MANIFEST, plugin: { marketplace: 'plugin', name: 'cost' } });
     fs.writeFileSync(path.join(root, 'package.json'), '{"version":"1.3.0"}');
-    fs.mkdirSync(path.join(root, 'plugin', 'cost', '.claude-plugin'), { recursive: true });
-    fs.writeFileSync(path.join(root, 'plugin', 'cost', '.claude-plugin', 'plugin.json'), '{"version":"0.4.0"}');
+    assert.equal(loadApp(COST, { hubRoot, resolve: noPackage, log }), null);
+    assert.match(logs[0], /marketplace.json: not found\. cost is skipped/);
+    fs.mkdirSync(path.join(root, 'plugin', '.claude-plugin'), { recursive: true });
+    fs.mkdirSync(path.join(root, 'plugin', 'plugins', 'cost', '.claude-plugin'), { recursive: true });
+    fs.writeFileSync(path.join(root, 'plugin', 'plugins', 'cost', '.claude-plugin', 'plugin.json'), '{"version":"0.5.0"}');
+    const marketFile = path.join(root, 'plugin', '.claude-plugin', 'marketplace.json');
+    fs.writeFileSync(marketFile, JSON.stringify({ name: 'cost-market', plugins: [{ name: 'cost', source: './plugins/cost' }] }));
     const app = loadApp(COST, { hubRoot, resolve: noPackage, log });
     assert.equal(app.version, '1.3.0');
-    assert.deepEqual(app.plugin, { id: 'cost@cost', bundled: '0.4.0', install: 'claude-code-cost --install' });
+    assert.deepEqual(app.plugin, { id: 'cost@cost-market', bundled: '0.5.0', install: 'claude-code-hub ext plugin cost' });
+    fs.writeFileSync(marketFile, JSON.stringify({ name: 'cost-market', plugins: [] }));
+    assert.equal(loadApp(COST, { hubRoot, resolve: noPackage, log }), null);
+    assert.match(logs[1], /does not list plugin "cost"\. cost is skipped/);
   });
 
   it('prefers a checked-out submodule and reads its manifest', () => {

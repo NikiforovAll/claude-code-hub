@@ -1130,6 +1130,11 @@ const PALETTE_MODES = {
       const s = palette.appStats?.[row.id];
       if (s?.version) li.append(el('span', 'ver', s.version));
       if (s?.plugin) li.append(pluginNode(s.plugin));
+      if (s?.linked) {
+        const badge = el('span', 'linked', 'linked');
+        badge.title = 'Runs from a local folder (ext add --link). Restart (Ctrl+R) loads its code changes.';
+        li.append(badge);
+      }
       if (s?.slowMs) {
         const badge = el('span', 'slow', 'slow port');
         badge.title = `Its port delays requests by up to ${(s.slowMs / 1000).toFixed(1)} s. Restart (Ctrl+R) moves it to a new port.`;
