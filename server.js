@@ -90,9 +90,14 @@ if (process.argv[2] === 'ext') {
 if (process.argv.includes('--install') || process.argv.includes('--uninstall')) {
   const { runInstall, runUninstall } = require('./lib/install');
   const configDir = cliConfigDir();
-  const ok = process.argv.includes('--install')
-    ? runInstall({ hubDir: HUB_DIR, configDir })
-    : runUninstall({ configDir });
+  let ok;
+  if (process.argv.includes('--install')) {
+    const { installBuiltInPlugins } = require('./lib/ext');
+    const hubOk = runInstall({ hubDir: HUB_DIR, configDir });
+    ok = installBuiltInPlugins({ hubDir: HUB_DIR, configDir: () => configDir }) && hubOk;
+  } else {
+    ok = runUninstall({ configDir });
+  }
   process.exit(ok ? 0 : 1);
 }
 

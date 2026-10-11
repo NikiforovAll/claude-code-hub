@@ -1132,7 +1132,7 @@ const PALETTE_MODES = {
       if (s?.plugin) li.append(pluginNode(s.plugin));
       if (s?.linked) {
         const badge = el('span', 'linked', 'linked');
-        badge.title = 'Runs from a local folder (ext add --link). Restart (Ctrl+R) loads its code changes.';
+        badge.title = 'Runs from a local folder (ext install). Restart (Ctrl+R) loads its code changes.';
         li.append(badge);
       }
       if (s?.slowMs) {

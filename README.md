@@ -77,13 +77,13 @@ npm start        # http://localhost:3540
 
 ## Agent observability (one-time setup)
 
-For the full Kanban view (agent log, live subagent tracking, waiting-for-user indicators, and context window use), install the hooks:
+For the full Kanban view (agent log, live subagent tracking, waiting-for-user indicators, and context window use), install the plugins:
 
 ```bash
-npx claude-code-kanban --install
+claude-code-hub --install
 ```
 
-Without the hooks you still get the task board and sessions, but no live agent activity. The hooks and status line are installed per Claude config dir, so run the command again for each dir you use. See the [Kanban docs](https://nikiforovall.blog/claude-code-kanban/) for details.
+This installs Kanban's plugin and the hub's own plugin. Without Kanban's plugin you still get the task board and sessions, but no live agent activity. The plugins are installed per Claude config dir, so run the command again with `--dir <config dir>` for each dir you use. After a hub update, run the command again to update the plugins. See the [Kanban docs](https://nikiforovall.blog/claude-code-kanban/) for details.
 
 ## Hub token
 

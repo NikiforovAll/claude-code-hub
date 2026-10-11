@@ -217,6 +217,40 @@ describe('manifestError', () => {
     assert.match(err({ apps: 'kanban' }), /requires.apps/);
     assert.match(err({ apps: ['Kanban'] }), /requires.apps/);
   });
+
+  it('accepts a plain-text listing, and rejects markup, long text and bad fields', () => {
+    const err = (listing) => manifestError({ ...ok, listing }, 'cost', root);
+    const full = {
+      tagline: 'One session, turn by turn',
+      description: 'Shows each prompt and its tool calls.',
+      tags: ['sessions', 'debugging'],
+      screenshots: [
+        { path: 'docs/shots/turns.png', alt: 'The turns' },
+        { url: 'https://example.com/shot.webp', alt: 'A shot' },
+      ],
+      author: 'NikiforovAll',
+      homepage: 'https://example.com/inspector/',
+      license: 'MIT',
+    };
+    assert.equal(err(full), null);
+    assert.equal(err({}), null);
+    assert.match(err([]), /listing is not an object/);
+    assert.match(err({ tagline: 'x'.repeat(81) }), /listing.tagline/);
+    assert.match(err({ tagline: '' }), /listing.tagline/);
+    assert.match(err({ description: '<b>bold</b>' }), /listing.description is not plain text/);
+    assert.match(err({ author: 'x'.repeat(61) }), /listing.author/);
+    assert.match(err({ tags: ['a', 'b', 'c', 'd', 'e', 'f'] }), /listing.tags/);
+    assert.match(err({ tags: ['Sessions'] }), /listing.tags/);
+    assert.match(err({ screenshots: Array(5).fill(full.screenshots[0]) }), /up to 4/);
+    assert.match(err({ screenshots: [{ path: 'a.png' }] }), /no alt/);
+    assert.match(err({ screenshots: [{ alt: 'x' }] }), /one of path or url/);
+    assert.match(err({ screenshots: [{ path: 'a.png', url: 'https://x/a.png', alt: 'x' }] }), /one of path or url/);
+    assert.match(err({ screenshots: [{ path: 'a.gif', alt: 'x' }] }), /PNG, JPEG or WebP/);
+    assert.match(err({ screenshots: [{ path: '../a.png', alt: 'x' }] }), /outside the app directory/);
+    assert.match(err({ screenshots: [{ url: 'http://x/a.png', alt: 'x' }] }), /not https/);
+    assert.match(err({ homepage: 'javascript:alert(1)' }), /listing.homepage/);
+    assert.match(err({ license: 'MIT License' }), /SPDX/);
+  });
 });
 
 describe('resolvePlugin', () => {
@@ -231,19 +265,19 @@ describe('resolvePlugin', () => {
     fs.writeFileSync(path.join(root, 'plugin', '.claude-plugin', 'marketplace.json'), JSON.stringify(json));
   };
 
-  it('derives the id and folder from marketplace.json, and the default install from the app id', () => {
+  it('derives the id and folder from marketplace.json, and the hub install command from the app id', () => {
     market({ name: 'claude-code-swarm', plugins: [{ name: 'kanban-delm-swarm', source: './plugins/kanban-delm-swarm' }] });
     assert.deepEqual(resolvePlugin({ marketplace: 'plugin', name: 'kanban-delm-swarm' }, root, 'swarm'), {
       id: 'kanban-delm-swarm@claude-code-swarm',
       dir: path.join(root, 'plugin', 'plugins', 'kanban-delm-swarm'),
       bundled: null,
       marketplace: { dir: path.join(root, 'plugin'), name: 'claude-code-swarm' },
-      install: 'claude-code-hub ext plugin swarm',
-      custom: false,
+      install: 'claude-code-hub ext install swarm',
+      custom: null,
     });
     const own = resolvePlugin({ marketplace: 'plugin', name: 'kanban-delm-swarm', install: 'swarm --install' }, root, 'swarm');
-    assert.equal(own.install, 'swarm --install');
-    assert.equal(own.custom, true);
+    assert.equal(own.install, 'claude-code-hub ext install swarm');
+    assert.equal(own.custom, 'swarm --install');
   });
 
   it('throws when marketplace.json is missing, does not list the plugin or points outside the root', () => {
@@ -336,7 +370,7 @@ describe('loadApp', () => {
     fs.writeFileSync(marketFile, JSON.stringify({ name: 'cost-market', plugins: [{ name: 'cost', source: './plugins/cost' }] }));
     const app = loadApp(COST, { hubRoot, resolve: noPackage, log });
     assert.equal(app.version, '1.3.0');
-    assert.deepEqual(app.plugin, { id: 'cost@cost-market', bundled: '0.5.0', install: 'claude-code-hub ext plugin cost' });
+    assert.deepEqual(app.plugin, { id: 'cost@cost-market', bundled: '0.5.0', install: 'claude-code-hub ext install cost' });
     fs.writeFileSync(marketFile, JSON.stringify({ name: 'cost-market', plugins: [] }));
     assert.equal(loadApp(COST, { hubRoot, resolve: noPackage, log }), null);
     assert.match(logs[1], /does not list plugin "cost"\. cost is skipped/);
