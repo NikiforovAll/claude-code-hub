@@ -26,7 +26,9 @@ describe('ext', () => {
     if (cmd === 'claude plugin marketplace list --json') return { ok: true, output: JSON.stringify(marketplaces) };
     return results[cmd] ?? { ok: true, idempotent: false, output: '' };
   };
-  const ext = (...argv) => runExt(argv, { hubDir, configDir: () => configDir, hubVersion: '1.11.0', nodeVersion: '22.13.0', exec });
+  const registry = () => path.join(configDir, 'registry.json');
+  const ctx = (more) => ({ hubDir, configDir: () => configDir, hubVersion: '1.11.0', nodeVersion: '22.13.0', exec, registry: registry(), ...more });
+  const ext = (...argv) => runExt(argv, ctx());
   const configFile = () => path.join(hubDir, 'config.json');
   const config = () => JSON.parse(fs.readFileSync(configFile(), 'utf8'));
   const manifest = (fields) => writeJson(path.join(root, 'hub-app.json'), { manifest: 1, id: 'probe', run: { entry: 'server.js' }, ...fields });
@@ -133,7 +135,7 @@ describe('ext', () => {
 
   it('refuses an npm or URL source', () => {
     for (const target of ['npm:probe', 'https://github.com/o/r']) assert.equal(ext('install', target), false);
-    assert.match(out.join('\n'), /Only a github: source or a local folder installs/);
+    assert.match(out.join('\n'), /Only a registry name, a github: source or a local folder installs/);
     assert.deepEqual(commands, []);
   });
 
@@ -150,7 +152,7 @@ describe('ext', () => {
     const extensions = () => path.join(hubDir, 'extensions');
     const clone = () => path.join(extensions(), 'probe');
     const extRoot = () => path.join(clone(), 'ext');
-    const gh = (...argv) => runExt(argv, { hubDir, configDir: () => configDir, hubVersion: '1.11.0', nodeVersion: '22.13.0', exec, githubBase: remote });
+    const gh = (...argv) => runExt(argv, ctx({ githubBase: remote }));
 
     beforeEach(() => {
       remote = tmp('hub-ext-gh-');
@@ -269,6 +271,66 @@ describe('ext', () => {
         assert.deepEqual(fs.existsSync(extensions()) ? fs.readdirSync(extensions()) : [], []);
       });
     }
+
+    describe('by a registry name', () => {
+      const listing = (...extensions) => writeJson(registry(), { extensions });
+
+      it('installs the source the registry lists and keeps that source in the entry', () => {
+        const sha = commit('one');
+        listing({ id: 'other', source: 'github:o/nope', pinned: false }, { id: 'probe', source: 'github:o/r/ext', sha, pinned: false });
+        assert.equal(gh('install', 'probe'), true);
+        assert.deepEqual(commands, installCmds(extRoot()));
+        assert.deepEqual(config().apps, [{ id: 'probe', path: 'extensions/probe/ext', source: 'github:o/r/ext', sha }]);
+        assert.match(out.join('\n'), /probe: github:o\/r\/ext, from the registry/);
+      });
+
+      it('installs a pinned entry at its commit', () => {
+        const first = commit('one');
+        manifest({ plugin: PLUGIN, name: 'Two' });
+        commit('two');
+        listing({ id: 'probe', source: 'github:o/r/ext', sha: first, pinned: true });
+        assert.equal(gh('install', 'probe'), true);
+        assert.deepEqual(config().apps[0], { id: 'probe', path: 'extensions/probe/ext', source: 'github:o/r/ext', ref: first, sha: first });
+      });
+
+      it('installs a folder of that name, not the registry entry', () => {
+        commit('one');
+        listing({ id: 'probe', source: 'github:o/r/ext', pinned: false });
+        fs.cpSync(root, path.join(remote, 'probe'), { recursive: true });
+        const cwd = process.cwd();
+        process.chdir(remote);
+        try {
+          assert.equal(gh('install', 'probe'), true);
+        } finally {
+          process.chdir(cwd);
+        }
+        assert.deepEqual(config().apps, [{ id: 'probe', path: path.join(remote, 'probe').replaceAll('\\', '/'), source: 'local' }]);
+      });
+
+      for (const [why, list, reason] of [
+        ['a name the registry does not list', [], /"probe" is not an app the hub runs, a folder, or an extension in the registry/],
+        ['an entry whose manifest has another id', [{ id: 'other', source: 'github:o/r/ext', pinned: false }], /lists other at github:o\/r\/ext, but its hub-app\.json has the id probe/],
+        ['an entry that is not a GitHub source', [{ id: 'probe', source: 'https://example.com/x', pinned: false }], /not a GitHub source/],
+      ]) {
+        it(`refuses ${why} and leaves no clone`, () => {
+          commit('one');
+          listing(...list);
+          const name = list[0]?.id ?? 'probe';
+          assert.equal(gh('install', name), false);
+          assert.match(out.join('\n'), reason);
+          assert.equal(fs.existsSync(configFile()), false);
+          assert.deepEqual(fs.existsSync(extensions()) ? fs.readdirSync(extensions()) : [], []);
+        });
+      }
+
+      it('names the registry when it cannot read it', () => {
+        assert.equal(gh('install', 'probe'), false);
+        assert.match(out.join('\n'), /Cannot read the registry .*registry\.json/);
+        fs.writeFileSync(registry(), '{"items":[]}');
+        assert.equal(gh('install', 'probe'), false);
+        assert.match(out.join('\n'), /has no extensions list/);
+      });
+    });
   });
 
   it('updates a linked extension by installing its plugin again', () => {
@@ -352,8 +414,11 @@ describe('ext', () => {
     writeJson(configFile(), { apps: [{ id: 'board', path: 'forks/board' }] });
     for (const cmd of ['update', 'remove']) assert.equal(ext(cmd, 'board'), false);
     assert.match(out.join('\n'), /"board" is not an extension/);
+    writeJson(registry(), { extensions: [] });
     assert.equal(ext('install', 'nope'), false);
-    assert.match(out.join('\n'), /"nope" is not an app the hub runs, and no folder has that name/);
+    assert.match(out.join('\n'), /"nope" is not an app the hub runs, a folder, or an extension in the registry/);
+    assert.equal(ext('install', 'No/Such'), false);
+    assert.match(out.join('\n'), /"No\/Such" is not an app the hub runs, and no folder has that name/);
     assert.deepEqual(commands, []);
   });
 

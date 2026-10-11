@@ -49,6 +49,16 @@ An extension's `hub-app.json` is a normal [app manifest](/claude-code-hub/extens
 
 The `id` must not be a built-in id (`kanban`, `marketplace`, `cost`, `memory`).
 
+## Add an extension from the registry
+
+```bash
+claude-code-hub ext install <name>
+```
+
+For example, `claude-code-hub ext install swarm`. The command finds `<name>` in the [registry](/claude-code-hub/extensions/) and installs the GitHub source that it lists, as in [Add an extension from GitHub](#add-an-extension-from-github). A reviewed extension installs at the commit that was reviewed.
+
+The entry in `config.json` keeps the GitHub source, not the name. So `ext update` follows that repository, and a later change to the registry does not move an installed extension. When the current folder has a folder named `<name>`, the command adds that folder instead. To use another registry, set `CLAUDE_HUB_REGISTRY` to the URL of its `extensions.json`.
+
 ## Add an extension from GitHub
 
 ```bash
@@ -120,6 +130,7 @@ claude-code-hub ext <command> [--hub-dir <path>] [--dir <config dir>]
 
 | Command | Action |
 | --- | --- |
+| `ext install <name>` | Find the extension in the registry, then install it as from GitHub |
 | `ext install github:<owner>/<repo>[/<folder>][@<ref>]` | Clone the extension into the hub dir, add it to the hub and install its plugin. When the hub already has it from that source, install only the plugin |
 | `ext install <dir>` | Add the extension in `<dir>` to the hub and install its plugin. When the hub already runs `<dir>`, install only the plugin |
 | `ext install <id>` | Install or update the plugin of an app the hub runs, built-in or extension |

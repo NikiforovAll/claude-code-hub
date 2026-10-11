@@ -59,7 +59,7 @@ const ld = {
       <h2 id="install">Install</h2>
       <pre><code>{x.install}</code></pre>
       <p>
-        <code>ext install</code> clones the extension into the hub dir with git{x.plugin && <> and installs the {x.plugin} plugin in your Claude config dir</>}.
+        <code>ext install</code> finds {x.id} in this registry and clones it into the hub dir with git{x.plugin && <> and installs the {x.plugin} plugin in your Claude config dir</>}.
         Restart the hub, and the app gets the next tab.
       </p>
     </section>
@@ -76,7 +76,7 @@ const ld = {
           ))
         }
         <dt>Source</dt>
-        <dd><a href={x.tree}>{x.source.replace(/^github:/, '')} {x.pinned ? `at ${x.sha.slice(0, 7)}` : 'on its default branch'}</a></dd>
+        <dd><a href={x.tree}>{x.source.replace(/^github:/, '')}{x.pinned && ` at ${x.sha.slice(0, 7)}`}</a></dd>
         {
           x.homepage && (
             <>

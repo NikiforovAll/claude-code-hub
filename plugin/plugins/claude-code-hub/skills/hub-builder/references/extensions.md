@@ -2,6 +2,7 @@
 
 An extension is a hub app that the hub does not ship: a folder with a `hub-app.json`, often with a Claude Code plugin. Page: `extensibility/extensions/`.
 
+- `ext install <name>` finds the extension in the registry and installs the GitHub source it lists, as below. A folder named `<name>` in the current dir wins.
 - `ext install github:<owner>/<repo>[/<folder>][@<commit or branch>]` clones it into `<hub dir>/extensions/<id>` (needs `git`), installs its npm dependencies with install scripts off, and installs its plugin.
 - `ext install <dir>` makes it a *linked* extension: the hub runs it from that folder in place and copies nothing.
 
@@ -14,7 +15,7 @@ Fetch the registry index, `https://nikiforovall.blog/claude-code-hub/extensions.
 ## Install
 
 1. **Trust.** An extension runs as the user with no sandbox, and its plugin can run hooks in every Claude Code session. Tell the user that, name the repository and the plugin, and wait for a yes.
-2. **Run** the entry's `install` command. A failed step deletes the clone and leaves `config.json` as it was, so fix the cause (see Failures) and run the command again.
+2. **Run** the entry's `install` command, `claude-code-hub ext install <id>`. A failed step deletes the clone and leaves `config.json` as it was, so fix the cause (see Failures) and run the command again.
 3. **Restart** the hub. The extension starts with it and gets the next tab. `"deferredStart": true` in its `apps` entry makes it start only from the app launcher (`Ctrl+Alt+A`, select it, `Ctrl+S`).
 
 Done when `claude-code-hub ext list` shows the id with its source and its plugin `ok`.
@@ -49,5 +50,7 @@ The registry lists an extension whose manifest has `listing.tagline`. Page: `ext
 - **`it needs hub <x>` or `it needs Node <x>`**: upgrade the hub (`npm i -g claude-code-hub`) or Node. When it names an app that is off, turn that app on in the `apps` list of `config.json`.
 - **`git is not on PATH`**: install git, or clone the repo by other means and pass the folder.
 - **`git clone failed`**: the repo name is wrong, or the repo is private and git has no credentials for it.
-- **`Only a github: source or a local folder installs`**: the source is `npm:` or a URL. Write it as `github:<owner>/<repo>[/<folder>]`.
+- **`Only a registry name, a github: source or a local folder installs`**: the source is `npm:` or a URL. Write it as `github:<owner>/<repo>[/<folder>]`.
+- **`Cannot read the registry`**: no network, or the site is down. Install with the entry's `source` from the registry page: `ext install github:…`, plus `@<sha>` for a pinned entry.
+- **`is not an app the hub runs, a folder, or an extension in the registry`**: the name is wrong. Find it in the registry (see Find).
 - **The app is missing from the launcher after a restart**: the hub startup log names each skipped app and why.

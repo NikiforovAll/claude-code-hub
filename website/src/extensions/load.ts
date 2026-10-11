@@ -119,7 +119,7 @@ async function loadOne(file: string, local: Map<string, string>): Promise<Extens
     sha,
     pinned,
     tree: `https://github.com/${src.owner}/${src.repo}/tree/${pinned ? sha : 'HEAD'}/${src.subdir}`,
-    install: `claude-code-hub ext install ${entry.source}${pinned ? `@${sha}` : ''}`,
+    install: `claude-code-hub ext install ${id}`,
   };
 }
 
