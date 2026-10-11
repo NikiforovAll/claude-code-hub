@@ -23,7 +23,17 @@ const lanes = [
   [24, 10, -1, 20, 24, -1, 8],
 ];
 
+const BOARD_ALT =
+  'Swarm in the hub: the supervisor and two workers grouped in the Kanban sidebar, the task cards with the owner of each, and the Swarm timeline in a pane beside the board';
+
 const watch = [
+  {
+    title: 'On the board',
+    body: 'The supervisor and its workers sit in one group in the Kanban sidebar. Each card names the worker that claimed it, and the Swarm app opens in a pane beside the board.',
+    shot: 'swarm-board',
+    alt: BOARD_ALT,
+    size: { width: 2000, height: 1103 },
+  },
   {
     title: 'Summary',
     body: 'The goal, the outcome and the delivered files, the workers, and the items that need a look from you.',
@@ -67,7 +77,7 @@ const setup = [
     <header class="nav">
       <a class="mark" href={url('swarm/')}>Swarm</a>
       <nav aria-label="Site">
-        <a href={LISTING}>Extension</a>
+        <a href={url('extensions/')}>Extensions</a>
         <a href={SOURCE}>GitHub</a>
         <details class="family">
           <summary>Apps</summary>
@@ -140,8 +150,8 @@ const setup = [
                   <p>{it.body}</p>
                 </div>
                 <div class="by-mode">
-                  <div class="light"><Shot src={shot(it.shot, 'light')} alt={it.alt} /></div>
-                  <div class="dark"><Shot src={shot(it.shot, 'dark')} alt={it.alt} /></div>
+                  <div class="light"><Shot src={shot(it.shot, 'light')} alt={it.alt} {...it.size} /></div>
+                  <div class="dark"><Shot src={shot(it.shot, 'dark')} alt={it.alt} {...it.size} /></div>
                 </div>
               </article>
             ))

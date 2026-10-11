@@ -1,0 +1,5 @@
+{
+  "source": "github:NikiforovAll/claude-code-kanban/extensions/swarm",
+  "official": true,
+  "order": 1
+}
