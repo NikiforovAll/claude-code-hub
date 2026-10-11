@@ -1,6 +1,5 @@
 ---
 import Shell from '../../extensions/Shell.astro';
-import Keys from '../../kit/Keys.astro';
 import { url } from '../../kit/family';
 import { loadExtensions, onSite, type Extension } from '../../extensions/load';
 
@@ -58,10 +57,10 @@ const ld = {
   <div class="body">
     <section aria-labelledby="install">
       <h2 id="install">Install</h2>
-      <pre><code>{x.install.join('\n')}</code></pre>
+      <pre><code>{x.install}</code></pre>
       <p>
-        <Keys text="Restart the hub, then start the app from the app launcher ([Ctrl+Alt+A])." />
-        {x.plugin && <> <code>ext install</code> also installs the {x.plugin} plugin in your active Claude config dir.</>}
+        <code>ext install</code> clones the extension into the hub dir with git{x.plugin && <> and installs the {x.plugin} plugin in your Claude config dir</>}.
+        Restart the hub, and the app gets the next tab.
       </p>
     </section>
 

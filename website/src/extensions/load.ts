@@ -29,7 +29,7 @@ export interface Extension {
   sha: string;
   pinned: boolean;
   tree: string;
-  install: string[];
+  install: string;
 }
 
 // EXTENSIONS_LOCAL=<id>=<dir>,… reads those extensions from local folders (relative to website/), to preview a
@@ -100,9 +100,7 @@ async function loadOne(file: string, local: Map<string, string>): Promise<Extens
   if (err) throw new Error(`${file}: ${err}`);
   const listing = manifest.listing ?? {};
   if (!listing.tagline) throw new Error(`${file}: listing.tagline is missing`);
-  const pkg = JSON.parse((await readAt(src, sha, 'package.json', dir)) ?? '{}');
   const at = (rel: string) => `https://raw.githubusercontent.com/${src.owner}/${src.repo}/${sha}/${[src.subdir, rel].filter(Boolean).join('/')}`;
-  const clone = [src.repo, src.subdir].filter(Boolean).join('/');
   return {
     id,
     name: manifest.name ?? id,
@@ -121,12 +119,7 @@ async function loadOne(file: string, local: Map<string, string>): Promise<Extens
     sha,
     pinned,
     tree: `https://github.com/${src.owner}/${src.repo}/tree/${pinned ? sha : 'HEAD'}/${src.subdir}`,
-    install: [
-      `git clone https://github.com/${src.owner}/${src.repo}`,
-      ...(pinned ? [`git -C ${src.repo} checkout ${sha}`] : []),
-      ...(Object.keys(pkg.dependencies ?? {}).length ? [`npm install --prefix ${clone}`] : []),
-      `claude-code-hub ext install ${clone}`,
-    ],
+    install: `claude-code-hub ext install ${entry.source}${pinned ? `@${sha}` : ''}`,
   };
 }
 

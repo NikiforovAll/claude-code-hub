@@ -63,27 +63,13 @@ The page uses these routes. Each reads the transcript from `<CLAUDE_CONFIG_DIR>/
 
 ## Run it in the hub
 
-In a clone of the hub, install the app:
+Install it as an [extension](/claude-code-hub/extensibility/extensions/):
 
 ```sh
-npm install --prefix examples/inspector
+claude-code-hub ext install github:NikiforovAll/claude-code-hub/examples/inspector
 ```
 
-Add it to the `apps` list in `~/.claude-hub/config.json`, after the built-in tools:
-
-```json
-{
-  "apps": [
-    { "id": "kanban" },
-    { "id": "marketplace" },
-    { "id": "cost" },
-    { "id": "memory" },
-    { "id": "inspector", "path": "C:/dev/claude-code-hub/examples/inspector" }
-  ]
-}
-```
-
-Restart the hub. The Inspector is the fifth tab, <kbd>Alt+5</kbd>.
+Restart the hub. The Inspector is the fifth tab, <kbd>Alt+5</kbd>. In a clone of the hub, `claude-code-hub ext install examples/inspector` runs it from the clone instead; run `npm install` in `examples/inspector` first.
 
 To run it alone, run `npm start` in `examples/inspector` and open `http://localhost:3545`.
 

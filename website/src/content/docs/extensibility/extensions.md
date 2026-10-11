@@ -7,7 +7,7 @@ An extension is a hub app that the hub does not ship. It is a folder with a `hub
 
 Use an extension when you want to share a [new app](/claude-code-hub/extensibility/new-app/), or when your app needs a skill or a hook in Claude Code to work.
 
-The [Extensions page](/claude-code-hub/extensions/) lists the official extensions, which install from their latest code, and the reviewed ones, each pinned to the commit that was reviewed, with the commands that install each one. Agents read the same list as JSON at [`/claude-code-hub/extensions.json`](/claude-code-hub/extensions.json).
+The [Extensions page](/claude-code-hub/extensions/) lists the official extensions, which install from their latest code, and the reviewed ones, each pinned to the commit that was reviewed, with the command that installs each one. Agents read the same list as JSON at [`/claude-code-hub/extensions.json`](/claude-code-hub/extensions.json).
 
 ## Layout
 
@@ -49,28 +49,42 @@ An extension's `hub-app.json` is a normal [app manifest](/claude-code-hub/extens
 
 The `id` must not be a built-in id (`kanban`, `marketplace`, `cost`, `memory`).
 
-## Add an extension
+## Add an extension from GitHub
+
+```bash
+claude-code-hub ext install github:<owner>/<repo>[/<folder>][@<commit or branch>]
+```
+
+For example, `claude-code-hub ext install github:NikiforovAll/claude-code-kanban/extensions/swarm`. The command needs `git` on `PATH`. It:
+
+1. Clones the repository into `<hub dir>/extensions/<id>`. The clone has only `<folder>` and gets file contents on demand, so a big repository costs little.
+2. Checks out `@<commit or branch>`, else the tip of the default branch.
+3. Reads `hub-app.json` in `<folder>` and checks it, the `id` and `requires`.
+4. Runs `npm install --omit=dev --ignore-scripts` when `package.json` has dependencies. Install scripts do not run.
+5. Installs the plugin in one config dir: `--dir`, else `CLAUDE_CONFIG_DIR`, else `~/.claude`.
+6. Adds an entry to the `apps` list in `config.json`.
+
+When a step fails, the command deletes the clone and does not change `config.json`. The entry records where the code came from:
+
+```json
+{ "id": "swarm", "path": "extensions/swarm/extensions/swarm", "source": "github:NikiforovAll/claude-code-kanban/extensions/swarm", "sha": "6f1c2e0…" }
+```
+
+With `@<commit or branch>`, the entry also has `ref`. Then restart the hub. The extension starts with the hub and gets the next tab. To start it only from the app launcher (<kbd>Ctrl+Alt+A</kbd>, then <kbd>Ctrl+S</kbd>), add [`"deferredStart": true`](/claude-code-hub/extensibility/reference/apps-entry/) to its entry.
+
+## Add an extension from a folder
 
 ```bash
 claude-code-hub ext install <dir>
 ```
 
-The command:
-
-1. Reads `hub-app.json` in `<dir>` and checks it.
-2. Checks the `id` and `requires`.
-3. Installs the plugin in one config dir: `--dir`, else `CLAUDE_CONFIG_DIR`, else `~/.claude`.
-4. Adds an entry to the `apps` list in `config.json`.
-
-When a check or the plugin install fails, the command stops and does not change `config.json`.
-
-The entry points at `<dir>`, so the hub runs the app from that folder and copies nothing:
+The command runs the same checks and plugin install, and copies nothing: the entry points at `<dir>`, so the hub runs the app from that folder. Use it for an extension you are writing.
 
 ```json
-{ "id": "swarm", "path": "C:/dev/swarm", "source": "local", "deferredStart": true }
+{ "id": "swarm", "path": "C:/dev/swarm", "source": "local" }
 ```
 
-Run `npm install` in `<dir>` first when the app has dependencies. Then restart the hub. An extension does not start with the hub: start it from the app launcher (<kbd>Ctrl+Alt+A</kbd>) with <kbd>Ctrl+S</kbd>. Its row in the launcher has a **linked** badge.
+Run `npm install` in `<dir>` first when the app has dependencies. The app's row in the launcher has a **linked** badge.
 
 ## Install the plugin in another config dir
 
@@ -84,17 +98,18 @@ With an id the hub runs, `ext install` installs only the plugin. This also works
 
 `ext install` is safe to run again. It updates a plugin that is already installed.
 
-## Change an extension
+## Update an extension
+
+```bash
+claude-code-hub ext update swarm
+```
+
+For an extension from GitHub, `ext update` fetches the repository, checks out the tip of `ref` (or of the default branch), installs the dependencies and the plugin again, and writes the new `sha` to the entry. An extension pinned to a commit stays at that commit. When the new code fails a check, the clone goes back to the commit it had. Restart the app (<kbd>Ctrl+R</kbd> on its row in the app launcher) and start a new Claude Code session.
+
+For a linked extension:
 
 - **App code.** Restart the app: <kbd>Ctrl+R</kbd> on its row in the app launcher.
-- **Plugin.** Claude Code runs the copy in its cache, so an edit in `<dir>` does not reach it. Run `ext update`, then start a new Claude Code session:
-
-  ```bash
-  claude-code-hub ext update swarm
-  ```
-
-  `ext update` installs the plugin again, also when its version did not change.
-
+- **Plugin.** Claude Code runs the copy in its cache, so an edit in `<dir>` does not reach it. Run `ext update`, then start a new Claude Code session. `ext update` installs the plugin again, also when its version did not change.
 - **Manifest.** Restart the hub.
 
 ## Commands
@@ -105,18 +120,19 @@ claude-code-hub ext <command> [--hub-dir <path>] [--dir <config dir>]
 
 | Command | Action |
 | --- | --- |
+| `ext install github:<owner>/<repo>[/<folder>][@<ref>]` | Clone the extension into the hub dir, add it to the hub and install its plugin. When the hub already has it from that source, install only the plugin |
 | `ext install <dir>` | Add the extension in `<dir>` to the hub and install its plugin. When the hub already runs `<dir>`, install only the plugin |
 | `ext install <id>` | Install or update the plugin of an app the hub runs, built-in or extension |
-| `ext list` | List the extensions with their folder and the state of their plugin in the config dir |
-| `ext update <id>` | Install the plugin of an extension again |
-| `ext remove <id>` | Remove the plugin and its marketplace from the config dir, and the entry from `config.json`. The folder stays |
+| `ext list` | List the extensions with their source or folder and the state of their plugin in the config dir |
+| `ext update <id>` | Get the latest code of an extension from GitHub, and install the plugin of an extension again |
+| `ext remove <id>` | Remove the plugin and its marketplace from the config dir, and the entry from `config.json`. The clone of an extension from GitHub is deleted; a linked folder stays |
 
 | Option | Default | Meaning |
 | --- | --- | --- |
 | `--hub-dir <path>` | `CLAUDE_HUB_DIR`, else `~/.claude-hub` | The hub folder with `config.json` |
 | `--dir <path>` | `CLAUDE_CONFIG_DIR`, else `~/.claude` | The config dir for the plugin steps |
 
-`ext update` and `ext remove` work only on an entry that `ext install` added. Restart the hub after `ext install <dir>` and `ext remove`.
+`ext update` and `ext remove` work only on an entry that `ext install` added. Restart the hub after you add or remove an extension.
 
 ## The plugin install
 

@@ -35,13 +35,12 @@ const read = [
 const setup = [
   {
     title: 'Install it',
-    cmd: 'npm install --prefix examples/inspector',
-    body: 'Run it in a clone of the hub repository. The Inspector has no npm package of its own.',
+    cmd: 'claude-code-hub ext install github:NikiforovAll/claude-code-hub/examples/inspector',
+    body: 'This clones the Inspector into the hub dir and installs its dependencies. It needs git.',
   },
   {
-    title: 'Add it to the apps list',
-    cmd: '{ "id": "inspector", "path": "<clone>/examples/inspector" }',
-    body: 'Put it in apps in ~/.claude-hub/config.json, after the four built-in tools, and restart the hub. The Inspector is the fifth tab: press [Alt+5] ([⌃⌥5] on macOS) to go to it.',
+    title: 'Start it',
+    body: 'Restart the hub. The Inspector is the fifth tab: press [Alt+5] ([⌃⌥5] on macOS) to go to it.',
   },
 ];
 ---

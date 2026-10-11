@@ -1,5 +1,6 @@
 const { describe, it, beforeEach, afterEach, mock } = require('node:test');
 const assert = require('node:assert/strict');
+const { execFileSync } = require('node:child_process');
 const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
@@ -29,14 +30,14 @@ describe('ext', () => {
   const configFile = () => path.join(hubDir, 'config.json');
   const config = () => JSON.parse(fs.readFileSync(configFile(), 'utf8'));
   const manifest = (fields) => writeJson(path.join(root, 'hub-app.json'), { manifest: 1, id: 'probe', run: { entry: 'server.js' }, ...fields });
-  const marketDir = () => path.join(root, 'plugin');
+  const marketDir = (dir = root) => path.join(dir, 'plugin');
   const PLUGIN = { marketplace: 'plugin', name: 'probe' };
   const rawConfig = () => (fs.existsSync(configFile()) ? fs.readFileSync(configFile(), 'utf8') : null);
-  const registerCmds = () => [`claude plugin marketplace add "${marketDir()}"`, 'claude plugin marketplace update probe-market'];
-  const installCmds = () => [
+  const registerCmds = (dir) => [`claude plugin marketplace add "${marketDir(dir)}"`, 'claude plugin marketplace update probe-market'];
+  const installCmds = (dir) => [
     'claude --version',
     'claude plugin marketplace list --json',
-    ...registerCmds(),
+    ...registerCmds(dir),
     'claude plugin install probe@probe-market',
   ];
 
@@ -71,7 +72,7 @@ describe('ext', () => {
     assert.deepEqual(config(), {
       configDirs: ['C:/cfg'],
       keys: { 'hub.palette': null },
-      apps: [{ id: 'probe', path: root.replaceAll('\\', '/'), source: 'local', deferredStart: true }],
+      apps: [{ id: 'probe', path: root.replaceAll('\\', '/'), source: 'local' }],
     });
     assert.deepEqual(fs.readdirSync(hubDir), ['config.json']);
     assert.match(out.join('\n'), /Restart the hub/);
@@ -130,9 +131,144 @@ describe('ext', () => {
     assert.equal(fs.existsSync(configFile()), false);
   });
 
-  it('refuses a GitHub source for now', () => {
-    assert.equal(ext('install', 'github:o/r'), false);
-    assert.match(out.join('\n'), /not built yet.*ext install <dir>/);
+  it('refuses an npm or URL source', () => {
+    for (const target of ['npm:probe', 'https://github.com/o/r']) assert.equal(ext('install', target), false);
+    assert.match(out.join('\n'), /Only a github: source or a local folder installs/);
+    assert.deepEqual(commands, []);
+  });
+
+  describe('from GitHub', () => {
+    let remote;
+    let repo;
+    const gitIn = (cwd, ...args) => execFileSync('git', ['-c', 'user.name=t', '-c', 'user.email=t@t', ...args], { cwd, encoding: 'utf8', stdio: 'pipe' }).trim();
+    const commit = (message) => {
+      fs.cpSync(root, path.join(repo, 'ext'), { recursive: true });
+      gitIn(repo, 'add', '-A');
+      gitIn(repo, 'commit', '--quiet', '-m', message);
+      return gitIn(repo, 'rev-parse', 'HEAD');
+    };
+    const extensions = () => path.join(hubDir, 'extensions');
+    const clone = () => path.join(extensions(), 'probe');
+    const extRoot = () => path.join(clone(), 'ext');
+    const gh = (...argv) => runExt(argv, { hubDir, configDir: () => configDir, hubVersion: '1.11.0', nodeVersion: '22.13.0', exec, githubBase: remote });
+
+    beforeEach(() => {
+      remote = tmp('hub-ext-gh-');
+      repo = path.join(remote, 'o', 'r');
+      fs.mkdirSync(repo, { recursive: true });
+      gitIn(repo, 'init', '--quiet', '-b', 'main');
+      writeJson(path.join(repo, 'other', 'big.json'), {});
+    });
+
+    afterEach(() => fs.rmSync(remote, { recursive: true, force: true }));
+
+    it('clones only the folder into the hub dir and writes an entry with a path relative to it', () => {
+      const sha = commit('one');
+      assert.equal(gh('install', 'github:o/r/ext'), true);
+      assert.deepEqual(commands, installCmds(extRoot()));
+      assert.deepEqual(config().apps, [{ id: 'probe', path: 'extensions/probe/ext', source: 'github:o/r/ext', sha }]);
+      assert.ok(fs.existsSync(path.join(extRoot(), 'hub-app.json')));
+      assert.equal(fs.existsSync(path.join(clone(), 'other')), false);
+      assert.deepEqual(fs.readdirSync(extensions()), ['probe']);
+      assert.match(out.join('\n'), new RegExp(`Installed probe from github:o/r/ext at ${sha.slice(0, 7)}`));
+    });
+
+    it('pins a commit, and update keeps it there', () => {
+      const first = commit('one');
+      manifest({ plugin: PLUGIN, name: 'Two' });
+      commit('two');
+      assert.equal(gh('install', `github:o/r/ext@${first}`), true);
+      assert.deepEqual(config().apps[0], { id: 'probe', path: 'extensions/probe/ext', source: 'github:o/r/ext', ref: first, sha: first });
+      assert.equal(JSON.parse(fs.readFileSync(path.join(extRoot(), 'hub-app.json'), 'utf8')).name, undefined);
+      assert.equal(gh('update', 'probe'), true);
+      assert.equal(config().apps[0].sha, first);
+    });
+
+    it('follows a branch', () => {
+      commit('one');
+      gitIn(repo, 'checkout', '--quiet', '-b', 'dev');
+      manifest({ plugin: PLUGIN, name: 'Dev' });
+      const dev = commit('dev');
+      assert.equal(gh('install', 'github:o/r/ext@dev'), true);
+      assert.deepEqual(config().apps[0], { id: 'probe', path: 'extensions/probe/ext', source: 'github:o/r/ext', ref: 'dev', sha: dev });
+    });
+
+    it('updates to the latest commit and installs the plugin again', () => {
+      commit('one');
+      gh('install', 'github:o/r/ext');
+      manifest({ plugin: PLUGIN, name: 'Two' });
+      const two = commit('two');
+      commands = [];
+      assert.equal(gh('update', 'probe'), true);
+      assert.equal(config().apps[0].sha, two);
+      assert.equal(JSON.parse(fs.readFileSync(path.join(extRoot(), 'hub-app.json'), 'utf8')).name, 'Two');
+      assert.deepEqual(commands, ['claude --version', ...registerCmds(extRoot()), 'claude plugin uninstall probe@probe-market', 'claude plugin install probe@probe-market']);
+    });
+
+    it('goes back to the installed commit when the new code needs a newer hub', () => {
+      const one = commit('one');
+      gh('install', 'github:o/r/ext');
+      manifest({ plugin: PLUGIN, requires: { hub: '99.0.0' } });
+      commit('two');
+      commands = [];
+      assert.equal(gh('update', 'probe'), false);
+      assert.match(out.join('\n'), /it needs hub 99\.0\.0/);
+      assert.equal(config().apps[0].sha, one);
+      assert.equal(gitIn(clone(), 'rev-parse', 'HEAD'), one);
+      assert.deepEqual(commands, []);
+    });
+
+    it('removes the plugin, the entry and the clone', () => {
+      commit('one');
+      gh('install', 'github:o/r/ext');
+      assert.equal(gh('remove', 'probe'), true);
+      assert.deepEqual(config().apps, []);
+      assert.equal(fs.existsSync(clone()), false);
+      assert.match(out.join('\n'), /Removed probe and its clone/);
+    });
+
+    it('installs only the plugin when the hub has the extension from the same source', () => {
+      const sha = commit('one');
+      gh('install', 'github:o/r/ext');
+      const entries = config().apps;
+      commands = [];
+      assert.equal(gh('install', 'github:o/r/ext'), true);
+      assert.deepEqual(commands, installCmds(extRoot()));
+      assert.deepEqual(config().apps, entries);
+      assert.deepEqual(fs.readdirSync(extensions()), ['probe']);
+      assert.match(out.join('\n'), new RegExp(`already in the hub, at ${sha.slice(0, 7)}`));
+    });
+
+    it('installs npm dependencies with install scripts off before the plugin', () => {
+      writeJson(path.join(root, 'package.json'), { name: 'probe', dependencies: { express: '^4.0.0' } });
+      commit('one');
+      assert.equal(gh('install', 'github:o/r/ext'), true);
+      assert.equal(commands[0], `npm install --omit=dev --ignore-scripts --no-audit --no-fund --prefix "${extRoot()}"`);
+    });
+
+    it('deletes the clone and writes no entry when the plugin install fails', () => {
+      commit('one');
+      results['claude plugin install probe@probe-market'] = { ok: false, error: 'boom' };
+      assert.equal(gh('install', 'github:o/r/ext'), false);
+      assert.equal(fs.existsSync(configFile()), false);
+      assert.deepEqual(fs.readdirSync(extensions()), []);
+    });
+
+    for (const [target, reason] of [
+      ['github:o', /not a GitHub source/],
+      ['github:o/nope', /git clone failed/],
+      ['github:o/r/ext@nope', /nope is not a branch or a commit/],
+      ['github:o/r/missing', /hub-app\.json/],
+    ]) {
+      it(`refuses ${target} and leaves no clone`, () => {
+        commit('one');
+        assert.equal(gh('install', target), false);
+        assert.match(out.join('\n'), reason);
+        assert.deepEqual(commands, []);
+        assert.equal(fs.existsSync(configFile()), false);
+        assert.deepEqual(fs.existsSync(extensions()) ? fs.readdirSync(extensions()) : [], []);
+      });
+    }
   });
 
   it('updates a linked extension by installing its plugin again', () => {

@@ -111,7 +111,7 @@ The launcher shows the installed version. When the plugin is not installed, is d
 | `node` | The lowest Node version, `x.y.z` |
 | `apps` | The ids of the apps that must be enabled in the hub |
 
-`ext install <dir>` and `ext update` stop when the hub or Node is older, or when an app in `apps` is off.
+`ext install` and `ext update` stop when the hub or Node is older, or when an app in `apps` is off.
 
 ## Listing
 
