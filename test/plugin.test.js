@@ -32,8 +32,17 @@ describe('hub plugin', () => {
 });
 
 describe('claudeEnv', () => {
-  it('leaves CLAUDE_CONFIG_DIR alone for ~/.claude and sets it for any other dir', () => {
-    assert.equal(claudeEnv(path.join(os.homedir(), '.claude')), process.env);
-    assert.equal(claudeEnv(path.join(os.tmpdir(), 'cfg')).CLAUDE_CONFIG_DIR, path.join(os.tmpdir(), 'cfg'));
+  it('unsets CLAUDE_CONFIG_DIR for ~/.claude and sets it for any other dir', () => {
+    const before = process.env.CLAUDE_CONFIG_DIR;
+    process.env.CLAUDE_CONFIG_DIR = path.join(os.tmpdir(), 'other');
+    try {
+      const env = claudeEnv(path.join(os.homedir(), '.claude'));
+      assert.equal('CLAUDE_CONFIG_DIR' in env, false);
+      assert.equal(env.PATH ?? env.Path, process.env.PATH ?? process.env.Path);
+      assert.equal(claudeEnv(path.join(os.tmpdir(), 'cfg')).CLAUDE_CONFIG_DIR, path.join(os.tmpdir(), 'cfg'));
+    } finally {
+      if (before === undefined) delete process.env.CLAUDE_CONFIG_DIR;
+      else process.env.CLAUDE_CONFIG_DIR = before;
+    }
   });
 });
