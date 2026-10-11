@@ -1,0 +1,512 @@
+---
+import SiteLayout from '../kit/SiteLayout.astro';
+import Shot from '../kit/Shot.astro';
+import ModeToggle from '../kit/ModeToggle.astro';
+import Lightbox from '../kit/Lightbox.astro';
+import FamilyFooter from '../kit/FamilyFooter.astro';
+import { family, url } from '../kit/family';
+
+const SOURCE = 'https://github.com/NikiforovAll/claude-code-kanban/tree/HEAD/extensions/swarm';
+const DEVIATIONS =
+  'https://github.com/NikiforovAll/claude-code-kanban/blob/HEAD/extensions/swarm/plugin/plugins/kanban-delm-swarm/DEVIATIONS.md';
+const DELM = 'https://yuzhenmao.github.io/DeLM/';
+const LISTING = url('extensions/swarm/');
+const TIMELINE_ALT =
+  "The Swarm timeline: three workers' claimed tasks over one hour, with findings, publications, applies, lost claims, a released task and a stopped worker";
+const shot = (name: string, mode: 'light' | 'dark') =>
+  `shots/extensions/${name}${mode === 'dark' ? '-dark' : ''}.webp`;
+
+const pills = ['Parallel sessions', 'Shared log', 'Task queue'];
+const lanes = [
+  [18, -1, 26, 14, -1, 20],
+  [12, 14, -2, 16, 22, 14],
+  [24, 10, -1, 20, 24, -1, 8],
+];
+
+const watch = [
+  {
+    title: 'Summary',
+    body: 'The goal, the outcome and the delivered files, the workers, and the items that need a look from you.',
+    shot: 'swarm-summary',
+    alt: 'The Swarm summary: the goal, the outcome and delivered files, a change request, the three workers and the items that need a look',
+  },
+  {
+    title: 'Knowledge',
+    body: 'The findings the workers shared, newest first, and the tasks they handed off to each other.',
+    shot: 'swarm-knowledge',
+    alt: 'The Swarm knowledge view: the findings the workers shared, newest first, and the tasks they handed off',
+  },
+  {
+    title: 'Changes',
+    body: 'Who applied whose work, the files each worker touched, and what each one published.',
+    shot: 'swarm-changes',
+    alt: 'The Swarm changes view: who applied whose work, the files each worker touched, and the publications',
+  },
+];
+
+const setup = [
+  {
+    title: 'Install it',
+    cmd: 'git clone https://github.com/NikiforovAll/claude-code-kanban\nclaude-code-hub ext install claude-code-kanban/extensions/swarm',
+    body: 'This adds the Swarm app to the hub and its plugin to Claude Code. Restart the hub and start a new Claude Code session.',
+  },
+  {
+    title: 'Start a swarm',
+    cmd: '/kanban-delm-swarm:swarm <goal> --n 3',
+    body: 'Run it in a session in the Kanban terminal. Your session writes a spec and the first tasks, and starts the workers after you agree to them. It then supervises: it answers blockers and ends the swarm.',
+  },
+];
+---
+
+<SiteLayout
+  title="Swarm: several Claude Code sessions on one goal"
+  description="Run a team of Claude Code sessions that share a task queue and a log of findings, on the Claude Code Kanban board. Experimental."
+  image="og.png"
+>
+  <div class="page">
+    <header class="nav">
+      <a class="mark" href={url('swarm/')}>Swarm</a>
+      <nav aria-label="Site">
+        <a href={LISTING}>Extension</a>
+        <a href={SOURCE}>GitHub</a>
+        <details class="family">
+          <summary>Apps</summary>
+          <ul>
+            {family.map((s) => <li><a href={s.href}>{s.name}</a></li>)}
+          </ul>
+        </details>
+        <ModeToggle />
+      </nav>
+    </header>
+
+    <main>
+      <section class="hero">
+        <div class="hero-card">
+          <p class="badge">Experimental</p>
+          <h1>Swarm</h1>
+          <p class="subtitle">Decentralized Multi-Agent Systems with Shared Context</p>
+          <ul class="pills">
+            {pills.map((p) => <li>{p}</li>)}
+          </ul>
+          <p class="credit">An implementation of the <a href={DELM}>DeLM</a> idea on Claude Code Kanban</p>
+          <div class="actions">
+            <a class="button" href="#setup">Add it to the hub</a>
+            <a class="button ghost" href={SOURCE}>Code</a>
+            <a class="button ghost" href={DELM}>DeLM</a>
+          </div>
+          <div class="lanes" aria-hidden="true">
+            {
+              lanes.map((lane) => (
+                <div class="lane">
+                  {lane.map((w) => (
+                    <span class={w < 0 ? 'gap' : 'bar'} style={`flex-grow: ${Math.abs(w)}`} />
+                  ))}
+                </div>
+              ))
+            }
+          </div>
+        </div>
+        <p class="lede">
+          Swarm starts 2 to 4 workers as Claude Code sessions on the Kanban board. They claim tasks from a shared queue and
+          post what they learn to a shared log, so no main agent hands out the work. Your own session supervises.
+        </p>
+        <p class="note">
+          The idea comes from <a href={DELM}>DeLM</a>, decentralized multi-agent systems with shared context. Swarm is our
+          own implementation on top of Kanban, not a port: it lists where it differs in <a href={DEVIATIONS}
+            >DEVIATIONS.md</a
+          >.
+        </p>
+
+        <figure class="hero-shot by-mode">
+          <div class="light"><Shot src={shot('swarm-timeline', 'light')} alt={TIMELINE_ALT} eager /></div>
+          <div class="dark"><Shot src={shot('swarm-timeline', 'dark')} alt={TIMELINE_ALT} /></div>
+        </figure>
+      </section>
+
+      <section class="half" aria-labelledby="watch">
+        <div class="half-head">
+          <h2 id="watch">Watch</h2>
+          <p>
+            The timeline shows each worker's claims, findings and publications. Each worker runs in its own git worktree
+            and its own Kanban terminal, so you can open any of them and type.
+          </p>
+        </div>
+        <div class="items">
+          {
+            watch.map((it) => (
+              <article class="item">
+                <div class="item-text">
+                  <h3>{it.title}</h3>
+                  <p>{it.body}</p>
+                </div>
+                <div class="by-mode">
+                  <div class="light"><Shot src={shot(it.shot, 'light')} alt={it.alt} /></div>
+                  <div class="dark"><Shot src={shot(it.shot, 'dark')} alt={it.alt} /></div>
+                </div>
+              </article>
+            ))
+          }
+        </div>
+      </section>
+
+      <section class="setup" aria-labelledby="setup">
+        <h2 id="setup">Set up in two steps</h2>
+        <ol>
+          {
+            setup.map((s) => (
+              <li>
+                <h3>{s.title}</h3>
+                <code class="step-cmd">{s.cmd}</code>
+                <p>{s.body}</p>
+              </li>
+            ))
+          }
+        </ol>
+        <p class="aside">
+          It needs Claude Code Kanban with its terminal on and Node 22.13 or later. The
+          <a href={LISTING}>extension page</a> has the full install steps.
+        </p>
+      </section>
+    </main>
+
+    <FamilyFooter
+      current="hub"
+      links={[
+        { label: 'Extensions', href: url('extensions/') },
+        { label: 'DeLM', href: DELM },
+        { label: 'GitHub', href: SOURCE },
+      ]}
+    />
+  </div>
+  <Lightbox />
+</SiteLayout>
+
+<style>
+  .page {
+    width: min(100% - 2rem, 78rem);
+    margin-inline: auto;
+  }
+
+  .nav {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1rem;
+    padding-block: 1.25rem;
+  }
+  .mark {
+    font: 600 1.25rem/1 var(--font-display);
+    color: var(--c-ink1);
+    text-decoration: none;
+  }
+  .nav nav {
+    display: flex;
+    align-items: center;
+    gap: 1.25rem;
+    font: 500 0.875rem var(--font-mono);
+  }
+  .nav nav a,
+  .family summary {
+    color: var(--c-ink2);
+    text-decoration: none;
+    cursor: pointer;
+  }
+  .nav nav a:hover,
+  .family summary:hover {
+    color: var(--c-ink1);
+  }
+  .family {
+    position: relative;
+  }
+  .family summary {
+    list-style: none;
+  }
+  .family summary::-webkit-details-marker {
+    display: none;
+  }
+  .family summary::after {
+    content: ' ▾';
+  }
+  .family ul {
+    position: absolute;
+    right: 0;
+    top: calc(100% + 0.5rem);
+    z-index: 10;
+    margin: 0;
+    padding: 0.375rem;
+    list-style: none;
+    min-width: 11rem;
+    background: var(--c-elevated);
+    border: 1px solid var(--c-border);
+    border-radius: 0.5rem;
+  }
+  .family li a {
+    display: block;
+    padding: 0.5rem 0.75rem;
+    border-radius: 0.375rem;
+  }
+  .family li a:hover {
+    background: var(--c-hover);
+  }
+
+  .hero {
+    padding-block: clamp(1.5rem, 4vw, 3rem) 0;
+  }
+  .hero-card {
+    max-width: 60rem;
+    margin-inline: auto;
+    padding: clamp(2rem, 5vw, 3.5rem) clamp(1rem, 4vw, 2.5rem) 0;
+    text-align: center;
+    background: linear-gradient(160deg, var(--c-accent-dim), var(--c-elevated) 70%);
+    border: 1px solid var(--c-border);
+    border-radius: 1.5rem;
+    overflow: hidden;
+  }
+  .subtitle {
+    margin: 1rem auto 0;
+    max-width: 28ch;
+    font: 500 clamp(1.25rem, 2.6vw, 1.75rem) / 1.25 var(--font-display);
+    color: var(--c-ink1);
+  }
+  .pills {
+    margin: 1.5rem 0 0;
+    padding: 0;
+    list-style: none;
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 0.5rem;
+  }
+  .pills li {
+    padding: 0.375rem 0.875rem;
+    font: 500 0.8125rem/1.2 var(--font-mono);
+    color: var(--c-ink2);
+    background: var(--c-field);
+    border: 1px solid var(--c-border);
+    border-radius: 999px;
+  }
+  .credit {
+    margin: 1.25rem 0 0;
+    font-size: 0.9375rem;
+    color: var(--c-ink3);
+  }
+  .credit a {
+    color: var(--c-ink1);
+  }
+  .hero-card .actions {
+    justify-content: center;
+  }
+  .lanes {
+    margin: clamp(2rem, 4vw, 3rem) calc(-1 * clamp(1rem, 4vw, 2.5rem)) 1rem;
+    display: grid;
+    gap: 0.375rem;
+  }
+  .lane {
+    display: flex;
+    gap: 0.25rem;
+  }
+  .lane span {
+    flex-basis: 0;
+    height: 0.5rem;
+  }
+  .lane .bar {
+    background: var(--c-accent);
+    opacity: 0.55;
+  }
+  .lane:nth-child(2) .bar {
+    opacity: 0.75;
+  }
+  .lane:nth-child(3) .bar {
+    opacity: 0.95;
+  }
+  .lane .gap {
+    background: var(--c-border);
+  }
+  .badge {
+    display: inline-block;
+    margin: 0 0 1.25rem;
+    padding: 0.25rem 0.625rem;
+    font: 500 0.75rem/1.4 var(--font-mono);
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: var(--c-accent-ink);
+    border: 1px solid var(--c-border);
+    border-radius: 999px;
+  }
+  h1 {
+    margin: 0;
+    font: 700 clamp(4rem, 12vw, 8rem) / 0.9 var(--font-display);
+    letter-spacing: -0.035em;
+    color: var(--c-accent-ink);
+  }
+  .lede {
+    margin: clamp(2.5rem, 5vw, 4rem) 0 0;
+    max-width: 38rem;
+    font-size: 1.1875rem;
+    color: var(--c-ink2);
+  }
+  .note {
+    margin: 1rem 0 0;
+    max-width: 38rem;
+    font-size: 0.9375rem;
+    color: var(--c-ink3);
+  }
+  .note a,
+  .aside a {
+    color: inherit;
+  }
+  .actions {
+    margin-top: 2rem;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.75rem;
+  }
+  .button {
+    display: inline-flex;
+    align-items: center;
+    font: 500 0.875rem/1 var(--font-mono);
+    padding: 0.75rem 1rem;
+    border-radius: 0.375rem;
+    text-decoration: none;
+    color: var(--c-field);
+    background: var(--c-ink1);
+    border: 1px solid var(--c-ink1);
+  }
+  .button:hover {
+    background: var(--c-accent-ink);
+    border-color: var(--c-accent-ink);
+  }
+  .button.ghost {
+    color: var(--c-ink1);
+    background: transparent;
+    border-color: var(--c-border);
+  }
+  .button.ghost:hover {
+    background: var(--c-hover);
+    border-color: var(--c-border);
+  }
+  .button:focus-visible,
+  .nav a:focus-visible,
+  .family summary:focus-visible,
+  .note a:focus-visible,
+  .credit a:focus-visible,
+  .aside a:focus-visible {
+    outline: 2px solid var(--c-accent);
+    outline-offset: 2px;
+  }
+
+  .hero-shot {
+    margin: clamp(2.5rem, 5vw, 4rem) 0 0;
+  }
+  :global(:root[data-theme='dark']) .by-mode .light,
+  :global(:root:not([data-theme='dark'])) .by-mode .dark {
+    display: none;
+  }
+
+  .half {
+    margin-top: clamp(5rem, 10vw, 9rem);
+    display: grid;
+    grid-template-columns: minmax(14rem, 18rem) 1fr;
+    gap: 2rem clamp(2rem, 5vw, 4.5rem);
+    align-items: start;
+  }
+  .half-head {
+    position: sticky;
+    top: 2rem;
+  }
+  .half-head h2 {
+    margin: 0 0 1rem;
+    font: 600 clamp(3.5rem, 8vw, 6rem) / 0.9 var(--font-display);
+    letter-spacing: -0.03em;
+    color: var(--c-accent-ink);
+  }
+  .half-head p {
+    margin: 0 0 1rem;
+    color: var(--c-ink2);
+  }
+  .aside {
+    font-size: 0.9375rem;
+    color: var(--c-ink3);
+  }
+  .items {
+    display: grid;
+    gap: clamp(3.5rem, 6vw, 5.5rem);
+  }
+  .item {
+    display: grid;
+    gap: 1.25rem;
+  }
+  .item-text {
+    max-width: 40rem;
+  }
+  .item h3,
+  .setup h3 {
+    margin: 0 0 0.5rem;
+    font: 600 1.625rem/1.2 var(--font-display);
+    letter-spacing: -0.01em;
+  }
+  .item p {
+    margin: 0;
+    color: var(--c-ink2);
+  }
+  h2 {
+    margin: 0 0 1rem;
+    font: 600 clamp(2rem, 4vw, 2.75rem) / 1.08 var(--font-display);
+    letter-spacing: -0.02em;
+  }
+
+  .setup {
+    margin-block: clamp(5rem, 10vw, 9rem) clamp(4rem, 8vw, 6rem);
+    scroll-margin-top: 2rem;
+  }
+  .setup ol {
+    margin: 2rem 0;
+    padding: 0;
+    list-style: none;
+    counter-reset: step;
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(16rem, 1fr));
+    gap: 1.5rem;
+  }
+  .setup li {
+    counter-increment: step;
+    padding-top: 1.25rem;
+    border-top: 2px solid var(--c-ink1);
+    min-width: 0;
+  }
+  .setup li::before {
+    content: counter(step);
+    display: block;
+    font: 600 1rem var(--font-mono);
+    color: var(--c-accent-ink);
+    margin-bottom: 0.5rem;
+  }
+  .step-cmd {
+    display: block;
+    margin: 0.75rem 0;
+    padding: 0.625rem 0.875rem;
+    background: var(--c-elevated);
+    border: 1px solid var(--c-border);
+    border-radius: 0.375rem;
+    font-size: 0.875rem;
+    white-space: pre-wrap;
+    overflow-wrap: anywhere;
+  }
+  .setup li p {
+    margin: 0;
+    color: var(--c-ink2);
+    font-size: 0.9375rem;
+  }
+
+  @media (max-width: 52rem) {
+    .half {
+      grid-template-columns: 1fr;
+    }
+    .half-head {
+      position: static;
+    }
+    .nav nav {
+      gap: 0.875rem;
+    }
+  }
+</style>
