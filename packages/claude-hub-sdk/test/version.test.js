@@ -13,6 +13,7 @@ const RELEASED = {
   '1.2.0': '62c7d9f477b2',
   '1.3.0': '4c9f3341a24d',
   '1.4.0': '7d559a8888ce',
+  '1.5.0': '1505d3d5f8ba',
 };
 
 describe('version', () => {

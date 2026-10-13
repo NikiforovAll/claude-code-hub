@@ -2,6 +2,12 @@
 
 The SDK follows semver. A new function or message is a minor version, a change that breaks an app is a major version. The protocol version is separate ([Versioning](https://nikiforovall.blog/claude-code-hub/reference/protocol/#versioning)).
 
+## 1.5.0
+
+- A page framed inside another app's page, such as a Swarm page in a Kanban pane, talks to the hub through `window.top`, so it gets `welcome`, the themes and `theme.changed` like a tab. Before, it sent `hello` to the page around it, waited 2 s for nothing and then dropped the hub's theme. A tab sees no change: its `window.top` is its parent.
+- Where the browser lists `location.ancestorOrigins`, the client runs standalone at once when the top window is not the hub, and sends no `hello`.
+- The cached theme vars keep the hub origin that sent them: `claude-hub:vars` holds `{origin, vars}`, and a cache in the old shape is not painted. A framed page paints them at start only when its top window has that origin, so a page framed by something other than the hub does not paint the hub's last theme.
+
 ## 1.4.0
 
 - `hub.keyLabel(action)` gives the keys of a hub action from `welcome.keys`, as a help row shows them: `['Ctrl', 'Alt', 'P']`, or `['⌃', '⌥', 'P']` on macOS. A list of actions shares one row, merged by their common modifiers: `['Ctrl', 'Alt', '←/→']`. It gives `[]` when no key runs the action, and `null` before welcome, standalone, or for an action the hub did not list. The stub always gives `null`.

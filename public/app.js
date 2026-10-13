@@ -13,6 +13,9 @@ const guardedApps = new Set();
 // App id → the topics its hub:hello subscribes to. An app is live from its hello until the next
 // iframe load: e.source is the same WindowProxy across reloads, so a new document starts unknown.
 const liveApps = new Map();
+// Window → {appId, topics}: an app's page framed inside another app's page, such as a cck pane
+// (protocol §5.1). A pane does not reload when its parent does, so a closed window is dropped on send.
+const nestedApps = new Map();
 // Apps whose next document the hub loads from an action URL.
 const linkLoads = new Set();
 const HUB_PROTOCOLS = [1];
@@ -80,10 +83,14 @@ function themePayload() {
   return { theme: themeState.theme ?? osTheme(), colorTheme: activeColorTheme() };
 }
 
-function sendTheme(appId) {
+function themeEvent() {
   const payload = themePayload();
   const vars = themeVars[payload.colorTheme ?? 'ember']?.[payload.theme];
-  sendTopic(appId, 'theme.changed', vars ? { ...payload, vars } : payload);
+  return vars ? { ...payload, vars } : payload;
+}
+
+function sendTheme(appId) {
+  sendTopic(appId, 'theme.changed', themeEvent());
 }
 
 // {<themeId>: {dark, light}}, each a map of the apps' core CSS variables, from /api/config, which
@@ -158,6 +165,36 @@ function postTo(appId, message) {
 
 function appIdOf(source) {
   return Object.keys(iframes).find((id) => iframes[id].contentWindow === source);
+}
+
+function appIdByOrigin(origin) {
+  return Object.keys(apps).find((id) => originOf(id) === origin);
+}
+
+// A frame below a tab's frame. A cross-origin WindowProxy still exposes parent, and a popup or
+// another top window never reaches a tab.
+function underTab(source) {
+  for (let w = source?.parent; w && w !== window; w = w.parent) {
+    if (appIdOf(w)) return true;
+    if (w === w.parent) return false;
+  }
+  return false;
+}
+
+function postNested(win, message) {
+  const nested = nestedApps.get(win);
+  if (!nested) return;
+  if (win.closed) {
+    nestedApps.delete(win);
+    return;
+  }
+  win.postMessage(message, originOf(nested.appId));
+}
+
+function sendNestedTheme(win, payload = themeEvent()) {
+  if (nestedApps.get(win)?.topics.has('theme.changed')) {
+    postNested(win, { type: 'hub:event', topic: 'theme.changed', payload });
+  }
 }
 
 // The last value lives in themeState and projectState, so a replay after welcome is a send.
@@ -363,6 +400,7 @@ function reloadIframes() {
   projectState = null;
   published.clear();
   missed.clear();
+  nestedApps.clear();
   // A new element, because assigning src is only a fragment navigation when the app's URL
   // differs from the new one by the #t= fragment alone, and the old dir's document stays.
   for (const id of Object.keys(iframes)) replaceIframe(id);
@@ -486,18 +524,26 @@ function onIframeLoad(appId) {
   if (appId === activeApp) hideLoading();
 }
 
-function onHello(appId, data) {
+function welcomeFor(data) {
   const common = Array.isArray(data.protocol) ? HUB_PROTOCOLS.filter((v) => data.protocol.includes(v)) : [];
-  if (!common.length) return;
-  liveApps.set(appId, new Set(Array.isArray(data.subscribes) ? data.subscribes : []));
-  postTo(appId, {
+  if (!common.length) return null;
+  return {
     type: 'hub:welcome',
     protocol: Math.max(...common),
     forward: Object.keys(bindings()),
     keys: actionKeys(),
     themes: hubThemes,
     actions: Object.keys(actions),
-  });
+  };
+}
+
+const helloTopics = (data) => new Set(Array.isArray(data.subscribes) ? data.subscribes : []);
+
+function onHello(appId, data) {
+  const welcome = welcomeFor(data);
+  if (!welcome) return;
+  liveApps.set(appId, helloTopics(data));
+  postTo(appId, welcome);
   sendTheme(appId);
   // A document the hub loaded from an action URL got its project from that URL. The hub's own
   // project would undo the link, so it goes out only with the next change.
@@ -532,9 +578,9 @@ function fillUrl(template, params) {
 }
 
 // Protocol §7. The result does not wait for the handler: the hub queues nothing.
-function onInvoke(appId, { id, action, params = {} }) {
+function onInvoke({ id, action, params = {} }, send) {
   if (typeof id !== 'string') return;
-  const reply = (result) => postTo(appId, { type: 'hub:result', id, ...result });
+  const reply = (result) => send({ type: 'hub:result', id, ...result });
   const spec = typeof action === 'string' && Object.hasOwn(actions, action) ? actions[action] : null;
   if (!spec) return reply({ ok: false, reason: 'unhandled' });
   if (badParams(spec.params, params)) return reply({ ok: false, reason: 'bad-params' });
@@ -556,12 +602,13 @@ function listenMessages() {
   });
   window.addEventListener('message', (e) => {
     const appId = appIdOf(e.source);
-    if (!appId || e.origin !== originOf(appId)) return;
+    if (!appId) return onNestedMessage(e);
+    if (e.origin !== originOf(appId)) return;
     const data = e.data ?? {};
     if (data.type === 'hub:hello') {
       onHello(appId, data);
     } else if (data.type === 'hub:invoke') {
-      onInvoke(appId, data);
+      onInvoke(data, (m) => postTo(appId, m));
     } else if (data.type === 'hub:publish') {
       onPublish(appId, data);
     } else if (data.type === 'hub:keydown') {
@@ -580,33 +627,69 @@ function listenMessages() {
         })
         .catch(() => {});
     } else if (data.type === 'hub:openExternal') {
-      // In the installed PWA window a framed sub-app's own target=_blank opens
-      // nothing, so the SDK hands external links up to the top frame instead.
-      let url;
-      try {
-        url = new URL(String(data.url));
-      } catch (_) {
-        return;
-      }
-      if (url.protocol !== 'http:' && url.protocol !== 'https:') return;
-      window.open(url.href, '_blank', 'noopener');
+      openExternal(data);
     } else if (data.type === 'hub:theme') {
-      // colorTheme is optional and sticky.
-      if (data.theme !== 'light' && data.theme !== 'dark') return;
-      const hasColor = typeof data.colorTheme === 'string' && /^[a-z0-9-]{0,32}$/.test(data.colorTheme);
-      const changed = data.theme !== themeState.theme || (hasColor && data.colorTheme !== activeColorTheme());
-      if (!changed) return;
-      themeState.theme = data.theme;
-      if (hasColor) {
-        themeState.colorTheme = data.colorTheme;
-        if (activeConfigDir) themeState.colorThemes[activeConfigDir] = data.colorTheme;
-      }
-      localStorage.setItem('hub-theme', JSON.stringify(themeState));
-      applyHubTheme();
-      // The sender gets the echo too, for the vars.
-      for (const id of Object.keys(iframes)) sendTheme(id);
+      onThemeMessage(data);
     }
   });
+}
+
+// Protocol §5.1. A nested page gets the welcome and theme.changed, and may send hello, invoke,
+// keydown, openExternal and theme. hub:active, the other topics, publish, closeGuard and the
+// terminal token belong to the app's tab, which keeps them per app id.
+function onNestedMessage(e) {
+  const data = e.data ?? {};
+  const known = nestedApps.get(e.source);
+  const appId = data.type === 'hub:hello' && underTab(e.source) ? appIdByOrigin(e.origin) : known?.appId;
+  if (!appId || e.origin !== originOf(appId)) return;
+  if (data.type === 'hub:hello') {
+    const welcome = welcomeFor(data);
+    if (!welcome) return;
+    const topics = helloTopics(data);
+    nestedApps.set(e.source, { appId, topics });
+    postNested(e.source, welcome);
+    sendNestedTheme(e.source);
+  } else if (data.type === 'hub:invoke') {
+    onInvoke(data, (m) => postNested(e.source, m));
+  } else if (data.type === 'hub:keydown') {
+    handleForwardedKey(data);
+  } else if (data.type === 'hub:openExternal') {
+    openExternal(data);
+  } else if (data.type === 'hub:theme') {
+    onThemeMessage(data);
+  }
+}
+
+// In the installed PWA window a framed sub-app's own target=_blank opens
+// nothing, so the SDK hands external links up to the top frame instead.
+function openExternal(data) {
+  let url;
+  try {
+    url = new URL(String(data.url));
+  } catch (_) {
+    return;
+  }
+  if (url.protocol !== 'http:' && url.protocol !== 'https:') return;
+  window.open(url.href, '_blank', 'noopener');
+}
+
+function onThemeMessage(data) {
+  // colorTheme is optional and sticky.
+  if (data.theme !== 'light' && data.theme !== 'dark') return;
+  const hasColor = typeof data.colorTheme === 'string' && /^[a-z0-9-]{0,32}$/.test(data.colorTheme);
+  const changed = data.theme !== themeState.theme || (hasColor && data.colorTheme !== activeColorTheme());
+  if (!changed) return;
+  themeState.theme = data.theme;
+  if (hasColor) {
+    themeState.colorTheme = data.colorTheme;
+    if (activeConfigDir) themeState.colorThemes[activeConfigDir] = data.colorTheme;
+  }
+  localStorage.setItem('hub-theme', JSON.stringify(themeState));
+  applyHubTheme();
+  // The sender gets the echo too, for the vars.
+  for (const id of Object.keys(iframes)) sendTheme(id);
+  const payload = themeEvent();
+  for (const win of nestedApps.keys()) sendNestedTheme(win, payload);
 }
 
 function handleForwardedKey(d) {

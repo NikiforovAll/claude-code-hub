@@ -34,6 +34,7 @@ An app must work with no hub. Everything in this spec turns on only when the hub
 | App id | A name that matches `^[a-z][a-z0-9-]{0,31}$`, unique in the hub, for example `cost`. `hub` is reserved |
 | Pool | The set of app processes for one Claude config dir |
 | Framed | The app document is not the top window (`window.top !== window`) |
+| Nested page | An app document framed inside another app's document, for example a page that a Kanban pane shows. Its top window is the hub, but its parent is not ([Nested pages](#51-nested-pages)) |
 | Current document | The document that the iframe holds now. A reload or a config-dir switch starts a new one |
 | Live | The iframe sent `hub:hello` after its last `load` event |
 
@@ -127,15 +128,17 @@ Each message is `{type: 'hub:<name>', …payload}`, sent with `postMessage`.
 **App side:**
 
 1. Until `/hub-config` resolves with `enabled: true`, the app sends nothing and drops every message.
-2. The app accepts a message only when `e.source === window.parent` and `e.origin` is the origin of `/hub-config`'s `url`.
-3. The app posts only to `window.parent`, with that origin as the target origin.
-4. Every apply must be idempotent. The hub can send the same state more than once.
+2. The app talks to the hub only when the hub is its top window. Where the browser lists `location.ancestorOrigins`, the last entry must be the origin of `/hub-config`'s `url`; when it is not, the app runs standalone at once. Firefox has no such list, so there the app sends `hello` and waits.
+3. The app accepts a message only when `e.source === window.top` and `e.origin` is the origin of `/hub-config`'s `url`.
+4. The app posts only to `window.top`, with that origin as the target origin. For an app in a tab, `window.top` is `window.parent`.
+5. Every apply must be idempotent. The hub can send the same state more than once.
 
 **Hub side:**
 
-1. The hub names the sender by `e.source`: the iframe whose `contentWindow` sent it. It drops a message when `e.source` is not an app iframe, or when `e.origin` is not that app's origin. A payload never names the sender.
-2. The hub posts to an iframe with that app's exact origin.
-3. The hub ignores a type it does not know. The app must do the same.
+1. The hub names the sender by `e.source`: the iframe whose `contentWindow` sent it. It drops a message when `e.origin` is not that app's origin. A payload never names the sender.
+2. A sender that is not an app iframe is a nested page when its parent chain reaches an app iframe. The hub names it by `e.origin`, the app whose origin it is, and keeps the window from its `hello`. It drops every other sender ([Nested pages](#51-nested-pages)).
+3. The hub posts to an iframe, or to a nested page's window, with that app's exact origin.
+4. The hub ignores a type it does not know. The app must do the same.
 
 ## 5. Handshake
 
@@ -153,6 +156,25 @@ Each message is `{type: 'hub:<name>', …payload}`, sent with `postMessage`.
    - `keys`: the combo of each hub action, for an app's help ([Keys](#8-keys), rule 5).
    - `themes`: the list for the theme picker ([Theme](#6-theme)).
    - `actions`: the actions that an enabled app handles ([Actions](#7-actions)).
+
+### 5.1 Nested pages
+
+An app page can be framed inside another app's page, for example a Swarm page in a Kanban pane. It is served from the app's own proxy origin, so it runs the hub's SDK and talks to the hub through `window.top`. The app's tab, if it has one, stays a separate document with its own state.
+
+| Message | Nested page |
+|---|---|
+| `hub:hello`, `hub:welcome` | Yes. The hub keeps the page's window until it closes or the config dir changes |
+| `hub:event` `theme.changed` | Yes, after `welcome` and on every change |
+| `hub:theme` | Yes. The user's pick reaches every tab and every nested page |
+| `hub:invoke`, `hub:result` | Yes. The result goes to the nested page |
+| `hub:keydown` | Yes, for the combos in `welcome.forward`, as from a tab |
+| `hub:openExternal` | Yes |
+| Other topics, `hub:publish` | No. Topics such as `project.changed` and `session.changed` belong to the tab |
+| `hub:active` | No. It names the tab on screen; a nested page is on screen when its parent shows it |
+| `hub:action` | No. The hub routes an action to the handler's tab |
+| `hub:closeGuard`, `hub:terminalToken` | No. The hub keeps them per app id, for the tab |
+
+A page with no `hub:active` must count itself active, as the SDK's `onActive` does by never calling back.
 
 ## 6. Theme
 
@@ -185,8 +207,8 @@ The hub does not theme semantic colors (`--success`, `--warning`, `--error`), ch
 
 1. **Apply on `body`.** The app writes `vars` as inline custom properties on `document.body`, so they win over every selector rule. It also sets its own mode class and theme attribute for the rest of its styles.
 2. **Apply on change only.** When `vars` equal the last set it applied, the app does nothing.
-3. **Paint the cached set first.** The app keeps the last `vars` in `localStorage`.
-   - When framed, it applies them synchronously at start, before the first paint and before `/hub-config` resolves. So the code runs from a classic script that is the first element in `<body>`, before the app's own scripts, with no `defer` or `async`. In `<head>`, `document.body` does not exist yet.
+3. **Paint the cached set first.** The app keeps the last `vars` in `localStorage`, with the hub origin that sent them.
+   - When framed, it applies them synchronously at start, before the first paint and before `/hub-config` resolves. Where the browser lists `location.ancestorOrigins`, it applies them only when the last entry is the cached hub origin, so a page framed by something other than the hub does not paint the hub's theme. So the code runs from a classic script that is the first element in `<body>`, before the app's own scripts, with no `defer` or `async`. In `<head>`, `document.body` does not exist yet.
    - Standalone, it never applies them: a standalone tab can share the origin with the proxy.
    - When the hub sends no `vars`, or sends no `welcome` within 2 s of `hello`, the app removes the cached set from the page and from `localStorage`. Until then, it keeps the cached set.
 4. **Derive extras.** An app computes any extra variable from the core set in its own CSS, for example `--chart-fill: color-mix(in srgb, var(--accent) 32%, transparent)`, so it follows a theme it does not know. It declares the extra on `body`, not `:root`: `var()` resolves where the property is declared, and the inline `vars` are on `body`.

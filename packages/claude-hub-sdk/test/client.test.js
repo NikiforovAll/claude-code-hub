@@ -6,7 +6,7 @@ const stub = require('../src/stub');
 
 const HUB = 'http://localhost:3540';
 const VARS = { '--accent': '#e86f33', '--bg-deep': '#111' };
-const CACHED = { 'claude-hub:vars': JSON.stringify(VARS) };
+const CACHED = { 'claude-hub:vars': JSON.stringify({ origin: HUB, vars: VARS }) };
 const NO_MODS = { key: '', code: '', ctrlKey: false, altKey: false, shiftKey: false, metaKey: false };
 const ctrlAlt = (key, code) => ({ ...NO_MODS, key, code, ctrlKey: true, altKey: true });
 
@@ -16,6 +16,8 @@ function fakeEnv({
   readyState = 'complete',
   storage = {},
   platform = 'Win32',
+  nested = false,
+  ancestors,
 } = {}) {
   const listeners = {};
   const on = (type, fn) => {
@@ -65,9 +67,13 @@ function fakeEnv({
       },
     },
   };
-  win.parent = framed ? parent : win;
+  // Nested: the page sits in another app's page, which sits in the hub. Only the hub (top) is recorded.
+  const middle = { sent: [], postMessage: (msg, origin) => middle.sent.push({ msg, origin }) };
+  win.parent = framed ? (nested ? middle : parent) : win;
   win.top = framed ? parent : win;
+  if (ancestors) win.location = { ancestorOrigins: ancestors };
   return {
+    middle,
     win,
     style,
     styleCalls,
@@ -225,7 +231,7 @@ describe('theme', () => {
     env.fromHub(themeEvent({ theme: 'dark', colorTheme: 'ember', vars: { ...VARS } }));
     assert.equal(env.style.get('--accent'), '#e86f33');
     assert.equal(env.styleCalls.length, 2);
-    assert.deepEqual(JSON.parse(env.storage['claude-hub:vars']), VARS);
+    assert.deepEqual(JSON.parse(env.storage['claude-hub:vars']), { origin: HUB, vars: VARS });
     env.fromHub(themeEvent({ theme: 'dark', colorTheme: 'ember', vars: { '--accent': '#000' } }));
     assert.deepEqual([...env.style.keys()], ['--accent']);
   });
@@ -601,6 +607,49 @@ describe('standalone', () => {
 
   it('removes the cached set when framed by a page that is not the hub', async () => {
     const { env } = await connected({}, { config: { enabled: false }, storage: { ...CACHED } });
+    assert.equal(env.style.size, 0);
+  });
+});
+
+describe('nested page', () => {
+  const CCK = 'http://localhost:3541';
+
+  it('says hello to the hub at the top, not to the page around it, and goes live', async () => {
+    const { env, hub } = await connected({}, { nested: true, ancestors: [CCK, HUB] });
+    assert.deepEqual(env.posts(), [{ msg: { type: 'hub:hello', protocol: [1], subscribes: [] }, origin: HUB }]);
+    assert.deepEqual(env.middle.sent, []);
+    env.fromHub(welcome(), { source: env.middle });
+    assert.equal(hub.status, 'waiting');
+    env.fromHub(welcome());
+    assert.equal(hub.status, 'live');
+  });
+
+  it('paints the cached set from the first paint and keeps the hub theme after welcome', async () => {
+    const { env } = await connected({}, { nested: true, ancestors: [CCK, HUB], storage: { ...CACHED } });
+    assert.equal(env.style.get('--accent'), '#e86f33');
+    env.fromHub(welcome());
+    env.fromHub(themeEvent({ theme: 'dark', colorTheme: 'ember', vars: VARS }));
+    env.endWait();
+    assert.equal(env.style.get('--accent'), '#e86f33');
+    assert.equal(JSON.parse(env.storage['claude-hub:vars']).origin, HUB);
+  });
+
+  it('runs standalone at once and paints no cached set when the hub is not the top window', async () => {
+    const { env, hub } = await connected({}, { nested: true, ancestors: [CCK], storage: { ...CACHED } });
+    assert.equal(hub.status, 'standalone');
+    assert.equal(hub.inHub, false);
+    assert.equal(env.style.size, 0);
+    assert.deepEqual(env.sent(), []);
+    assert.deepEqual(env.middle.sent, []);
+    assert.equal(env.storage['claude-hub:vars'], CACHED['claude-hub:vars']);
+  });
+
+  it('paints no cached set that another hub origin sent', () => {
+    const env = fakeEnv({
+      ancestors: [HUB],
+      storage: { 'claude-hub:vars': JSON.stringify({ origin: 'http://localhost:4540', vars: VARS }) },
+    });
+    createClaudeHub(env.win);
     assert.equal(env.style.size, 0);
   });
 });
