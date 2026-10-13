@@ -12,7 +12,7 @@ const DEVIATIONS =
 const DELM = 'https://yuzhenmao.github.io/DeLM/';
 const LISTING = url('extensions/swarm/');
 const TIMELINE_ALT =
-  "The Swarm timeline: three workers' claimed tasks over one hour, with findings, publications, applies, lost claims, a released task and a stopped worker";
+  "The Swarm timeline: three workers' claimed tasks over one hour, with findings, publications, applies, lost claims, a released task and a stopped worker, and the event list under it";
 const shot = (name: string, mode: 'light' | 'dark') =>
   `shots/extensions/${name}${mode === 'dark' ? '-dark' : ''}.webp`;
 
@@ -38,7 +38,19 @@ const watch = [
     title: 'Summary',
     body: 'The goal, the outcome and the delivered files, the workers, and the items that need a look from you.',
     shot: 'swarm-summary',
-    alt: 'The Swarm summary: the goal, the outcome and delivered files, a change request, the three workers and the items that need a look',
+    alt: 'The Swarm summary: the goal, the wall time, the outcome and delivered files, the request and its revision, the three workers and the items that need a look',
+  },
+  {
+    title: 'Request',
+    body: 'The spec and each revision you asked for, on the timeline, with the tasks and publications that came after each one.',
+    shot: 'swarm-request',
+    alt: 'The Swarm request view: the spec and revision 2, the revisions over time on the worker timeline, and the revision with its new tasks and the workers it woke',
+  },
+  {
+    title: 'Queue',
+    body: 'The open, claimed and done tasks, with who took each one, how long it took and the claim races it had.',
+    shot: 'swarm-queue',
+    alt: 'The Swarm queue: no open or claimed tasks, and the done tasks with their worker, time taken, result and lost claims',
   },
   {
     title: 'Knowledge',
@@ -51,6 +63,12 @@ const watch = [
     body: 'Who applied whose work, the files each worker touched, and what each one published.',
     shot: 'swarm-changes',
     alt: 'The Swarm changes view: who applied whose work, the files each worker touched, and the publications',
+  },
+  {
+    title: 'Log',
+    body: 'Every event of the swarm, newest first: claims, findings, publications, wakes and the end.',
+    shot: 'swarm-log',
+    alt: 'The Swarm log: the events newest first, each with its sequence number, time, worker, kind and what happened',
   },
 ];
 
