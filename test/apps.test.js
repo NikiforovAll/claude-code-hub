@@ -135,7 +135,7 @@ describe('app manifests', () => {
   });
 
   it('kanban keeps its session keys', () => {
-    assert.deepEqual(loadApp(KANBAN, { log: () => {} }).keeps, ['ctrl+alt+n', 'ctrl+alt+r', 'ctrl+alt+s', 'ctrl+shift+k', 'ctrl+shift+p', 'ctrl+shift+z']);
+    assert.deepEqual(loadApp(KANBAN, { log: () => {} }).keeps, ['ctrl+alt+n', 'ctrl+alt+r', 'ctrl+alt+s', 'ctrl+shift+d', 'ctrl+shift+k', 'ctrl+shift+p', 'ctrl+shift+z']);
   });
 });
 
