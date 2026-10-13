@@ -38,8 +38,8 @@ An extension's `hub-app.json` is a normal [app manifest](/claude-code-hub/extens
   "manifest": 1,
   "id": "swarm",
   "name": "Swarm",
-  "run": { "entry": "plugin/plugins/kanban-delm-swarm/viewer/server.js", "defaultPort": 3546 },
-  "plugin": { "marketplace": "plugin", "name": "kanban-delm-swarm" },
+  "run": { "entry": "plugin/plugins/swarm/viewer/server.js", "defaultPort": 3546 },
+  "plugin": { "marketplace": "plugin", "name": "swarm" },
   "requires": { "node": "22.13.0", "apps": ["kanban"] }
 }
 ```

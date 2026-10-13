@@ -266,16 +266,16 @@ describe('resolvePlugin', () => {
   };
 
   it('derives the id and folder from marketplace.json, and the hub install command from the app id', () => {
-    market({ name: 'claude-code-swarm', plugins: [{ name: 'kanban-delm-swarm', source: './plugins/kanban-delm-swarm' }] });
-    assert.deepEqual(resolvePlugin({ marketplace: 'plugin', name: 'kanban-delm-swarm' }, root, 'swarm'), {
-      id: 'kanban-delm-swarm@claude-code-swarm',
-      dir: path.join(root, 'plugin', 'plugins', 'kanban-delm-swarm'),
+    market({ name: 'claude-code-swarm', plugins: [{ name: 'swarm', source: './plugins/swarm' }] });
+    assert.deepEqual(resolvePlugin({ marketplace: 'plugin', name: 'swarm' }, root, 'swarm'), {
+      id: 'swarm@claude-code-swarm',
+      dir: path.join(root, 'plugin', 'plugins', 'swarm'),
       bundled: null,
       marketplace: { dir: path.join(root, 'plugin'), name: 'claude-code-swarm' },
       install: 'claude-code-hub ext install swarm',
       custom: null,
     });
-    const own = resolvePlugin({ marketplace: 'plugin', name: 'kanban-delm-swarm', install: 'swarm --install' }, root, 'swarm');
+    const own = resolvePlugin({ marketplace: 'plugin', name: 'swarm', install: 'swarm --install' }, root, 'swarm');
     assert.equal(own.install, 'claude-code-hub ext install swarm');
     assert.equal(own.custom, 'swarm --install');
   });

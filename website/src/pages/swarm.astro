@@ -8,7 +8,7 @@ import { family, url } from '../kit/family';
 
 const SOURCE = 'https://github.com/NikiforovAll/claude-code-kanban/tree/HEAD/extensions/swarm';
 const DEVIATIONS =
-  'https://github.com/NikiforovAll/claude-code-kanban/blob/HEAD/extensions/swarm/plugin/plugins/kanban-delm-swarm/DEVIATIONS.md';
+  'https://github.com/NikiforovAll/claude-code-kanban/blob/HEAD/extensions/swarm/plugin/plugins/swarm/DEVIATIONS.md';
 const DELM = 'https://yuzhenmao.github.io/DeLM/';
 const LISTING = url('extensions/swarm/');
 const TIMELINE_ALT =
@@ -62,7 +62,7 @@ const setup = [
   },
   {
     title: 'Start a swarm',
-    cmd: '/kanban-delm-swarm:swarm <goal> --n 2',
+    cmd: '/swarm:swarm <goal> --n 2',
     body: 'Run it in a session in the Kanban terminal. Your session writes a spec and the first tasks, and starts the workers after you agree to them. It then supervises: it answers blockers and ends the swarm.',
   },
 ];
