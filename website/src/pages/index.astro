@@ -101,7 +101,7 @@ const windows = [
 >
   <div class="page">
     <header class="nav">
-      <a class="mark" href={url()}>Claude Code Hub</a>
+      <a class="mark" href={url()}><img src={url('favicon.svg')} alt="" width="26" height="26" />Claude Code Hub</a>
       <nav aria-label="Site">
         <a href={url('getting-started/')}>Docs</a>
         <details class="family">
@@ -321,6 +321,9 @@ const windows = [
     padding-block: 1.25rem;
   }
   .mark {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.6rem;
     font: 600 1.25rem/1 var(--font-display);
     color: var(--c-ink1);
     text-decoration: none;
