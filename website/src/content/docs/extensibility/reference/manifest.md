@@ -122,7 +122,14 @@ The launcher shows the installed version. When the plugin is not installed, is d
   "tagline": "One Claude Code session, turn by turn",
   "description": "Reads a session transcript and shows each prompt, its tool calls and their token use.",
   "tags": ["sessions", "debugging"],
-  "screenshots": [{ "url": "https://example.com/shots/turns.webp", "alt": "The turns of one session" }],
+  "screenshots": [
+    {
+      "url": "https://example.com/shots/turns.webp",
+      "alt": "The turns of one session",
+      "title": "Turns",
+      "caption": "Each prompt, its tool calls and their token use."
+    }
+  ],
   "author": "NikiforovAll",
   "homepage": "https://nikiforovall.blog/claude-code-hub/inspector/",
   "license": "MIT"
@@ -134,7 +141,7 @@ The launcher shows the installed version. When the plugin is not installed, is d
 | `tagline` | 80 characters or fewer. The Extensions page needs it |
 | `description` | 500 characters or fewer |
 | `tags` | Up to 5. Lowercase letters, digits and `-` |
-| `screenshots` | Up to 4. Each has `alt` and one of `path` (a file in the extension folder) or `url` (an `https://` link). PNG, JPEG or WebP |
+| `screenshots` | Up to 4. Each has `alt` and one of `path` (a file in the extension folder) or `url` (an `https://` link). PNG, JPEG or WebP. Optional: `title` (40 characters or fewer) and `caption` (200 or fewer), which the Extensions page shows under the image |
 | `author` | 60 characters or fewer |
 | `homepage` | An `https://` URL |
 | `license` | An SPDX id, for example `MIT` |
@@ -169,7 +176,7 @@ The hub skips the app, with a log line, when:
 | `requires.<hub or node> is not a version x.y.z` | A version is not three numbers |
 | `requires.apps is not a list of app ids` | `requires.apps` is not a list, or an item breaks the id rule |
 | `listing is not an object` | `listing` is an array or a value |
-| `listing.<field> is not plain text of <n> characters or fewer` | `tagline`, `description` or `author` is empty, too long, not a string, or has `<` or `>` |
+| `listing.<field> is not plain text of <n> characters or fewer` | `tagline`, `description`, `author`, or a screenshot's `title` or `caption`, is empty, too long, not a string, or has `<` or `>` |
 | `listing.tags is not a list of up to 5 lowercase tags` | `tags` breaks the tag rule |
 | `listing.screenshots ...` | A screenshot has no `alt`, has both or neither of `path` and `url`, is not PNG, JPEG or WebP, has a `url` that is not `https://`, or a `path` outside the folder. Or there are more than 4 |
 | `listing.homepage is not an https URL` | `homepage` does not start with `https://` |

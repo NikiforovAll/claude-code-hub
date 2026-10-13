@@ -12,11 +12,15 @@
     "screenshots": [
       {
         "url": "https://nikiforovall.blog/claude-code-hub/shots/extensibility/inspector-hub.webp",
-        "alt": "The Inspector in the hub: a chart of the context size per turn with a compaction line, the first turns with their tool calls, and the skills and MCP tools that the session used"
+        "alt": "The Inspector in the hub: a chart of the context size per turn with a compaction line, the first turns with their tool calls, and the skills and MCP tools that the session used",
+        "title": "Turn by turn",
+        "caption": "The context size per turn, where it was compacted, and each prompt with the tool calls that followed it."
       },
       {
         "url": "https://nikiforovall.blog/claude-code-hub/shots/extensibility/inspector-errors.webp",
-        "alt": "The Inspector with Errors only on: the turns with a failed tool call, and the detail panel with one failed call and its output"
+        "alt": "The Inspector with Errors only on: the turns with a failed tool call, and the detail panel with one failed call and its output",
+        "title": "Find the call that failed",
+        "caption": "Errors only keeps the turns with a failed tool call. Click a call to see its input and its output."
       }
     ],
     "author": "NikiforovAll",

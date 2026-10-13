@@ -23,7 +23,7 @@ export interface Extension {
   tagline: string;
   description?: string;
   tags: string[];
-  screenshots: { src: string; alt: string }[];
+  screenshots: { src: string; alt: string; title?: string; caption?: string }[];
   author?: string;
   homepage?: string;
   license?: string;
@@ -113,7 +113,12 @@ async function loadOne(file: string, local: Map<string, string>): Promise<Extens
     tagline: listing.tagline,
     description: listing.description,
     tags: listing.tags ?? [],
-    screenshots: (listing.screenshots ?? []).map((s: { path?: string; url?: string; alt: string }) => ({ src: s.url ?? at(s.path!), alt: s.alt })),
+    screenshots: (listing.screenshots ?? []).map((s: { path?: string; url?: string; alt: string; title?: string; caption?: string }) => ({
+      src: s.url ?? at(s.path!),
+      alt: s.alt,
+      title: s.title,
+      caption: s.caption,
+    })),
     author: listing.author,
     homepage: listing.homepage,
     license: listing.license,

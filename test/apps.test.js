@@ -226,7 +226,7 @@ describe('manifestError', () => {
       tags: ['sessions', 'debugging'],
       screenshots: [
         { path: 'docs/shots/turns.png', alt: 'The turns' },
-        { url: 'https://example.com/shot.webp', alt: 'A shot' },
+        { url: 'https://example.com/shot.webp', alt: 'A shot', title: 'Turns', caption: 'Each prompt and its tool calls.' },
       ],
       author: 'NikiforovAll',
       homepage: 'https://example.com/inspector/',
@@ -248,6 +248,8 @@ describe('manifestError', () => {
     assert.match(err({ screenshots: [{ path: 'a.gif', alt: 'x' }] }), /PNG, JPEG or WebP/);
     assert.match(err({ screenshots: [{ path: '../a.png', alt: 'x' }] }), /outside the app directory/);
     assert.match(err({ screenshots: [{ url: 'http://x/a.png', alt: 'x' }] }), /not https/);
+    assert.match(err({ screenshots: [{ path: 'a.png', alt: 'x', title: 'x'.repeat(41) }] }), /listing.screenshots.title/);
+    assert.match(err({ screenshots: [{ path: 'a.png', alt: 'x', caption: '<i>x</i>' }] }), /listing.screenshots.caption/);
     assert.match(err({ homepage: 'javascript:alert(1)' }), /listing.homepage/);
     assert.match(err({ license: 'MIT License' }), /SPDX/);
   });

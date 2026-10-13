@@ -93,9 +93,17 @@ const ld = {
     x.screenshots.length > 0 && (
       <section class="shots" aria-label="Screenshots">
         {x.screenshots.map((s) => (
-          <button type="button" class="shot" data-lightbox aria-label={`Enlarge: ${s.alt}`}>
-            <img src={onSite(s.src)} alt={s.alt} loading="lazy" decoding="async" />
-          </button>
+          <figure>
+            <button type="button" class="shot" data-lightbox aria-label={`Enlarge: ${s.alt}`}>
+              <img src={onSite(s.src)} alt={s.alt} loading="lazy" decoding="async" />
+            </button>
+            {(s.title || s.caption) && (
+              <figcaption>
+                {s.title && <strong>{s.title}</strong>}
+                {s.caption && <span>{s.caption}</span>}
+              </figcaption>
+            )}
+          </figure>
         ))}
       </section>
     )
@@ -201,26 +209,46 @@ const ld = {
   .shots {
     margin-top: clamp(3rem, 6vw, 4.5rem);
     display: grid;
-    gap: 2rem;
+    gap: 2.5rem;
+  }
+  figure {
+    margin: 0;
+    border: 1px solid var(--c-border);
+    border-radius: 0.625rem;
+    overflow: hidden;
+    background: var(--c-surface);
   }
   .shot {
     display: block;
     width: 100%;
     padding: 0;
-    border: 1px solid var(--c-border);
-    border-radius: 0.625rem;
-    overflow: hidden;
-    background: var(--c-surface);
+    border: 0;
+    background: none;
     cursor: zoom-in;
   }
-  .shot:focus-visible,
+  .shot:focus-visible {
+    outline: 2px solid var(--c-accent);
+    outline-offset: -2px;
+  }
   .back:focus-visible {
     outline: 2px solid var(--c-accent);
     outline-offset: 3px;
   }
   .shot img {
+    display: block;
     width: 100%;
     height: auto;
+  }
+  figcaption {
+    display: grid;
+    gap: 0.25rem;
+    padding: 0.875rem 1.125rem 1rem;
+    border-top: 1px solid var(--c-border);
+    color: var(--c-ink2);
+  }
+  figcaption strong {
+    font: 600 1rem var(--font-mono);
+    color: var(--c-ink1);
   }
   @media (max-width: 30rem) {
     dl {
