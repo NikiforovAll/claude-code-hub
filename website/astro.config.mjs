@@ -12,6 +12,7 @@ export default defineConfig({
 			title: 'Claude Code Hub',
 			description: 'Your own command center for Claude Code. Run your sessions, watch your agents, and when a tool is missing, ask Claude to build it.',
 			favicon: '/favicon.svg',
+			logo: { src: './src/assets/logo.svg' },
 			head: [
 				{ tag: 'meta', attrs: { property: 'og:image', content: 'https://nikiforovall.blog/claude-code-hub/og.png' } },
 				{ tag: 'meta', attrs: { name: 'twitter:image', content: 'https://nikiforovall.blog/claude-code-hub/og.png' } },
