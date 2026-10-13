@@ -40,6 +40,8 @@ const missed = new Map();
 const MAX_EVENT_CHARS = 16 * 1024;
 // The config dir the hub falls back to (~/.claude). Stays out of the window title.
 let defaultConfigDir = null;
+// What Ctrl+Alt+W does: 'palette' opens the config-dir palette, 'swap' switches to the previous dir.
+let configDirSwitch = 'palette';
 // The app launcher's footer: the hub version from /api/config and its plugin from /api/apps/stats.
 const hubInfo = { version: null, plugin: null };
 // mode: 'project' (Ctrl+Alt+P), 'configDir' (Ctrl+Alt+W) or 'app' (Ctrl+Alt+A). One widget, three row sources.
@@ -47,7 +49,7 @@ const palette = {
   open: false,
   mode: 'project',
   projects: [],
-  configDirs: { dirs: [], active: null },
+  configDirs: { dirs: [], active: null, previous: null },
   rows: [],
   sel: 0,
   query: '',
@@ -68,9 +70,11 @@ function loadThemeState() {
 
 // The color theme of the active config dir, falling back to the last one picked anywhere.
 // An id the registry lacks shows as Ember everywhere, so the hub page and every app agree.
+const DEFAULT_COLOR_THEME = 'ember';
+
 function activeColorTheme() {
   const id = themeState.colorThemes[activeConfigDir] ?? themeState.colorTheme;
-  return id && hubThemes.length && !themeVars[id] ? 'ember' : id;
+  return id && hubThemes.length && !themeVars[id] ? DEFAULT_COLOR_THEME : id;
 }
 
 function osTheme() {
@@ -85,7 +89,7 @@ function themePayload() {
 
 function themeEvent() {
   const payload = themePayload();
-  const vars = themeVars[payload.colorTheme ?? 'ember']?.[payload.theme];
+  const vars = themeVars[payload.colorTheme ?? DEFAULT_COLOR_THEME]?.[payload.theme];
   return vars ? { ...payload, vars } : payload;
 }
 
@@ -122,8 +126,10 @@ function applyHubTheme() {
   const mode = themeState.theme ?? osTheme();
   const root = document.documentElement;
   root.classList.toggle('light', mode === 'light');
-  const key = `${activeColorTheme()}/${mode}`;
-  const core = themeVars[activeColorTheme()]?.[mode];
+  // No app has named a theme yet: paint the one every app starts with.
+  const theme = activeColorTheme() ?? DEFAULT_COLOR_THEME;
+  const key = `${theme}/${mode}`;
+  const core = themeVars[theme]?.[mode];
   let vars = core && Object.fromEntries(Object.entries(HUB_VARS).map(([hub, name]) => [hub, core[name]]));
   try {
     if (vars) localStorage.setItem(PALETTE_KEY, JSON.stringify({ key, vars }));
@@ -273,6 +279,7 @@ async function init() {
   setApps(config.apps);
   defaultConfigDir = config.defaultConfigDir ?? null;
   activeConfigDir = config.activeConfigDir ?? null;
+  configDirSwitch = config.configDirSwitch ?? 'palette';
   applyTitle(config.activeConfigDir);
   themeVars = config.themeVars ?? {};
   hubThemes = config.themes ?? [];
@@ -285,6 +292,7 @@ async function init() {
   listenMessages();
   listenKeys();
   bindPalette();
+  bindSettings();
   registerSW();
   bindErrorToast();
   showUpdateToast();
@@ -710,8 +718,14 @@ function handleForwardedKey(d) {
 function hubActions() {
   return [
     { id: 'hub.projectPicker', combo: 'ctrl+alt+p', run: () => togglePalette('project'), inPalette: true },
-    { id: 'hub.configDirPicker', combo: 'ctrl+alt+w', run: () => togglePalette('configDir'), inPalette: true },
+    {
+      id: 'hub.configDirPicker',
+      combo: 'ctrl+alt+w',
+      run: () => (configDirSwitch === 'swap' ? swapConfigDir() : togglePalette('configDir')),
+      inPalette: true,
+    },
     { id: 'hub.appLauncher', combo: 'ctrl+alt+a', run: () => togglePalette('app'), inPalette: true },
+    { id: 'hub.settings', combo: 'ctrl+,', run: () => toggleSettings(), inPalette: true },
     { id: 'hub.prevApp', combo: 'ctrl+alt+ArrowLeft', run: () => cycleTab(-1) },
     { id: 'hub.nextApp', combo: 'ctrl+alt+ArrowRight', run: () => cycleTab(1) },
     {
@@ -784,13 +798,14 @@ function listenKeys() {
       binding.run();
       return;
     }
-    // While the palette is open the input owns the keyboard — don't let tab shortcuts fire
-    // mid-path (Alt+digit especially, since Windows paths contain digits). Escape still closes:
-    // bound here as well as on the input so it works wherever focus landed in the hub document.
-    if (palette.open) {
+    // While the palette or the settings modal is open, its input or buttons own the keyboard — don't
+    // let tab shortcuts fire mid-path (Alt+digit especially, since Windows paths contain digits).
+    // Escape still closes: bound here as well as on the input so it works wherever focus landed in
+    // the hub document.
+    if (openOverlay) {
       if (e.key === 'Escape') {
         e.preventDefault();
-        closePalette();
+        openOverlay.close();
       }
       return;
     }
@@ -1174,9 +1189,11 @@ const PALETTE_MODES = {
       if (looksLikePath(typed) && !dirs.some((d) => d.toLowerCase() === q)) rows.push({ kind: 'literal', path: typed });
       return rows;
     },
-    // Enter on the default row must switch, so the cursor lands on the dir before the active one,
-    // wrapping. With two dirs the palette then behaves like a toggle.
+    // Enter on the default row must switch, so the cursor lands on the previous dir, else on the
+    // dir before the active one, wrapping. With two dirs the palette then behaves like a toggle.
     initialSel(rows) {
+      const previous = rows.findIndex((r) => r.path === palette.configDirs.previous);
+      if (previous >= 0) return previous;
       const active = rows.findIndex((r) => r.active);
       if (active < 0 || rows.length < 2) return 0;
       return (active - 1 + rows.length) % rows.length;
@@ -1250,6 +1267,225 @@ const PALETTE_MODES = {
   },
 };
 
+// The hub settings modal (Ctrl+,). Each change is saved at once; data is the last /api/settings answer.
+const settingsModal = { open: false, data: null, error: null, busy: false };
+
+const SWITCH_CHOICES = [
+  ['palette', 'Open the list', 'Opens the config-dir list. Pick a dir, or type a path to add one.'],
+  [
+    'swap',
+    'Swap to last dir',
+    'Switches straight to the dir you used before, with no list. With one dir only, it opens the list.',
+  ],
+];
+const SHOW_CHOICES = [
+  ['shown', 'Tab'],
+  ['hidden', 'Launcher only'],
+  ['off', 'Off'],
+];
+const START_CHOICES = [
+  [false, 'With hub'],
+  [true, 'On demand'],
+];
+
+function toggleSettings() {
+  if (settingsModal.open) closeSettings();
+  else openSettings();
+}
+
+async function openSettings() {
+  settingsModal.open = true;
+  settingsModal.error = null;
+  showOverlay('settings', closeSettings);
+  renderSettings();
+  document.querySelector('#settings .settings-box').focus();
+  try {
+    settingsModal.data = await sendJson('GET', '/api/settings');
+  } catch (err) {
+    settingsModal.error = err.message;
+  }
+  if (settingsModal.open) renderSettings();
+}
+
+function closeSettings() {
+  settingsModal.open = false;
+  hideOverlay('settings');
+}
+
+async function saveSetting(patch) {
+  if (settingsModal.busy) return;
+  settingsModal.busy = true;
+  try {
+    settingsModal.data = await sendJson('POST', '/api/settings', patch);
+    settingsModal.error = null;
+    configDirSwitch = settingsModal.data.configDirSwitch;
+  } catch (err) {
+    settingsModal.error = err.message;
+  } finally {
+    settingsModal.busy = false;
+  }
+  if (settingsModal.open) renderSettings();
+}
+
+// A row of buttons that acts as one radio group: Tab reaches the checked one, ← and → change it.
+function segmented(name, choices, current, onPick, disabledOf = () => null) {
+  const group = el('span', 'seg');
+  group.setAttribute('role', 'radiogroup');
+  group.setAttribute('aria-label', name);
+  for (const [value, label] of choices) {
+    const btn = el('button', value === current ? 'on' : '', label);
+    btn.type = 'button';
+    btn.setAttribute('role', 'radio');
+    btn.setAttribute('aria-checked', String(value === current));
+    btn.tabIndex = value === current ? 0 : -1;
+    const why = disabledOf(value);
+    if (why) {
+      btn.disabled = true;
+      btn.title = why;
+    }
+    btn.addEventListener('click', () => value !== current && onPick(value));
+    group.append(btn);
+  }
+  return group;
+}
+
+function settingRow(label, control, help) {
+  const row = el('div', 'set-row');
+  row.append(typeof label === 'string' ? el('span', 'set-label', label) : label, control);
+  if (help) row.append(el('span', 'set-help', help));
+  return row;
+}
+
+function renderSettings() {
+  const body = document.getElementById('settings-body');
+  const foot = document.getElementById('settings-foot');
+  const s = settingsModal.data;
+  const focusKey = document.activeElement?.closest?.('[data-focus]')?.dataset.focus;
+  if (!s) {
+    body.replaceChildren(el('div', 'set-help', settingsModal.error ?? 'Loading…'));
+    foot.replaceChildren();
+    return;
+  }
+
+  const dirs = el('section', 'set-sec');
+  dirs.append(el('h4', '', 'Config dirs'));
+  const key = actionKeys()['hub.configDirPicker'];
+  const label = el('span', 'set-label');
+  if (key) label.append(kbd(comboLabel(key)), ' does');
+  else label.textContent = 'Config-dir key does';
+  const sw = SWITCH_CHOICES.find(([v]) => v === s.configDirSwitch);
+  const switchSeg = segmented('Config-dir key', SWITCH_CHOICES, s.configDirSwitch, (v) =>
+    saveSetting({ configDirSwitch: v }),
+  );
+  switchSeg.dataset.focus = 'switch';
+  dirs.append(settingRow(label, switchSeg, sw[2]));
+
+  const step = el('span', 'step');
+  const stepBtn = (text, delta, aria) => {
+    const b = el('button', '', text);
+    b.type = 'button';
+    b.setAttribute('aria-label', aria);
+    const n = s.poolSize + delta;
+    b.disabled = s.poolSizeFlag || n < 1 || n > s.maxPoolSize;
+    b.dataset.focus = `pool${delta}`;
+    b.addEventListener('click', () => saveSetting({ poolSize: n }));
+    return b;
+  };
+  step.append(stepBtn('−', -1, 'Fewer'), el('b', '', String(s.poolSize)), stepBtn('+', 1, 'More'), ' dirs');
+  const poolHelp = s.poolSizeFlag
+    ? 'Set by --pool-size for this run.'
+    : s.poolSize === 1
+      ? 'Only the active dir runs its apps. Every switch waits a few seconds while the apps start.'
+      : `The ${s.poolSize} dirs you used last keep their apps running, so going back to them is instant. Each one runs its own copy of every app. Others start again when you open them (a few seconds).`;
+  dirs.append(settingRow('Instant switch-back', step, poolHelp));
+
+  const manage = el('button', '', 'Manage…');
+  manage.type = 'button';
+  manage.dataset.focus = 'manage';
+  manage.addEventListener('click', () => openPalette('configDir'));
+  dirs.append(settingRow('Config dirs', manage));
+
+  const appsSec = el('section', 'set-sec');
+  appsSec.append(el('h4', '', 'Apps'));
+  const table = el('table', 'set-apps');
+  const head = el('tr', '');
+  head.append(el('th', '', 'App'), el('th', '', 'Show'), el('th', '', 'Start'));
+  table.append(head);
+  const onCount = s.apps.filter((a) => a.state !== 'off').length;
+  for (const a of s.apps) {
+    const tr = el('tr', '');
+    const show = segmented(
+      `Show ${a.name}`,
+      SHOW_CHOICES,
+      a.state,
+      (v) => saveSetting({ app: { id: a.id, state: v } }),
+      (v) => (v === 'off' && a.state !== 'off' && onCount === 1 ? 'At least one app must stay on' : null),
+    );
+    show.dataset.focus = `show:${a.id}`;
+    const start = segmented(
+      `Start ${a.name}`,
+      START_CHOICES,
+      a.deferredStart,
+      (v) => saveSetting({ app: { id: a.id, deferredStart: v } }),
+      () => (a.state === 'off' ? 'The app is off' : null),
+    );
+    start.dataset.focus = `start:${a.id}`;
+    const showTd = el('td', '');
+    showTd.append(show);
+    const startTd = el('td', '');
+    startTd.append(start);
+    tr.append(el('td', '', a.name), showTd, startTd);
+    table.append(tr);
+  }
+  appsSec.append(
+    table,
+    el(
+      'span',
+      'set-help',
+      '“Launcher only” keeps the app running but gives it no tab or number key; open it from the app launcher. “On demand” starts it the first time you open it.',
+    ),
+  );
+  body.replaceChildren(dirs, appsSec);
+
+  let status = el('span', '', 'Saved as you change it');
+  if (settingsModal.error) status = el('span', 'set-error', settingsModal.error);
+  else if (s.restartNeeded) status = el('span', 'set-restart', 'Restart the hub to apply app changes');
+  const keys = el('span', 'set-keys');
+  keys.append(kbd('Tab'), ' move · ', kbd('←'), kbd('→'), ' change');
+  foot.replaceChildren(status, keys);
+
+  // A save redraws the modal, so put focus back on the control that had it.
+  if (focusKey) {
+    const target = body.querySelector(`[data-focus="${CSS.escape(focusKey)}"]`);
+    // A radio group gets its checked button; a button that became disabled hands focus to its neighbour.
+    const focusable = target?.matches('button:not(:disabled)')
+      ? target
+      : (target?.querySelector('[aria-checked="true"]:not(:disabled)') ??
+        target?.parentElement.querySelector('button:not(:disabled)'));
+    (focusable ?? document.querySelector('#settings .settings-box')).focus();
+  }
+}
+
+function kbd(text) {
+  return el('kbd', '', text);
+}
+
+function bindSettings() {
+  const overlay = document.getElementById('settings');
+  overlay.addEventListener('mousedown', (e) => {
+    if (e.target === overlay) closeSettings();
+  });
+  overlay.addEventListener('keydown', (e) => {
+    if (e.key !== 'ArrowLeft' && e.key !== 'ArrowRight') return;
+    const group = e.target.closest('[role="radiogroup"]');
+    if (!group) return;
+    e.preventDefault();
+    const radios = [...group.querySelectorAll('[role="radio"]:not(:disabled)')];
+    const i = radios.indexOf(e.target);
+    radios[i + (e.key === 'ArrowRight' ? 1 : -1)]?.click();
+  });
+}
+
 function renderPalette() {
   const list = document.getElementById('palette-list');
   const spec = PALETTE_MODES[palette.mode];
@@ -1306,11 +1542,7 @@ function openPalette(mode) {
   input.placeholder = spec.placeholder;
   document.querySelector('#palette .palette-box').setAttribute('aria-label', spec.label);
   drawPaletteHint();
-  document.getElementById('palette').hidden = false;
-  // Ctrl+Alt+P usually arrives forwarded from a focused iframe. Without inert the sub-app can keep
-  // or take focus back, and then Escape is handled inside it — the palette stays open and only the
-  // sub-app's own focus visibly changes.
-  setIframesInert(true);
+  showOverlay('palette', closePalette);
   renderPalette();
   input.focus();
   // Stale-while-revalidate: the cached list renders instantly, recency refreshes when this lands.
@@ -1328,7 +1560,25 @@ function openPalette(mode) {
 
 function closePalette() {
   palette.open = false;
-  document.getElementById('palette').hidden = true;
+  hideOverlay('palette');
+}
+
+// The palette and the settings modal: one is open at a time, and Escape closes it.
+let openOverlay = null;
+
+function showOverlay(id, close) {
+  if (openOverlay && openOverlay.id !== id) openOverlay.close();
+  openOverlay = { id, close };
+  document.getElementById(id).hidden = false;
+  // Hub keys usually arrive forwarded from a focused iframe. Without inert the sub-app can keep
+  // or take focus back, and then Escape is handled inside it — the overlay stays open and only the
+  // sub-app's own focus visibly changes.
+  setIframesInert(true);
+}
+
+function hideOverlay(id) {
+  if (openOverlay?.id === id) openOverlay = null;
+  document.getElementById(id).hidden = true;
   setIframesInert(false);
   iframes[activeApp]?.focus();
 }
@@ -1394,19 +1644,39 @@ async function commitConfigDir(row) {
   closePalette();
   // The server would no-op too, but the client would still reload every iframe.
   if (target === palette.configDirs.active) return;
+  await switchConfigDir(() => sendJson('POST', '/api/config-dirs/activate', { path: target }));
+}
+
+// The previous dir, with no palette. With none (one dir only) it opens the palette to add one.
+let swapping = false;
+async function swapConfigDir() {
+  if (swapping) return;
+  swapping = true;
+  openOverlay?.close();
+  try {
+    await switchConfigDir(() => sendJson('POST', '/api/config-dirs/swap'));
+  } finally {
+    swapping = false;
+  }
+}
+
+async function switchConfigDir(request) {
   showLoading();
   try {
-    setApps((await sendJson('POST', '/api/config-dirs/activate', { path: target })).apps);
+    const { apps: list, active, previous } = await request();
+    setApps(list);
     // The palette renders from this cache before its refetch lands, and initialSel keys off it.
-    palette.configDirs.active = target;
-    activeConfigDir = target;
-    applyTitle(target);
+    palette.configDirs.previous = previous;
+    palette.configDirs.active = active;
+    activeConfigDir = active;
+    applyTitle(active);
     // Each iframe gets the new dir's color theme from its load handler; this repaints the palette.
     applyHubTheme();
     reloadIframes();
   } catch (err) {
-    showErrorToast('Could not switch config dir', err);
     hideLoading();
+    if (err.status === 409) openPalette('configDir');
+    else showErrorToast('Could not switch config dir', err);
   }
 }
 

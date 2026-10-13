@@ -16,8 +16,9 @@ The hub has no visible controls. These keys drive it. They work while focus is i
 | <kbd>Alt+3</kbd> | Cost |
 | <kbd>Alt+4</kbd> | Memory Diagnoser |
 | <kbd>Ctrl+Alt+P</kbd> | Open or close the project palette |
-| <kbd>Ctrl+Alt+W</kbd> | Open or close the config-dir palette |
+| <kbd>Ctrl+Alt+W</kbd> | Open or close the config-dir palette, or switch to the previous dir (see [Switch with one key](/claude-code-hub/guides/config-dirs/#switch-with-one-key)) |
 | <kbd>Ctrl+Alt+A</kbd> | Open or close the app launcher |
+| <kbd>Ctrl+,</kbd> | Open or close the hub settings |
 
 The number keys follow the tab order. The table shows the default order. The `apps` list in the [config file](/claude-code-hub/reference/configuration/#the-config-file) changes it, and a tool that is off has no number.
 
@@ -25,13 +26,14 @@ On a layout with <kbd>AltGr</kbd>, such as Polish or German, Windows sends <kbd>
 
 ## macOS
 
-On macOS, every hub key is <kbd>Control+Option</kbd> (⌃⌥) with a key, the tool numbers too:
+On macOS, the hub keys use <kbd>Control</kbd> (⌃), not <kbd>Command</kbd>. All but the hub settings key are <kbd>Control+Option</kbd> (⌃⌥) with a key, the tool numbers too:
 
 | Key | Action |
 | --- | --- |
 | <kbd>⌃⌥→</kbd> / <kbd>⌃⌥←</kbd> | Next or previous tool |
 | <kbd>⌃⌥1</kbd> … <kbd>⌃⌥9</kbd> | Go to a tool by its number |
 | <kbd>⌃⌥P</kbd>, <kbd>⌃⌥W</kbd>, <kbd>⌃⌥A</kbd> | Project palette, config-dir palette, app launcher |
+| <kbd>⌃,</kbd> | Hub settings |
 
 <kbd>Option</kbd> with a digit types a character on macOS, for example <kbd>Option+5</kbd> types `[` on a German layout. The hub does not bind it, so you can type these characters in every tool.
 
@@ -54,11 +56,12 @@ Add a `keys` block to the [config file](/claude-code-hub/reference/configuration
 | `hub.projectPicker` | `ctrl+alt+p` | `ctrl+alt+p` |
 | `hub.configDirPicker` | `ctrl+alt+w` | `ctrl+alt+w` |
 | `hub.appLauncher` | `ctrl+alt+a` | `ctrl+alt+a` |
+| `hub.settings` | `ctrl+,` | `ctrl+,` |
 | `hub.prevApp` | `ctrl+alt+ArrowLeft` | `ctrl+alt+ArrowLeft` |
 | `hub.nextApp` | `ctrl+alt+ArrowRight` | `ctrl+alt+ArrowRight` |
 | `hub.appByNumber` | `alt+{n}` | `ctrl+alt+{n}` |
 
-- A key is one or more of `ctrl`, `alt`, `shift` and `meta`, then a letter, a digit from 1 to 9, or a key name such as `ArrowUp` or `F2`, joined by `+`. On macOS, `alt` is <kbd>Option</kbd> and `meta` is <kbd>Command</kbd>. Case does not matter, except in a key name.
+- A key is one or more of `ctrl`, `alt`, `shift` and `meta`, then a letter, a digit from 1 to 9, `,`, or a key name such as `ArrowUp` or `F2`, joined by `+`. On macOS, `alt` is <kbd>Option</kbd> and `meta` is <kbd>Command</kbd>. Case does not matter, except in a key name.
 - `hub.appByNumber` ends in `+{n}`. The hub puts the tool number, 1 to 9, in place of `{n}`.
 - `null` turns the action's key off.
 - When you give an action the default key of another action, that other action has no key until you give it one.

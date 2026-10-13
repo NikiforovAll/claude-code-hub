@@ -19,7 +19,7 @@ The examples use the command of a [global install](/claude-code-hub/getting-star
 | `--cost-port <n>` | 3543 | Cost port |
 | `--memory-port <n>` | 3544 | Memory Diagnoser port |
 | `--hub-dir <path>` | `~/.claude-hub` | The folder for the hub's config file and token. See [Run a second hub](#run-a-second-hub) |
-| `--pool-size <n>` | 3 | How many [config-dir](/claude-code-hub/guides/config-dirs/) sets stay running after a switch |
+| `--pool-size <n>` | `poolSize` in the config file, else 3 | How many [config-dir](/claude-code-hub/guides/config-dirs/) sets stay running after a switch |
 | `--disable-terminal` | | Turn off the [embedded terminal](/claude-code-hub/guides/terminal/) in Kanban |
 | `--host <addr>` | `127.0.0.1` | Bind address. See [Security](/claude-code-hub/reference/security/#reach-the-hub-from-another-machine). |
 | `--allowed-hosts <list>` | | Extra host names to accept, comma-separated |
@@ -91,6 +91,20 @@ The hub creates the folder, the config file and a new token on the first run. Se
 
 On start, the hub asks npm for the latest `claude-code-hub` version and keeps the answer for 12 hours. If a newer stable version exists, the hub page shows a notice in the bottom-right corner when it loads. The notice hides after 10 seconds, or when you click ×, and shows again on the next start. Click **Skip this version** to hide it until a later version ships. The hub skips the check when it runs from a git checkout.
 
+## Hub settings
+
+Press <kbd>Ctrl+,</kbd> to open the hub settings, and <kbd>Esc</kbd> or <kbd>Ctrl+,</kbd> to close them. Press <kbd>Tab</kbd> to move between the controls and <kbd>←</kbd> <kbd>→</kbd> to change a choice, or click it. The hub saves each change in the [config file](#the-config-file) at once.
+
+| Setting | Values | Takes effect |
+| --- | --- | --- |
+| **Ctrl+Alt+W does** | **Open the list** (the config-dir palette), or **Swap to last dir** (see [Switch with one key](/claude-code-hub/guides/config-dirs/#switch-with-one-key)) | At once |
+| **Instant switch-back** | 1 to 8 dirs whose tools stay running | At the next switch to a dir that has no running tools. `--pool-size` overrides it, and the setting cannot change then |
+| **Manage…** | Opens the config-dir palette | |
+| **Show**, one row per tool | **Tab**, **Launcher only** (`hidden`) or **Off** | After a hub restart. The footer says when a restart is needed |
+| **Start**, one row per tool | **With hub**, or **On demand** (`deferredStart`) | After a hub restart |
+
+The hub does not let you turn off every tool.
+
 ## The config file
 
 The hub keeps its settings in `config.json` in the hub folder, `~/.claude-hub` by default:
@@ -99,6 +113,9 @@ The hub keeps its settings in `config.json` in the hub folder, `~/.claude-hub` b
 {
   "configDirs": ["C:\\Users\\me\\.claude", "C:\\Users\\me\\.claude-work"],
   "activeConfigDir": "C:\\Users\\me\\.claude",
+  "previousConfigDir": "C:\\Users\\me\\.claude-work",
+  "configDirSwitch": "swap",
+  "poolSize": 2,
   "terminal": { "enabled": false },
   "apps": [
     { "id": "kanban" },
@@ -109,12 +126,13 @@ The hub keeps its settings in `config.json` in the hub folder, `~/.claude-hub` b
 }
 ```
 
-- `configDirs` and `activeConfigDir` are the config-dir list and the active dir. The config-dir palette writes them. You do not need to edit them.
+- `configDirs`, `activeConfigDir` and `previousConfigDir` are the config-dir list, the active dir and the dir used before it. The config-dir palette writes them. You do not need to edit them.
+- `configDirSwitch` is what <kbd>Ctrl+Alt+W</kbd> does: `"palette"` (the default) opens the config-dir palette, `"swap"` switches to the previous dir. `poolSize` is how many config-dir sets stay running, 1 to 8, 3 by default. The [hub settings](#hub-settings) write both.
 - `terminal` is for you to edit. `"enabled": false` turns off the embedded terminal. The hub gives the whole block to Kanban as its terminal config, so you can also set keys like `shell`, `fontFamily`, `maxSessions` (most terminals open at the same time, 30 by default) and `restore` (on by default: resume the terminals that were open when the hub last stopped; `false` turns it off) here. See [Terminal config](https://nikiforovall.blog/claude-code-kanban/reference/configuration/#terminal-config) in the Kanban docs. The hub keeps this block when it writes the file.
 - `apps` is for you to edit. It sets which tools run and the tab order. The ids are `kanban`, `marketplace`, `cost` and `memory`. The tools you list come first, in list order, and the tools you do not list follow in the default order. A tool with `"enabled": false` does not start, gets no tab and no port, and links from other tools to it do nothing. With Kanban off, the embedded terminal is off and the project palette has no project list. <kbd>Alt</kbd>+<kbd>1</kbd> to <kbd>Alt</kbd>+<kbd>4</kbd> follow the tab order. `port` sets the tool's port, a whole number from 1 to 65535 (see [Ports](#ports)). The hub logs and ignores a value that is not valid, such as `"4543"` in quotes. `"hidden": true` keeps a tool running and in the app launcher, but gives it no <kbd>Alt</kbd>+number key and no place in the <kbd>Ctrl+Alt+Left</kbd>/<kbd>Right</kbd> cycle. `"deferredStart": true` does not start the tool with the hub; start it from the app launcher with <kbd>Ctrl+S</kbd>. See [Apps entry](/claude-code-hub/extensibility/reference/apps-entry/). The hub keeps this list when it writes the file, and does not start when every tool is off.
 - `keys` is for you to edit. It changes the hub's keys. See [Change the keys](/claude-code-hub/reference/shortcuts/#change-the-keys). The hub keeps this block when it writes the file.
 
-Restart the hub after you edit the file.
+Restart the hub after you edit the file by hand.
 
 ## Files the hub writes
 

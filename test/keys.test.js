@@ -4,7 +4,14 @@ const vm = require('node:vm');
 const { MATRIX, ROW_SETS, source, loadHubKeys, eventOf, payloadOf } = require('./helpers/hub-keys');
 const { HUB_ACTIONS } = require('../lib/keymap');
 
-const PALETTE_AND_ARROWS = ['ctrl+alt+p', 'ctrl+alt+w', 'ctrl+alt+a', 'ctrl+alt+ArrowLeft', 'ctrl+alt+ArrowRight'];
+const PALETTE_AND_ARROWS = [
+  'ctrl+alt+p',
+  'ctrl+alt+w',
+  'ctrl+alt+a',
+  'ctrl+,',
+  'ctrl+alt+ArrowLeft',
+  'ctrl+alt+ArrowRight',
+];
 
 describe('hub keymap', () => {
   it('forwards the default combos, in this order', () => {
@@ -41,6 +48,7 @@ describe('hub keymap', () => {
       ['hub.projectPicker', 'ctrl+alt+p'],
       ['hub.configDirPicker', 'ctrl+alt+w'],
       ['hub.appLauncher', 'ctrl+alt+a'],
+      ['hub.settings', 'ctrl+,'],
       ['hub.prevApp', 'ctrl+alt+ArrowLeft'],
       ['hub.nextApp', 'ctrl+alt+ArrowRight'],
     ];
@@ -76,7 +84,13 @@ describe('hub keymap', () => {
   it('keeps the palette keys working while the palette is open', () => {
     const map = loadHubKeys().bindings();
     const inPalette = Object.keys(map).filter((c) => map[c].inPalette);
-    assert.deepEqual(inPalette, ['ctrl+alt+p', 'ctrl+alt+w', 'ctrl+alt+a']);
+    assert.deepEqual(inPalette, ['ctrl+alt+p', 'ctrl+alt+w', 'ctrl+alt+a', 'ctrl+,']);
+  });
+
+  it('swaps the config dir with no palette when configDirSwitch is swap', () => {
+    const w = eventOf({ key: 'w', code: 'KeyW', mods: ['ctrl', 'alt'] });
+    assert.equal(loadHubKeys().actionOf(w), 'hub.configDirPicker');
+    assert.equal(loadHubKeys({ configDirSwitch: 'swap' }).actionOf(w), 'hub.configDirPicker:swap');
   });
 });
 
@@ -87,6 +101,7 @@ describe('user keymap', () => {
       'ctrl+alt+o',
       'ctrl+alt+w',
       'ctrl+alt+a',
+      'ctrl+,',
       'ctrl+alt+ArrowLeft',
       'ctrl+alt+ArrowRight',
       'ctrl+1',

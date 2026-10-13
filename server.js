@@ -9,7 +9,7 @@ const tcp = require('net');
 const os = require('os');
 const path = require('path');
 const { actionTable } = require('./lib/actions');
-const { selectApps, loadApp, conflicts } = require('./lib/apps');
+const { HUB_ROOT, selectApps, appRoot, loadApp, conflicts, readApp } = require('./lib/apps');
 const { userKeys } = require('./lib/keymap');
 const { stripCookie } = require('./lib/cookies');
 const { createNetGuard, KEEP_ALIVE_MS } = require('./lib/net-guard');
@@ -21,7 +21,16 @@ const { createUpdateCheck } = require('./lib/update-check');
 const { liveHub, removeRecord, writeRecord } = require('./lib/hub-record');
 const { HUB_PLUGIN } = require('./lib/install');
 const { pluginChecker } = require('./lib/plugin-status');
-const { serializeConfig, writeConfigFile } = require('./lib/hub-config');
+const { readConfig, serializeConfig, writeConfigFile } = require('./lib/hub-config');
+const {
+  appSettings,
+  appsShape,
+  applySettings,
+  configDirSwitch,
+  poolSize,
+  copyLive,
+  MAX_POOL_SIZE,
+} = require('./lib/settings');
 const { version: HUB_VERSION } = require('./package.json');
 
 function getArg(name) {
@@ -36,7 +45,7 @@ const DEFAULT_HUB_PORT = 3540;
 const HUB_PORT = parseInt(getArg('port') || process.env.PORT || DEFAULT_HUB_PORT, 10);
 let hubPort = HUB_PORT;
 
-const POOL_SIZE = Math.max(1, parseInt(getArg('pool-size') || '3', 10));
+const POOL_SIZE_FLAG = getArg('pool-size');
 const RESTART_DELAY_MS = 500;
 // A rate window, not a total: a child may die and recover all session, but one that cannot stay up
 // stops being restarted. A consecutive counter cannot express that — anything that starts at all
@@ -150,6 +159,9 @@ function resolveHubConfig() {
   if (saved.terminal && typeof saved.terminal === 'object') config.terminal = saved.terminal;
   if (Array.isArray(saved.apps)) config.apps = saved.apps;
   if (saved.keys !== undefined) config.keys = saved.keys;
+  copyLive(saved, config);
+  const savedPrevious = typeof saved.previousConfigDir === 'string' ? canonical(saved.previousConfigDir) : null;
+  if (dirs.includes(savedPrevious) && savedPrevious !== active) config.previousConfigDir = savedPrevious;
   return { config, raw, fallback };
 }
 
@@ -161,12 +173,22 @@ function writeHubConfig(config) {
 function saveHubConfig() {
   let saved = hubConfig;
   try {
-    saved = JSON.parse(fs.readFileSync(HUB_CONFIG_FILE, 'utf8'));
+    saved = readSavedConfig();
   } catch {}
-  writeHubConfig({ ...saved, configDirs: hubConfig.configDirs, activeConfigDir: hubConfig.activeConfigDir });
+  writeHubConfig({
+    ...saved,
+    configDirs: hubConfig.configDirs,
+    activeConfigDir: hubConfig.activeConfigDir,
+    previousConfigDir: hubConfig.previousConfigDir,
+  });
+}
+
+function readSavedConfig() {
+  return readConfig(path.dirname(HUB_CONFIG_FILE)).config;
 }
 
 const hubConfig = loadHubConfig();
+const currentPoolSize = () => poolSize(hubConfig, POOL_SIZE_FLAG);
 
 const { apps: selectedApps, unknown: unknownApps } = selectApps(hubConfig.apps, path.dirname(HUB_CONFIG_FILE));
 const ENABLED_APPS = selectedApps.map((a) => loadApp(a, { flagPort: getArg(`${a.id}-port`) })).filter(Boolean);
@@ -380,7 +402,7 @@ function withTimeout(promise, ms) {
 }
 
 // Returns the live pool for a dir, spawning one when absent and evicting the least recently used
-// pool past POOL_SIZE. Resolves once every child has printed its port banner (or given up), so
+// pool past the pool size. Resolves once every child has printed its port banner (or given up), so
 // the caller can hand the client URLs that are actually live.
 async function ensurePool(dir) {
   let pool = pools.get(dir);
@@ -389,7 +411,7 @@ async function ensurePool(dir) {
     pools.set(dir, pool);
     return pool.ready;
   }
-  if (pools.size >= POOL_SIZE) await evictPools(dir);
+  if (pools.size >= currentPoolSize()) await evictPools(dir);
   pool = pools.get(dir);
   if (pool) return pool.ready;
   const stopped = new Set(ENABLED_APPS.filter((a) => a.deferredStart).map((a) => a.id));
@@ -423,10 +445,10 @@ async function evictPools(keepDir) {
     const counts = await Promise.all(candidates.map(terminalCount));
     pinned = new Set(candidates.filter((_, i) => counts[i]).map((p) => p.dir));
   }
-  while (pools.size >= POOL_SIZE) {
+  while (pools.size >= currentPoolSize()) {
     const victim = [...pools.keys()].find((d) => d !== keepDir && !pinned.has(d));
     if (!victim) {
-      console.log(`Pool size ${POOL_SIZE} exceeded: every other pool has live terminals`);
+      console.log(`Pool size ${currentPoolSize()} exceeded: every other pool has live terminals`);
       return;
     }
     console.log(`Evicting children for ${victim}`);
@@ -931,13 +953,20 @@ app.get('/api/config', (_req, res) => {
     keys: USER_KEYS,
     activeConfigDir: hubConfig.activeConfigDir,
     defaultConfigDir,
+    configDirSwitch: configDirSwitch(hubConfig),
     version: HUB_VERSION,
   });
 });
 
+// The dir a swap goes to: the one active before the current one, else the other of exactly two.
+function swapTarget() {
+  const { configDirs: dirs, activeConfigDir: active, previousConfigDir: previous } = hubConfig;
+  return previous ?? (dirs.length === 2 ? dirs.find((d) => d !== active) : null);
+}
+
 app.get('/api/config-dirs', (_req, res) => {
   res.setHeader('Cache-Control', 'no-store');
-  res.json({ dirs: hubConfig.configDirs, active: hubConfig.activeConfigDir });
+  res.json({ dirs: hubConfig.configDirs, active: hubConfig.activeConfigDir, previous: swapTarget() });
 });
 
 // Normalizes a typed path to its real on-disk form (true casing, native separators) so cck's
@@ -976,10 +1005,22 @@ app.delete('/api/config-dirs', (req, res) => {
     return;
   }
   hubConfig.configDirs = hubConfig.configDirs.filter((d) => d !== target);
+  if (hubConfig.previousConfigDir === target) delete hubConfig.previousConfigDir;
   saveHubConfig();
   dropPool(target);
-  res.json({ dirs: hubConfig.configDirs, active: hubConfig.activeConfigDir });
+  res.json({ dirs: hubConfig.configDirs, active: hubConfig.activeConfigDir, previous: swapTarget() });
 });
+
+async function activateConfigDir(target) {
+  if (target !== hubConfig.activeConfigDir) {
+    console.log(`Switching CLAUDE_CONFIG_DIR -> ${target}`);
+    await ensurePool(target);
+    hubConfig.previousConfigDir = hubConfig.activeConfigDir;
+    hubConfig.activeConfigDir = target;
+    saveHubConfig();
+  }
+  return { apps: appsConfig(), active: target, previous: swapTarget() };
+}
 
 // The response carries the app URLs so the client reloads every iframe against the new set.
 app.post('/api/config-dirs/activate', async (req, res) => {
@@ -988,13 +1029,79 @@ app.post('/api/config-dirs/activate', async (req, res) => {
     res.status(404).json({ error: 'Unknown config dir; add it first' });
     return;
   }
-  if (target !== hubConfig.activeConfigDir) {
-    console.log(`Switching CLAUDE_CONFIG_DIR -> ${target}`);
-    await ensurePool(target);
-    hubConfig.activeConfigDir = target;
-    saveHubConfig();
+  res.json(await activateConfigDir(target));
+});
+
+app.post('/api/config-dirs/swap', async (_req, res) => {
+  const target = swapTarget();
+  if (!target) {
+    res.status(409).json({ error: 'No previous config dir' });
+    return;
   }
-  res.json({ apps: appsConfig() });
+  res.json(await activateConfigDir(target));
+});
+
+// Apps changes need a hub restart: the app list is read once at startup.
+const CONFIG_BASE = path.dirname(HUB_CONFIG_FILE);
+const RUNNING_APPS = appsShape(appSettings(hubConfig.apps, CONFIG_BASE));
+const appNames = new Map(ENABLED_APPS.map((a) => [a.id, a.name]));
+
+// An app that is off has no loaded manifest, so its name is read on first use.
+function appName(a) {
+  if (!appNames.has(a.id)) {
+    let name = a.id;
+    try {
+      name = readApp(appRoot(a, HUB_ROOT, require.resolve), a.id).manifest.name;
+    } catch {}
+    appNames.set(a.id, name);
+  }
+  return appNames.get(a.id);
+}
+
+function settingsView(saved) {
+  const apps = appSettings(Array.isArray(saved.apps) ? saved.apps : [], CONFIG_BASE);
+  return {
+    configDirSwitch: configDirSwitch(hubConfig),
+    poolSize: currentPoolSize(),
+    poolSizeFlag: POOL_SIZE_FLAG !== null,
+    maxPoolSize: MAX_POOL_SIZE,
+    apps: apps.map((a) => ({ id: a.id, state: a.state, deferredStart: a.deferredStart, name: appName(a) })),
+    restartNeeded: appsShape(apps) !== RUNNING_APPS,
+  };
+}
+
+function readSettingsConfig(res) {
+  try {
+    return readSavedConfig();
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+    return null;
+  }
+}
+
+app.get('/api/settings', (_req, res) => {
+  const saved = readSettingsConfig(res);
+  if (!saved) return;
+  res.setHeader('Cache-Control', 'no-store');
+  res.json(settingsView(saved));
+});
+
+// Writes config.json from its copy on disk, so `ext` and hand edits made while the hub runs stay.
+app.post('/api/settings', (req, res) => {
+  if (req.body?.poolSize !== undefined && POOL_SIZE_FLAG !== null) {
+    res.status(409).json({ error: '--pool-size sets the pool size for this run' });
+    return;
+  }
+  const saved = readSettingsConfig(res);
+  if (!saved) return;
+  const r = applySettings(saved, req.body, CONFIG_BASE);
+  if (r.error) {
+    res.status(400).json({ error: r.error });
+    return;
+  }
+  writeHubConfig(r.config);
+  copyLive(r.config, hubConfig);
+  res.json(settingsView(r.config));
 });
 
 // The stalls hit a few percent of requests, so each round sends several probes per app.

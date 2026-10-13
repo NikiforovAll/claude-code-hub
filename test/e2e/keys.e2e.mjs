@@ -143,7 +143,10 @@ after(async () => {
 const frameOf = (id) => page.frame({ url: (u) => u.port === String(appPorts[IDS.indexOf(id)]) });
 
 async function hubState() {
-  return page.evaluate(() => ({ active: activeApp, palette: palette.open ? palette.mode : null }));
+  return page.evaluate(() => ({
+    active: activeApp,
+    palette: palette.open ? palette.mode : settingsModal.open ? 'settings' : null,
+  }));
 }
 
 async function press(row) {
@@ -157,6 +160,7 @@ async function press(row) {
 async function focusApp(id) {
   await page.evaluate((app) => {
     if (palette.open) closePalette();
+    if (settingsModal.open) closeSettings();
     switchTab(app);
   }, id);
   const frame = frameOf(id);
@@ -169,7 +173,7 @@ async function focusApp(id) {
   return frame;
 }
 
-const PALETTES = { 'hub.projectPicker': 'project', 'hub.configDirPicker': 'configDir', 'hub.appLauncher': 'app' };
+const PALETTES = { 'hub.projectPicker': 'project', 'hub.configDirPicker': 'configDir', 'hub.appLauncher': 'app', 'hub.settings': 'settings' };
 const MOVES = { 'hub.prevApp': 'e2e1', 'hub.nextApp': 'e2e3' };
 
 const SUITES = ROW_SETS.flatMap((set) =>

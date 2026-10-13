@@ -5,6 +5,7 @@
     { "name": "Windows US: project picker, Caps Lock on", "platform": "win", "key": "P", "code": "KeyP", "mods": ["ctrl", "alt"], "expect": "hub.projectPicker" },
     { "name": "Windows US: config-dir picker", "platform": "win", "key": "w", "code": "KeyW", "mods": ["ctrl", "alt"], "expect": "hub.configDirPicker" },
     { "name": "Windows US: app launcher", "platform": "win", "key": "a", "code": "KeyA", "mods": ["ctrl", "alt"], "expect": "hub.appLauncher" },
+    { "name": "Windows US: hub settings", "platform": "win", "key": ",", "code": "Comma", "mods": ["ctrl"], "expect": "hub.settings" },
     { "name": "Windows US: previous app", "platform": "win", "key": "ArrowLeft", "code": "ArrowLeft", "mods": ["ctrl", "alt"], "expect": "hub.prevApp" },
     { "name": "Windows US: next app", "platform": "win", "key": "ArrowRight", "code": "ArrowRight", "mods": ["ctrl", "alt"], "expect": "hub.nextApp" },
     { "name": "Windows US: app 1", "platform": "win", "key": "1", "code": "Digit1", "mods": ["alt"], "expect": "hub.appByNumber:1" },

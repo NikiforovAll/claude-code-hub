@@ -26,7 +26,13 @@ function source(name) {
 // The hub page's keymap, run with its UI calls replaced by a log of the action they stand for.
 // keys is config.json `keys` as the server hands it over, already checked.
 // hidden lists app ids with `hidden: true`; appByNumber:<n> names the visible app it switched to.
-function loadHubKeys({ apps: appCount = MATRIX.apps, platform = 'win', keys = {}, hidden = [] } = {}) {
+function loadHubKeys({
+  apps: appCount = MATRIX.apps,
+  platform = 'win',
+  keys = {},
+  hidden = [],
+  configDirSwitch = 'palette',
+} = {}) {
   const ids = Array.from({ length: appCount }, (_, i) => `app${i + 1}`);
   const ran = [];
   const ctx = {
@@ -36,7 +42,11 @@ function loadHubKeys({ apps: appCount = MATRIX.apps, platform = 'win', keys = {}
     keymap: null,
     userKeys: keys,
     apps: Object.fromEntries(ids.map((id) => [id, hidden.includes(id) ? { hidden: true } : {}])),
-    togglePalette: (mode) => ran.push({ project: 'hub.projectPicker', configDir: 'hub.configDirPicker', app: 'hub.appLauncher' }[mode]),
+    configDirSwitch,
+    togglePalette: (mode) =>
+      ran.push({ project: 'hub.projectPicker', configDir: 'hub.configDirPicker', app: 'hub.appLauncher' }[mode]),
+    toggleSettings: () => ran.push('hub.settings'),
+    swapConfigDir: () => ran.push('hub.configDirPicker:swap'),
     cycleTab: (delta) => ran.push(delta < 0 ? 'hub.prevApp' : 'hub.nextApp'),
     switchTab: (id) => ran.push(`hub.appByNumber:${ctx.k.tabIds().indexOf(id) + 1}`),
   };

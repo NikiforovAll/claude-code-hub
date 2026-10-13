@@ -9,7 +9,11 @@ Claude Code keeps its settings, sessions, and plugins in a config dir: `~/.claud
 
 Press <kbd>Ctrl+Alt+W</kbd> to open the config-dir palette. It lists the dirs you added, and the active dir has an **active** label.
 
-When the palette opens, the dir above the active one is selected. So with two dirs, <kbd>Ctrl+Alt+W</kbd> then <kbd>Enter</kbd> switches between them.
+When the palette opens, the dir you used before the active one is selected. So <kbd>Ctrl+Alt+W</kbd> then <kbd>Enter</kbd> switches back to it.
+
+## Switch with one key
+
+To make <kbd>Ctrl+Alt+W</kbd> switch to the previous dir at once, with no palette, open the [hub settings](/claude-code-hub/reference/configuration/#hub-settings) with <kbd>Ctrl+,</kbd> and set **Ctrl+Alt+W does** to **Swap to last dir**. Each press goes back to the dir you used before, so with two dirs the key toggles between them. When there is no previous dir, the key opens the palette. To add or remove a dir in this mode, click **Manage…** in the hub settings.
 
 | Key | Action |
 | --- | --- |
@@ -32,7 +36,7 @@ Select a dir and press <kbd>Ctrl+D</kbd>, or click **×** on its row. This remov
 
 Each tool reads its config dir once, when it starts. So the hub starts a separate set of the four tools for each dir.
 
-When you switch away from a dir, the hub keeps its set running, so switching back is instant. `--pool-size` sets how many sets stay alive, 3 by default. When a new set would go over that number, the hub stops the set you used least recently. It does not stop a set whose Kanban has an open terminal.
+When you switch away from a dir, the hub keeps its set running, so switching back is instant. **Instant switch-back** in the hub settings sets how many sets stay alive, 3 by default; `--pool-size` overrides it for one run. When a new set would go over that number, the hub stops the set you used least recently. It does not stop a set whose Kanban has an open terminal.
 
 The first switch to a dir takes a few seconds, while its tools start.
 
@@ -50,4 +54,4 @@ claude-code-hub --install --dir ~/.claude-work
 
 ## Where the list is saved
 
-The list and the active dir are in `~/.claude-hub/config.json`. See [CLI and configuration](/claude-code-hub/reference/configuration/#the-config-file).
+The list, the active dir and the previous dir are in `~/.claude-hub/config.json`. See [CLI and configuration](/claude-code-hub/reference/configuration/#the-config-file).

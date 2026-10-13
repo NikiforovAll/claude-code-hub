@@ -35,13 +35,14 @@ Ctrl+Alt+O opens the project palette, Ctrl+Alt+H and Ctrl+Alt+L move between too
 | `hub.projectPicker` | `ctrl+alt+p` | `ctrl+alt+p` |
 | `hub.configDirPicker` | `ctrl+alt+w` | `ctrl+alt+w` |
 | `hub.appLauncher` | `ctrl+alt+a` | `ctrl+alt+a` |
+| `hub.settings` | `ctrl+,` | `ctrl+,` |
 | `hub.prevApp` | `ctrl+alt+ArrowLeft` | `ctrl+alt+ArrowLeft` |
 | `hub.nextApp` | `ctrl+alt+ArrowRight` | `ctrl+alt+ArrowRight` |
 | `hub.appByNumber` | `alt+{n}` | `ctrl+alt+{n}` |
 
 ## Rules
 
-- **Form.** One or more of `ctrl`, `alt`, `shift`, `meta`, then one key, joined by `+`. The key is a letter, a digit 1 to 9, or a `KeyboardEvent.key` name (`ArrowUp`, `F2`, `PageDown`). On macOS `alt` is Option and `meta` is Command. Modifiers and letters take any case and order (`"Alt+Ctrl+O"` reads as `ctrl+alt+o`); a key name keeps its case (`PageDown`).
+- **Form.** One or more of `ctrl`, `alt`, `shift`, `meta`, then one key, joined by `+`. The key is a letter, a digit 1 to 9, `,`, or a `KeyboardEvent.key` name (`ArrowUp`, `F2`, `PageDown`). On macOS `alt` is Option and `meta` is Command. Modifiers and letters take any case and order (`"Alt+Ctrl+O"` reads as `ctrl+alt+o`); a key name keeps its case (`PageDown`).
 - **`{n}`.** `hub.appByNumber` ends in `+{n}`, and the hub binds it for 1 to 9. It is the only action with `{n}`.
 - **`null`** leaves the action with no key.
 - **Taking a default.** A combo that is another action's default moves to the new action, and the other action has no key until it gets one: `"hub.nextApp": "ctrl+alt+a"` leaves the app launcher with no key. Say so to the user.
