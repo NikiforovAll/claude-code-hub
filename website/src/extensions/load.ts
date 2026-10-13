@@ -1,6 +1,10 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { createRequire } from 'node:module';
+import { execFile } from 'node:child_process';
+import { promisify } from 'node:util';
+
+const execFileAsync = promisify(execFile);
 
 // Astro bundles this module, so paths come from the website folder the build runs in, not from import.meta.url.
 const SITE = process.cwd();
@@ -62,18 +66,18 @@ async function readAt(src: { owner: string; repo: string; subdir: string }, sha:
 }
 
 // The commit at the tip of the default branch. Kept per process, so a dev server asks once, not on every page view.
+// git ls-remote, because the REST API allows 60 requests an hour per IP without a token.
 const heads = new Map<string, Promise<string>>();
 function head(owner: string, repo: string): Promise<string> {
   const key = `${owner}/${repo}`;
   if (!heads.has(key)) {
-    const token = process.env.GITHUB_TOKEN;
-    const sha = fetch(`https://api.github.com/repos/${key}/commits/HEAD`, {
-      headers: { Accept: 'application/vnd.github.sha', ...(token && { Authorization: `Bearer ${token}` }) },
-    }).then(async (res) => {
-      const text = (await res.text()).trim();
-      if (!res.ok || !SHA_RE.test(text)) throw new Error(`${key}: default branch head: ${res.status} ${text.slice(0, 200)}`);
-      return text;
-    });
+    const sha = execFileAsync('git', ['ls-remote', `https://github.com/${key}.git`, 'HEAD'], { timeout: 30_000 }).then(
+      ({ stdout }) => {
+        const text = stdout.split(/\s/)[0];
+        if (!SHA_RE.test(text)) throw new Error(`${key}: default branch head: ${stdout.slice(0, 200)}`);
+        return text;
+      },
+    );
     sha.catch(() => heads.delete(key));
     heads.set(key, sha);
   }
