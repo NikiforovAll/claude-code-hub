@@ -135,7 +135,7 @@ describe('app manifests', () => {
   });
 
   it('kanban keeps its session keys', () => {
-    assert.deepEqual(loadApp(KANBAN, { log: () => {} }).keeps, ['ctrl+alt+n', 'ctrl+alt+r', 'ctrl+alt+s', 'ctrl+shift+d', 'ctrl+shift+k', 'ctrl+shift+l', 'ctrl+shift+m', 'ctrl+shift+p', 'ctrl+shift+z']);
+    assert.deepEqual(loadApp(KANBAN, { log: () => {} }).keeps, ['ctrl+alt+1', 'ctrl+alt+2', 'ctrl+alt+3', 'ctrl+alt+4', 'ctrl+alt+5', 'ctrl+alt+6', 'ctrl+alt+7', 'ctrl+alt+8', 'ctrl+alt+9', 'ctrl+alt+n', 'ctrl+alt+r', 'ctrl+alt+s', 'ctrl+shift+d', 'ctrl+shift+k', 'ctrl+shift+l', 'ctrl+shift+m', 'ctrl+shift+p', 'ctrl+shift+z']);
   });
 });
 
