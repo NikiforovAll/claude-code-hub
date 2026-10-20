@@ -33,7 +33,7 @@ Click the icon to open the hub, in the [installed app](#open-the-installed-app) 
 | --- | --- |
 | **Open Hub** | Open the hub in the installed app or the browser |
 | **Start Hub** / **Stop Hub** | Start or stop the hub and its tools |
-| **Restart Hub** | Stop the hub, then start it again |
+| **Restart Hub** | Stop the hub, then start it again. An open hub window reloads when the hub is back |
 | **Open log** | Open `hub.log`, the hub's output |
 | **Start with Windows** | Turn autostart on or off |
 | **Quit** | Stop the hub and close the tray |

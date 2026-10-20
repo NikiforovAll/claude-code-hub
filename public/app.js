@@ -296,6 +296,23 @@ async function init() {
   registerSW();
   bindErrorToast();
   showUpdateToast();
+  reloadOnHubRestart();
+}
+
+// EventSource reconnects by itself while the hub is down, but gives up for good on a non-200 answer.
+function reloadOnHubRestart() {
+  let boot = null;
+  const connect = () => {
+    const events = new EventSource('/api/events');
+    events.addEventListener('boot', (e) => {
+      if (boot && e.data !== boot) location.reload();
+      boot = e.data;
+    });
+    events.addEventListener('error', () => {
+      if (events.readyState === EventSource.CLOSED) setTimeout(connect, 2000);
+    });
+  };
+  connect();
 }
 
 // One key, overwritten by each dismissal: a dismissed version stays hidden until a newer one ships.

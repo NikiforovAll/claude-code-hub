@@ -941,6 +941,14 @@ const updateCheck = createUpdateCheck({
   enabled: !process.env.CLAUDE_HUB_NO_UPDATE_CHECK && !fs.existsSync(path.join(__dirname, '.git')),
 });
 
+// The page holds this open and reloads when a new run answers, because the tray cannot reach its window.
+const BOOT_ID = crypto.randomBytes(8).toString('hex');
+app.get('/api/events', (_req, res) => {
+  res.set({ 'Content-Type': 'text/event-stream', 'Cache-Control': 'no-store' });
+  res.flushHeaders();
+  res.write(`retry: 2000\nevent: boot\ndata: ${BOOT_ID}\n\n`);
+});
+
 app.get('/api/update', async (_req, res) => {
   res.json({ version: HUB_VERSION, update: await updateCheck.update() });
 });

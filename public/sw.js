@@ -18,6 +18,8 @@ self.addEventListener('activate', (e) => {
 });
 
 self.addEventListener('fetch', (e) => {
+  // A stream held by the worker ends when Chrome stops the idle worker.
+  if (new URL(e.request.url).pathname === '/api/events') return;
   if (e.request.url.includes('/api/')) {
     e.respondWith(fetch(e.request));
     return;
