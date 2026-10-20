@@ -17,7 +17,7 @@ The hub ships four tools. This page lists what each tool gives to other apps and
 <BuiltinLinks />
 
 - **Topics.** The hub publishes `project.changed` when you pick a project. Kanban filters its sessions to the project, Marketplace and Memory Diagnoser show that project, and Cost limits its totals to it. Kanban publishes [`session.changed`](#sessionchanged) when you open a session. No built-in tool subscribes to it, but your own apps can, as the Inspector does.
-- **Actions.** Kanban calls [`project.plugins`](#projectplugins), [`session.cost`](#sessioncost) and [`project.memory`](#projectmemory) from the session view. Any app can call them.
+- **Actions.** Kanban calls [`project.plugins`](#projectplugins), [`session.cost`](#sessioncost) and [`project.memory`](#projectmemory) from the session view, and [`agent.cost`](#agentcost) from its CLI. Any app can call them.
 - **Capabilities.** The hub reads [`projects`](#projects) and [`terminal`](#terminal) from Kanban.
 - **Kept keys.** Kanban keeps <kbd>Ctrl+Alt+N</kbd> (new session), <kbd>Ctrl+Alt+R</kbd> (resume session) and <kbd>Ctrl+Alt+S</kbd> (swap to the previous session) in `keys.keeps`. See [Kept keys](/claude-code-hub/extensibility/reference/manifest/#kept-keys).
 
@@ -56,7 +56,7 @@ The [Inspector](/claude-code-hub/extensibility/examples/inspector/) and the [Tas
 
 ## Actions
 
-Kanban calls all three actions from the session view. It shows each button only when `hub.can()` is true.
+Kanban calls `session.cost`, `project.plugins` and `project.memory` from the session view. It shows each button only when `hub.can()` is true.
 
 ### `session.cost`
 
@@ -71,6 +71,22 @@ Kanban calls all three actions from the session view. It shows each button only 
 ```js
 await hub.invoke('session.cost', { session: 'd3a7c2e1-5b4f-4c8e-9a12-6f0e8b7d4c31' });
 ```
+
+### `agent.cost`
+
+| | |
+| --- | --- |
+| Handler | Cost |
+| Params | `session`: a session id, `agent`: a subagent id (`agent-…`) |
+| URL | `?view=detail&session={session}&agent={agent}` |
+| Mode | `message` |
+| Shows | The cost of one subagent of that session |
+
+```js
+await hub.invoke('agent.cost', { session: 'd3a7c2e1-5b4f-4c8e-9a12-6f0e8b7d4c31', agent: 'agent-a10ff4203a47d12a9' });
+```
+
+Kanban calls it when `claude-code-kanban session cost <id> --agent <agent id>` names a subagent, and falls back to `session.cost` when no app handles it.
 
 ### `project.plugins`
 
