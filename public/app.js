@@ -559,6 +559,7 @@ function welcomeFor(data) {
     keys: actionKeys(),
     themes: hubThemes,
     actions: Object.keys(actions),
+    origins: Object.keys(apps).map(originOf),
   };
 }
 

@@ -97,6 +97,8 @@
       let origin = null;
       let welcome = null;
       let forward = null;
+      let appOrigins = new Set();
+      let linkOpened = null;
       let themeBinding = null;
       let lastTheme = null;
       let swatchesPainted = false;
@@ -178,6 +180,7 @@
           themes: Array.isArray(m.themes) ? m.themes : [],
         };
         forward = strings(m.forward);
+        appOrigins = strings(m.origins);
         setStatus('live');
         if (welcome.themes.length) for (const fn of themesFns) fn(pickerThemes());
         themesFns.clear();
@@ -246,8 +249,46 @@
         resolve({ ok: true, handledBy: 'standalone' });
       }
 
+      // A link with no target loads in the app's frame, and most sites refuse framing; in the installed
+      // window a _blank one opens nothing. Capture on the window runs before a modal's stopPropagation
+      // can hide the click. The hub page refuses framing, so a link to it opens outside too.
+      function onLinkClick(e) {
+        if (!welcome || e.defaultPrevented || (e.type === 'auxclick') !== (e.button === 1)) return;
+        const a = e.target?.closest?.('a[href]');
+        if (!a || a.hasAttribute?.('download')) return;
+        const target = a.getAttribute?.('target') || '';
+        if (target && !target.startsWith('_')) return;
+        let url;
+        try {
+          // An SVG <a> has an SVGAnimatedString href, so the attribute is read instead.
+          url = new URL(a.getAttribute?.('href') ?? a.href, doc.baseURI);
+        } catch (_) {
+          return;
+        }
+        if (url.protocol !== 'http:' && url.protocol !== 'https:') return;
+        const inApp = url.origin === win.location.origin || appOrigins.has(url.origin);
+        if (inApp && target !== '_blank') return;
+        e.preventDefault();
+        hub.openExternal(url.href);
+        // Apps written before this listener open the same link from their own click handler.
+        linkOpened = url.href;
+        win.setTimeout(() => {
+          linkOpened = null;
+        });
+      }
+
+      function sameUrl(url, href) {
+        try {
+          return new URL(String(url), doc.baseURI).href === href;
+        } catch (_) {
+          return false;
+        }
+      }
+
       win.addEventListener('message', onMessage);
       doc.addEventListener('keydown', onKeydown);
+      win.addEventListener('click', onLinkClick, true);
+      win.addEventListener('auxclick', onLinkClick, true);
 
       const loaded =
         doc.readyState === 'complete'
@@ -378,6 +419,7 @@
         },
         // In the hub's installed PWA window, a framed page's own _blank open does nothing.
         openExternal(url) {
+          if (linkOpened !== null && sameUrl(url, linkOpened)) return;
           if (origin) post({ type: 'hub:openExternal', url });
           else win.open(url, '_blank', 'noopener');
         },

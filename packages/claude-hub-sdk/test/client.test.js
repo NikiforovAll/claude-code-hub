@@ -5,6 +5,7 @@ const { keyParts } = require('../src/keys');
 const stub = require('../src/stub');
 
 const HUB = 'http://localhost:3540';
+const APP = 'http://localhost:3541';
 const VARS = { '--accent': '#e86f33', '--bg-deep': '#111' };
 const CACHED = { 'claude-hub:vars': JSON.stringify({ origin: HUB, vars: VARS }) };
 const NO_MODS = { key: '', code: '', ctrlKey: false, altKey: false, shiftKey: false, metaKey: false };
@@ -71,7 +72,7 @@ function fakeEnv({
   const middle = { sent: [], postMessage: (msg, origin) => middle.sent.push({ msg, origin }) };
   win.parent = framed ? (nested ? middle : parent) : win;
   win.top = framed ? parent : win;
-  if (ancestors) win.location = { ancestorOrigins: ancestors };
+  win.location = { origin: APP, ...(ancestors && { ancestorOrigins: ancestors }) };
   return {
     middle,
     win,
@@ -91,6 +92,21 @@ function fakeEnv({
         e.prevented = true;
       };
       fire('keydown', e);
+      return e;
+    },
+    click: (href, { type = 'click', button = type === 'click' ? 0 : 1, prevented = false, attrs = {} } = {}) => {
+      const all = { href, ...attrs };
+      const a = { href, getAttribute: (n) => all[n] ?? null, hasAttribute: (n) => n in all };
+      const e = {
+        type,
+        button,
+        defaultPrevented: prevented,
+        target: { closest: (sel) => (sel === 'a[href]' ? a : null) },
+      };
+      e.preventDefault = () => {
+        e.defaultPrevented = true;
+      };
+      fire(type, e);
       return e;
     },
     endWait: () => {
@@ -547,6 +563,66 @@ describe('other messages', () => {
     alone.hub.openExternal('https://example.com/');
     assert.deepEqual(alone.env.sent(), []);
     assert.deepEqual(alone.env.opened, [['https://example.com/', '_blank', 'noopener']]);
+  });
+
+  it('opens links to other sites outside the hub and keeps app and local links', async () => {
+    const { env } = await connected();
+    assert.equal(env.click('https://example.com/').defaultPrevented, false);
+    env.fromHub(welcome({ origins: [APP, 'http://localhost:3543'] }));
+    const svgHref = { baseVal: 'https://git.example.com/svg' };
+    const out = [
+      env.click('https://git.example.com/mr/1'),
+      env.click('https://git.example.com/mr/2', { type: 'auxclick' }),
+      env.click(`${HUB}/`),
+      env.click('http://localhost:3543/', { attrs: { target: '_blank' } }),
+      env.click(svgHref, { attrs: { href: svgHref.baseVal } }),
+    ];
+    const kept = [
+      env.click(`${APP}/#s=1`),
+      env.click('http://localhost:3543/?session=s1'),
+      env.click('file:///C:/x.md'),
+      env.click('https://example.com/', { prevented: true }),
+      env.click('https://example.com/', { type: 'auxclick', button: 2 }),
+      env.click('https://example.com/x.zip', { attrs: { download: '' } }),
+      env.click('https://example.com/', { attrs: { target: 'inner' } }),
+    ];
+    assert.deepEqual(
+      out.map((e) => e.defaultPrevented),
+      [true, true, true, true, true],
+    );
+    assert.deepEqual(
+      kept.map((e) => e.defaultPrevented),
+      [false, false, false, true, false, false, false],
+    );
+    assert.deepEqual(
+      env
+        .sent()
+        .filter((m) => m.type === 'hub:openExternal')
+        .map((m) => m.url),
+      [
+        'https://git.example.com/mr/1',
+        'https://git.example.com/mr/2',
+        `${HUB}/`,
+        'http://localhost:3543/',
+        'https://git.example.com/svg',
+      ],
+    );
+  });
+
+  it('opens a link once when the app also opens it from its click handler', async () => {
+    const { env, hub } = await connected();
+    env.fromHub(welcome());
+    env.click('https://example.com/');
+    hub.openExternal('https://example.com');
+    env.endWait();
+    hub.openExternal('https://example.com/');
+    assert.equal(env.sent().filter((m) => m.type === 'hub:openExternal').length, 2);
+  });
+
+  it('leaves links alone standalone', async () => {
+    const { env } = await connected({}, { config: { enabled: false } });
+    assert.equal(env.click('https://example.com/').defaultPrevented, false);
+    assert.deepEqual(env.opened, []);
   });
 
   it('resolves terminalToken with the answer, null on timeout, and null standalone', async () => {

@@ -389,13 +389,6 @@ hub.onStatus((status) => {
   settleAlone(status);
   renderTopbar();
 });
-
-document.addEventListener('click', (e) => {
-  const link = e.target.closest('a[target="_blank"]');
-  if (!link || !hub.inHub) return;
-  e.preventDefault();
-  hub.openExternal(link.href);
-});
 // #endregion HUB_INTEGRATION
 
 // #region RENDER

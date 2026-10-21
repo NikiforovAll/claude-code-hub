@@ -75,7 +75,7 @@ Under the hub, the SDK writes the hub's color variables, such as `--accent` and 
 | `ClaudeHub.comboOf(e)` | The combo string of a `keydown` event, in the form that `forwardCombos()` uses. A frame with no hub connection loads the SDK script to call it |
 | `keyLabel(action)` | The keys of a hub action for a help row, in this system's names: `['Ctrl', 'Alt', 'P']`, or `['⌃', '⌥', 'P']` on macOS. A list of actions shares one row, such as `['hub.prevApp', 'hub.nextApp']` → `['Ctrl', 'Alt', '←/→']`. `[]` when no key runs the action: hide the row. `null` before welcome, or from a hub that sends no `keys`: show the default keys. The user can change the hub's keys, so a help dialog reads them here, not from a fixed list. The actions are in [Keys](/claude-code-hub/reference/protocol/#8-keys), rule 5 |
 | `closeGuard(on)` | While `on` is true, the hub asks before the window closes. Use it while a key such as <kbd>Ctrl+W</kbd> can mean something in the app |
-| `openExternal(url)` | Opens an `http` or `https` URL in a new window. In the installed hub window, a framed page cannot open one itself |
+| `openExternal(url)` | Opens an `http` or `https` URL in a new window. In the installed hub window, a framed page cannot open one itself. Under a hub, the client already does this for a clicked link to another site ([Links](/claude-code-hub/reference/protocol/#121-links)) |
 | `terminalToken()` | Resolves a fresh terminal token, or `null` alone or after 3 s. The hub answers only the `terminal` provider |
 
 ## Alone

@@ -145,7 +145,7 @@ Each message is `{type: 'hub:<name>', …payload}`, sent with `postMessage`.
 | Direction | Type | Payload |
 |---|---|---|
 | App → hub | `hub:hello` | `{protocol: [1], subscribes?: string[]}` |
-| Hub → app | `hub:welcome` | `{protocol: 1, forward: string[], keys?: {[action]: string \| null}, themes: Theme[], actions: string[]}` |
+| Hub → app | `hub:welcome` | `{protocol: 1, forward: string[], keys?: {[action]: string \| null}, themes: Theme[], actions: string[], origins?: string[]}` |
 
 1. The app sends `hello` after its own `load` event, once `/hub-config` resolves with `enabled: true` and its message listeners are in place. It sends it once per document.
 2. `protocol` lists the versions the app speaks. The hub answers with the highest version in both lists. When there is none, the hub does not answer, and the app works as an app with no `welcome` ([No welcome](#no-welcome)).
@@ -156,6 +156,7 @@ Each message is `{type: 'hub:<name>', …payload}`, sent with `postMessage`.
    - `keys`: the combo of each hub action, for an app's help ([Keys](#8-keys), rule 5).
    - `themes`: the list for the theme picker ([Theme](#6-theme)).
    - `actions`: the actions that an enabled app handles ([Actions](#7-actions)).
+   - `origins`: the origin of each enabled app. A link to one of them stays in the hub ([Links](#121-links)). A hub older than this field does not send it.
 
 ### 5.1 Nested pages
 
@@ -385,6 +386,15 @@ The hub gives the `terminal` provider its first token in the iframe URL fragment
 :::caution[Trust]
 An app is local code that the user chose to run, with the user's rights. It can read `~/.claude-hub/token`, it gets the hub's whole environment, and it can call any action. The rules in this spec keep apps from breaking each other by mistake. They are not a sandbox.
 :::
+
+### 12.1 Links
+
+A link with no target loads in the app's frame, and most sites refuse framing. In the installed window, a `target="_blank"` link opens nothing. After `welcome`, the SDK opens links with `openExternal`:
+
+1. It listens for `click` and middle-button `auxclick` on `window` in the capture phase, so a handler that stops propagation does not hide the click. It runs before the page's own click handlers, so a page cannot cancel it with `preventDefault` from such a handler.
+2. An `http` or `https` link goes to `hub:openExternal`, unless its origin is the page's own origin or one in `welcome.origins` and it has no `target="_blank"`. Those load in the frame. A link to the hub's origin goes outside, because the hub page refuses framing.
+3. A link with another scheme, a `download` attribute or a named `target` (not starting with `_`) is left to the page, as is a click that an earlier capture listener prevented.
+4. Before `welcome`, and standalone, the SDK does not touch links.
 
 ## Planned
 

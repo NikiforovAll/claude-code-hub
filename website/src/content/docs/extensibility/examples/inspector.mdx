@@ -45,7 +45,7 @@ The Inspector follows the hub theme in light and dark mode:
 | Kanban | Kanban publishes `session.changed` when you open a session. The Inspector subscribes to it and opens the same session |
 | Any tool | The manifest declares the action `session.inspect`. A tool calls `hub.invoke('session.inspect', { session })` to open a session in the Inspector |
 | Cost | The **Cost** button calls `hub.invoke('session.cost', { session })`. It shows only when `hub.can('session.cost')` is true |
-| The hub | `bindTheme` and `onThemes` for the theme, `onActive` to reload when the tab comes on screen, `openExternal` for links |
+| The hub | `bindTheme` and `onThemes` for the theme, `onActive` to reload when the tab comes on screen. The SDK opens links to other sites outside the hub |
 
 See step 4 of [Write a new app](/claude-code-hub/extensibility/new-app/#4-connect-the-page) for the code.
 

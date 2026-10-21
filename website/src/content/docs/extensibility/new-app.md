@@ -191,13 +191,6 @@ hub.onStatus((status) => {
   renderTopbar();
 });
 settleAlone(hub.status);
-
-document.addEventListener('click', (e) => {
-  const link = e.target.closest('a[target="_blank"]');
-  if (!link || !hub.inHub) return;
-  e.preventDefault();
-  hub.openExternal(link.href);
-});
 // #endregion HUB_INTEGRATION
 ```
 
@@ -211,7 +204,7 @@ What each part does:
 | `handle('session.inspect')` | Opens the session that another tool asks for |
 | `onActive` | Tells the page when its tab is on screen. The Inspector reloads the session when you come back to it |
 | `onStatus`, `settleAlone` | When there is no hub, or the hub does not answer in 2 s, the page picks a session itself |
-| `openExternal` | A framed page cannot open a new window in the installed hub. The SDK asks the hub to do it |
+| Links | A framed page cannot open a new window in the installed hub. Under a hub, the SDK opens a clicked link to another site through `openExternal`, so the page needs no code for it |
 
 Subscribe before the page's `load` event. The SDK sends the topic list to the hub at `load`, and the hub sends nothing for a topic that is not in it.
 

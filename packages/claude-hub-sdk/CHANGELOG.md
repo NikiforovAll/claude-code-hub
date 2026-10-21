@@ -2,6 +2,11 @@
 
 The SDK follows semver. A new function or message is a minor version, a change that breaks an app is a major version. The protocol version is separate ([Versioning](https://nikiforovall.blog/claude-code-hub/reference/protocol/#versioning)).
 
+## 1.6.0
+
+- After `welcome`, the client opens every `http` or `https` link to another site through `openExternal`, from a click or a middle click. Before, a link with no target loaded in the app's frame, where most sites refuse framing. The client listens on `window` in the capture phase, so a modal that stops the click's propagation does not hide it. Links to the app's own origin or an origin in `welcome.origins` stay in the frame unless they have `target="_blank"`. A link to the hub goes outside, because the hub page refuses framing. Other schemes, `download` links and links with a named `target` are left to the page. Standalone, the browser handles links as before.
+- `openExternal(url)` called for the link the client just opened from the same click does nothing, so an app's own `target="_blank"` handler does not open it twice. Such a handler is no longer needed. The next major version drops this check.
+
 ## 1.5.0
 
 - A page framed inside another app's page, such as a Swarm page in a Kanban pane, talks to the hub through `window.top`, so it gets `welcome`, the themes and `theme.changed` like a tab. Before, it sent `hello` to the page around it, waited 2 s for nothing and then dropped the hub's theme. A tab sees no change: its `window.top` is its parent.
