@@ -2,6 +2,11 @@
 
 The SDK follows semver. A new function or message is a minor version, a change that breaks an app is a major version. The protocol version is separate ([Versioning](https://nikiforovall.blog/claude-code-hub/reference/protocol/#versioning)).
 
+## 1.8.0
+
+- `hub.invoke(action, params, {open: 'pane'})` asks for the action's URL instead of running it. The hub sends `open: 'pane'` in `hub:invoke`, fills the action's `url` template on the handler's origin and answers `{ok: true, handledBy, url}` without a tab switch, so the caller can show the app in a pane of its own. When the action has no `url` or a template param is missing, the hub runs the action as before and the result has no `url`. Standalone and in the stub, the result carries the standalone URL and no window opens.
+- A nested page hands back the keys the app page around it claims ([protocol §5.2](https://nikiforovall.blog/claude-code-hub/reference/protocol/#52-host-keys)). The host posts `hub:hostKeys` with its claims; the client answers `hub:hostReady` once and posts each matching press as `hub:hostKey`, except a press in a text field or one the page already handled. Hub combos still go to the hub first. `ClaudeHubKeys.keySigs(e)` gives the signatures a claim is matched by.
+
 ## 1.7.0
 
 - `hub.settings` and `hub.onSettings(fn)` give the values of the settings in the manifest's `settings`, from `welcome.settings` and each `hub:settings` message. In the stub, `settings` is `null` and `onSettings` never calls back.

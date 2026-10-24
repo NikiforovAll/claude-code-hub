@@ -32,7 +32,21 @@ var ClaudeHubKeys = (() => {
     return combo.split('+').map((k) => mods[k] ?? named[k] ?? (k.length === 1 ? k.toUpperCase() : k));
   }
 
-  return { comboOf, keyParts };
+  // A host claim (protocol §5.2) names a press by its physical code, or by its character when the layout
+  // moves the key: {ctrlKey?, altKey?, shiftKey?, metaKey?, code, key: 'Unidentified'} or {…, key, code: ''}.
+  // A press matches a claim when one of its two signatures is the claim's first. AltGr types a
+  // character, so its press matches by character only. cck's frames use the same format.
+  function keySigs(e) {
+    const mods = [e.ctrlKey && 'ctrl', e.altKey && 'alt', e.shiftKey && 'shift', e.metaKey && 'meta']
+      .filter(Boolean)
+      .join('+');
+    return [
+      e.code && !e.getModifierState?.('AltGraph') && `${mods}|c:${e.code}`,
+      typeof e.key === 'string' && e.key !== 'Unidentified' && `${mods}|k:${e.key.toLowerCase()}`,
+    ].filter(Boolean);
+  }
+
+  return { comboOf, keyParts, keySigs };
 })();
 
 if (typeof module === 'object' && module.exports) module.exports = ClaudeHubKeys;

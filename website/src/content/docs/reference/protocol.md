@@ -179,6 +179,18 @@ An app page can be framed inside another app's page, for example a Swarm page in
 
 A page with no `hub:active` must count itself active, as the SDK's `onActive` does by never calling back.
 
+### 5.2 Host keys
+
+While a nested page has focus, its key presses never reach the app page around it, the host. The host can claim the presses it acts on, such as Kanban's Alt+W that closes the pane. These messages go between the nested page and its host, not through the hub, and each side checks the other's window and origin.
+
+| Direction | Message | Payload |
+|---|---|---|
+| Host → page | `hub:hostKeys` | `{keys}`, the claims. The host sends it when the frame loads and again when its claims change. Each message replaces the last |
+| Page → host | `hub:hostReady` | `{}`, once per document, on the first `hub:hostKeys`. The host can then hide a hint that its keys are off |
+| Page → host | `hub:hostKey` | `{key, code, ctrl, alt, shift, meta}`, a claimed press. The host replays it as its own press |
+
+A claim names a press by its physical key, `{ctrlKey?, altKey?, shiftKey?, metaKey?, key: 'Unidentified', code}`, or by its character, `{…, key, code: ''}`. A press matches when its code or its lowercased key, with the same modifiers, equals the claim's. A press under AltGraph matches by character only. The page sends a press to the hub first when its combo is in `welcome.forward`. It keeps a press in a text field and a press it already handled (`defaultPrevented`), and calls `preventDefault()` on a press it sends. Kanban claims only presses with Ctrl, Alt or Meta, so the page keeps its own letter keys and Escape.
+
 ## 6. Theme
 
 The hub is the theme source. Under the hub, an app takes its colors from the hub. Its own theme CSS is for standalone use only.
@@ -250,19 +262,20 @@ An app declares what it handles in its manifest ([Manifest](#9-manifest)), becau
 
 | Direction | Type | Payload |
 |---|---|---|
-| App → hub | `hub:invoke` | `{id, action, params}`. `id` is a string that the caller picks, to match the result |
-| Hub → app | `hub:result` | `{id, ok: true, handledBy: <app id>}` or `{id, ok: false, reason: 'unhandled' \| 'bad-params'}` |
+| App → hub | `hub:invoke` | `{id, action, params, open?}`. `id` is a string that the caller picks, to match the result. `open: 'pane'` asks for the URL instead (see Routing) |
+| Hub → app | `hub:result` | `{id, ok: true, handledBy: <app id>, url?}` or `{id, ok: false, reason: 'unhandled' \| 'bad-params'}` |
 | Hub → app | `hub:action` | `{id, action, params}`, to the handler in `message` mode |
 
 ### Routing
 
 1. **Handler.** The first enabled app in tab order that declares the action. When there is none, the hub answers `unhandled`.
 2. **Params.** The hub answers `bad-params` when a required param is missing, a param is not declared, or a value is not a string.
-3. **Switch.** The hub switches to the handler's tab.
-4. **`message` mode.** When the handler is live, the hub posts `hub:action` and answers `hub:result` at once. It does not wait for the handler to finish, and it does not queue a call for an app that is not live.
-5. **`url` mode**, and `message` mode when the handler is not live. When every param in the template is present, the hub fills it in with `encodeURIComponent` on each value and sets the iframe `src`. It builds the URL the same way as the first `src`, so the handler keeps what the hub adds, such as the `#t=` fragment. It refuses a result that is not on the handler's origin. When a param is missing, or the handler has `hub:closeGuard` on, the hub only switches: setting `src` reloads the app.
-6. **Handler duty.** An app must handle every action that it declares with `mode: "message"`. It logs an action it does not know.
-7. **Availability.** The caller shows a link or runs a key for an action only when the action is in `welcome.actions`. With no `welcome`, see [No welcome](#no-welcome).
+3. **Pane.** With `open: 'pane'`, when the action has a `url` and every param in its template is present, the hub fills it in as in step 6, on the handler's origin and with no `#t=` fragment. It answers `{ok: true, handledBy, url}` with the absolute URL and does nothing else: no switch, no `hub:action`. The caller shows that URL in a frame of its own, where the page talks to the hub as a nested page ([§5.1](#51-nested-pages)). Otherwise the hub goes on with step 4 and the result has no `url`.
+4. **Switch.** The hub switches to the handler's tab.
+5. **`message` mode.** When the handler is live, the hub posts `hub:action` and answers `hub:result` at once. It does not wait for the handler to finish, and it does not queue a call for an app that is not live.
+6. **`url` mode**, and `message` mode when the handler is not live. When every param in the template is present, the hub fills it in with `encodeURIComponent` on each value and sets the iframe `src`. It builds the URL the same way as the first `src`, so the handler keeps what the hub adds, such as the `#t=` fragment. It refuses a result that is not on the handler's origin. When a param is missing, or the handler has `hub:closeGuard` on, the hub only switches: setting `src` reloads the app.
+7. **Handler duty.** An app must handle every action that it declares with `mode: "message"`. It logs an action it does not know.
+8. **Availability.** The caller shows a link or runs a key for an action only when the action is in `welcome.actions`. With no `welcome`, see [No welcome](#no-welcome).
 
 ## 8. Keys
 

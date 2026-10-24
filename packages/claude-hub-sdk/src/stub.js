@@ -29,9 +29,10 @@
         bindTheme: () => off,
         handle() {},
         publish() {},
-        invoke(action, params = {}) {
+        invoke(action, params = {}, opts = {}) {
           const target = standaloneFn(action)?.(params);
           if (!target) return Promise.resolve({ ok: false, reason: 'unhandled' });
+          if (opts.open === 'pane') return Promise.resolve({ ok: true, handledBy: 'standalone', url: target });
           win.open(target, '_blank', 'noopener');
           return Promise.resolve({ ok: true, handledBy: 'standalone' });
         },

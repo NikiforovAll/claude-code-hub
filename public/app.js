@@ -590,10 +590,13 @@ function onHello(appId, data) {
 }
 
 // A url such as '@evil.example/' turns the app host into userinfo, and the token rides in the fragment.
+function srcOnOrigin(appId, src) {
+  return URL.parse(src)?.origin === originOf(appId) ? src : null;
+}
+
 function navigateApp(appId, url) {
-  const src = appSrc(appId, url);
-  if (!URL.canParse(src) || new URL(src).origin !== originOf(appId)) return;
-  loadApp(appId, src, { link: true });
+  const src = srcOnOrigin(appId, appSrc(appId, url));
+  if (src) loadApp(appId, src, { link: true });
 }
 
 function isPlainObject(v) {
@@ -615,20 +618,22 @@ function fillUrl(template, params) {
 }
 
 // Protocol §7. The result does not wait for the handler: the hub queues nothing.
-function onInvoke({ id, action, params = {} }, send) {
+function onInvoke({ id, action, params = {}, open }, send) {
   if (typeof id !== 'string') return;
   const reply = (result) => send({ type: 'hub:result', id, ...result });
   const spec = typeof action === 'string' && Object.hasOwn(actions, action) ? actions[action] : null;
   if (!spec) return reply({ ok: false, reason: 'unhandled' });
   if (badParams(spec.params, params)) return reply({ ok: false, reason: 'bad-params' });
   const { app: handler, mode, url: template } = spec;
+  const url = template && fillUrl(template, params);
+  const paneSrc = open === 'pane' && url && srcOnOrigin(handler, apps[handler].url + url);
+  if (paneSrc) return reply({ ok: true, handledBy: handler, url: paneSrc });
   switchTab(handler);
   if (mode === 'message' && liveApps.has(handler)) {
     postTo(handler, { type: 'hub:action', id, action, params });
-  } else {
+  } else if (url && !guardedApps.has(handler)) {
     // Setting src reloads the app, so a guarded app only gets the switch.
-    const url = template && fillUrl(template, params);
-    if (url && !guardedApps.has(handler)) navigateApp(handler, url);
+    navigateApp(handler, url);
   }
   reply({ ok: true, handledBy: handler });
 }

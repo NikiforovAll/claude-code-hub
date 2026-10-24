@@ -8,9 +8,12 @@
   // hub's proxy port, so a page framed by something other than the hub would otherwise paint the hub's last theme.
   const VARS_KEY = 'claude-hub:vars';
   const WELCOME_WAIT_MS = 2000;
+  // A press in one of these types text, so the host never gets it.
+  const FIELDS =
+    'input:not([type=checkbox], [type=radio], [type=button], [type=submit], [type=reset], [type=range], [type=color], [type=file], [type=image]), textarea, select, [contenteditable]';
 
   // keys.js comes first in the served file. Required as a module, client.js loads it itself.
-  const { comboOf, keyParts } = typeof ClaudeHubKeys === 'object' ? ClaudeHubKeys : require('./keys');
+  const { comboOf, keyParts, keySigs } = typeof ClaudeHubKeys === 'object' ? ClaudeHubKeys : require('./keys');
 
   function isVars(v) {
     return (
@@ -234,28 +237,50 @@
         return !!forward && forward.has(comboOf(e));
       }
 
-      function onKeydown(e) {
-        if (!forwards(e)) return;
-        e.preventDefault();
-        post({
-          type: 'hub:keydown',
-          key: e.key,
-          code: e.code,
-          ctrl: e.ctrlKey,
-          alt: e.altKey,
-          shift: e.shiftKey,
-          meta: e.metaKey,
-        });
+      // Protocol §5.2. The app page that frames this one, such as a cck pane, claims the presses it acts on.
+      let hostKeys = null;
+      let hostOrigin = null;
+
+      function onHostMessage(e) {
+        const m = e.data;
+        if (!framed || e.source !== win.parent || win.parent === win.top) return;
+        if (m?.type !== 'hub:hostKeys' || !Array.isArray(m.keys)) return;
+        if (!hostKeys) win.parent.postMessage({ type: 'hub:hostReady' }, e.origin);
+        hostOrigin = e.origin;
+        hostKeys = new Set(m.keys.map((k) => keySigs(k)[0]));
       }
 
-      function run(action, params, resolve) {
+      const keyMessage = (type, e) => ({
+        type,
+        key: e.key,
+        code: e.code,
+        ctrl: e.ctrlKey,
+        alt: e.altKey,
+        shift: e.shiftKey,
+        meta: e.metaKey,
+      });
+
+      function onKeydown(e) {
+        if (forwards(e)) {
+          e.preventDefault();
+          return post(keyMessage('hub:keydown', e));
+        }
+        if (!hostKeys || e.defaultPrevented || !keySigs(e).some((s) => hostKeys.has(s))) return;
+        if (e.target?.closest?.(FIELDS)) return;
+        e.preventDefault();
+        win.parent.postMessage(keyMessage('hub:hostKey', e), hostOrigin);
+      }
+
+      function run(action, params, opts, resolve) {
+        const pane = opts?.open === 'pane';
         if (status === 'live') {
           const id = String(++nextId);
           pending.set(id, resolve);
-          return post({ type: 'hub:invoke', id, action, params });
+          return post({ type: 'hub:invoke', id, action, params, ...(pane && { open: 'pane' }) });
         }
         const target = standaloneFn(action)?.(params);
         if (!target) return resolve({ ok: false, reason: 'unhandled' });
+        if (pane) return resolve({ ok: true, handledBy: 'standalone', url: target });
         win.open(target, '_blank', 'noopener');
         resolve({ ok: true, handledBy: 'standalone' });
       }
@@ -297,6 +322,7 @@
       }
 
       win.addEventListener('message', onMessage);
+      win.addEventListener('message', onHostMessage);
       doc.addEventListener('keydown', onKeydown);
       win.addEventListener('click', onLinkClick, true);
       win.addEventListener('auxclick', onLinkClick, true);
@@ -408,10 +434,10 @@
           if (status === 'live') post({ type: 'hub:publish', topic, payload });
           else if (waiting()) outbox.set(topic, payload);
         },
-        invoke(action, params = {}) {
+        invoke(action, params = {}, opts = {}) {
           return new Promise((resolve) => {
-            if (waiting()) queued.push(() => run(action, params, resolve));
-            else run(action, params, resolve);
+            if (waiting()) queued.push(() => run(action, params, opts, resolve));
+            else run(action, params, opts, resolve);
           });
         },
         can(action) {

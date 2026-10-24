@@ -385,6 +385,28 @@ describe('actions', () => {
     assert.deepEqual(await result, { id: call.id, ok: true, handledBy: 'cost' });
   });
 
+  it('asks the hub for the URL with open: pane', async () => {
+    const { env, hub } = await connected();
+    env.fromHub(welcome({ actions: ['session.cost'] }));
+    const result = hub.invoke('session.cost', { session: 's1' }, { open: 'pane' });
+    const call = env.sent()[1];
+    assert.deepEqual(call, {
+      type: 'hub:invoke',
+      id: call.id,
+      action: 'session.cost',
+      params: { session: 's1' },
+      open: 'pane',
+    });
+    env.fromHub({
+      type: 'hub:result',
+      id: call.id,
+      ok: true,
+      handledBy: 'cost',
+      url: 'http://localhost:3543/?session=s1',
+    });
+    assert.equal((await result).url, 'http://localhost:3543/?session=s1');
+  });
+
   it('waits for welcome before it sends an invoke', async () => {
     const { env, hub } = await connected();
     hub.invoke('session.cost');
@@ -691,6 +713,17 @@ describe('standalone', () => {
     });
   }
 
+  it('gives the standalone URL for open: pane and opens no window', async () => {
+    const standalone = { 'session.cost': () => 'http://localhost:3543/' };
+    const { env, hub } = await connected({ standalone }, { config: { enabled: false } });
+    assert.deepEqual(await hub.invoke('session.cost', {}, { open: 'pane' }), {
+      ok: true,
+      handledBy: 'standalone',
+      url: 'http://localhost:3543/',
+    });
+    assert.deepEqual(env.opened, []);
+  });
+
   it('reads a standalone function at call time', async () => {
     const urls = {};
     const standalone = () => (urls.cost ? { 'session.cost': () => urls.cost } : {});
@@ -741,6 +774,48 @@ describe('nested page', () => {
     assert.equal(env.storage['claude-hub:vars'], CACHED['claude-hub:vars']);
   });
 
+  it('hands the host the presses it claims, after the hub combos', async () => {
+    const { env } = await connected({}, { nested: true, ancestors: [CCK, HUB] });
+    env.fromHub(welcome({ forward: ['ctrl+alt+p'] }));
+    const altW = { altKey: true, key: 'w', code: 'KeyW' };
+    assert.equal(env.key(altW).prevented, false);
+    const keys = [
+      { altKey: true, key: 'Unidentified', code: 'KeyW' },
+      { ctrlKey: true, key: '=', code: '' },
+      { ctrlKey: true, altKey: true, key: 'Unidentified', code: 'KeyP' },
+    ];
+    env.fromHub({ type: 'hub:hostKeys', keys }, { source: {}, origin: CCK });
+    env.fromHub({ type: 'hub:hostKeys', keys }, { source: env.middle, origin: CCK });
+    env.fromHub({ type: 'hub:hostKeys', keys }, { source: env.middle, origin: CCK });
+    assert.deepEqual(env.middle.sent, [{ msg: { type: 'hub:hostReady' }, origin: CCK }]);
+    env.middle.sent.length = 0;
+    assert.equal(env.key({ ...altW, key: '∑' }).prevented, true);
+    assert.equal(env.key({ ctrlKey: true, key: '=', code: 'Equal' }).prevented, true);
+    assert.equal(env.key({ ...altW, target: { closest: () => ({}) } }).prevented, false);
+    assert.equal(env.key({ ...altW, defaultPrevented: true }).prevented, false);
+    assert.equal(env.key({ key: 'w', code: 'KeyW' }).prevented, false);
+    env.key({ ctrlKey: true, altKey: true, key: 'p', code: 'KeyP' });
+    assert.deepEqual(
+      env.middle.sent.map((s) => [s.msg.type, s.msg.code, s.origin]),
+      [
+        ['hub:hostKey', 'KeyW', CCK],
+        ['hub:hostKey', 'Equal', CCK],
+      ],
+    );
+    assert.equal(env.sent().filter((m) => m.type === 'hub:keydown').length, 1);
+  });
+
+  it('ignores host keys in a tab', async () => {
+    const { env } = await connected();
+    env.fromHub(welcome());
+    env.fromHub({ type: 'hub:hostKeys', keys: [{ altKey: true, key: 'Unidentified', code: 'KeyW' }] });
+    assert.equal(env.key({ altKey: true, key: 'w', code: 'KeyW' }).prevented, false);
+    assert.deepEqual(
+      env.sent().filter((m) => m.type.startsWith('hub:host')),
+      [],
+    );
+  });
+
   it('paints no cached set that another hub origin sent', () => {
     const env = fakeEnv({
       ancestors: [HUB],
@@ -780,6 +855,7 @@ describe('stub', () => {
           forwardCombos: hub.forwardCombos(),
           token: await hub.terminalToken(),
           cost: await hub.invoke('session.cost', { id: 's1' }),
+          costPane: await hub.invoke('session.cost', { id: 's2' }, { open: 'pane' }),
           plugins: await hub.invoke('project.plugins', {}),
         },
         {
@@ -791,6 +867,7 @@ describe('stub', () => {
           forwardCombos: [],
           token: null,
           cost: { ok: true, handledBy: 'standalone' },
+          costPane: { ok: true, handledBy: 'standalone', url: 'http://localhost:3543/?session=s2' },
           plugins: { ok: false, reason: 'unhandled' },
         },
       );

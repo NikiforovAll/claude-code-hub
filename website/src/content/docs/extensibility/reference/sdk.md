@@ -52,7 +52,7 @@ See [Topics](/claude-code-hub/extensibility/reference/connect/#topics) for the h
 
 | Member | Meaning |
 | --- | --- |
-| `invoke(action, params?)` | Runs an action in the app that handles it. Resolves `{ok: true, handledBy}` or `{ok: false, reason}`, where `reason` is `unhandled` or `bad-params`. A call before welcome waits for it, up to 2 s |
+| `invoke(action, params?, opts?)` | Runs an action in the app that handles it. Resolves `{ok: true, handledBy}` or `{ok: false, reason}`, where `reason` is `unhandled` or `bad-params`. A call before welcome waits for it, up to 2 s. With `opts.open: 'pane'`, it runs nothing and resolves `{ok: true, handledBy, url}` with the action's URL, for the app to show in a frame of its own; an action with no URL runs as usual and the result has no `url`. Standalone, `url` is the standalone URL |
 | `can(action)` | True when an enabled app handles the action, or, alone, when `standalone` has it. Show a link or button for an action only when this is true |
 | `handle(action, fn)` | Calls `fn(params, {id})` when the hub sends the action to this page. Needed for each action that the manifest declares with `mode: "message"` |
 
@@ -82,6 +82,7 @@ The hub shows these settings in its settings modal and stores them. The app need
 | `forwards(e)` | True when the hub binds the key of this `keydown` event. The SDK forwards those keys from the document by itself. Ask this only in an element that takes keys before the document sees them, such as a terminal, and let those keys through |
 | `forwardCombos()` | The combos that `forwards(e)` matches, as strings such as `ctrl+alt+p`. Empty before welcome. Send it to a frame on another origin that takes keys, such as a terminal in its own process, so the frame can hand those keys back |
 | `ClaudeHub.comboOf(e)` | The combo string of a `keydown` event, in the form that `forwardCombos()` uses. A frame with no hub connection loads the SDK script to call it |
+| `ClaudeHubKeys.keySigs(e)` | The signatures that a host claim matches a `keydown` event by. In a page framed inside another app's page, the SDK hands back the presses that page claims by itself ([Host keys](/claude-code-hub/reference/protocol/#52-host-keys)) |
 | `keyLabel(action)` | The keys of a hub action for a help row, in this system's names: `['Ctrl', 'Alt', 'P']`, or `['⌃', '⌥', 'P']` on macOS. A list of actions shares one row, such as `['hub.prevApp', 'hub.nextApp']` → `['Ctrl', 'Alt', '←/→']`. `[]` when no key runs the action: hide the row. `null` before welcome, or from a hub that sends no `keys`: show the default keys. The user can change the hub's keys, so a help dialog reads them here, not from a fixed list. The actions are in [Keys](/claude-code-hub/reference/protocol/#8-keys), rule 5 |
 | `closeGuard(on)` | While `on` is true, the hub asks before the window closes. Use it while a key such as <kbd>Ctrl+W</kbd> can mean something in the app |
 | `openExternal(url)` | Opens an `http` or `https` URL in a new window. In the installed hub window, a framed page cannot open one itself. Under a hub, the client already does this for a clicked link to another site ([Links](/claude-code-hub/reference/protocol/#121-links)) |
