@@ -20,6 +20,8 @@
         status: 'standalone',
         themes: [],
         inHub: false,
+        settings: null,
+        onSettings: () => off,
         onStatus: () => off,
         onActive: () => off,
         onThemes: () => off,

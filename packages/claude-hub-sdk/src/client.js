@@ -90,6 +90,7 @@
       const pending = new Map();
       const tokenWaiters = new Set();
       const themesFns = new Set();
+      const settingsFns = new Set();
       const queued = [];
       // Topic → payload: the latest publish before welcome.
       const outbox = new Map();
@@ -101,6 +102,7 @@
       let linkOpened = null;
       let themeBinding = null;
       let lastTheme = null;
+      let settings = null;
       let swatchesPainted = false;
       let nextId = 0;
 
@@ -172,6 +174,11 @@
         return welcome.themes.map(({ id, label }) => ({ id, label }));
       }
 
+      function setSettings(s) {
+        settings = Object.freeze(s && typeof s === 'object' && !Array.isArray(s) ? { ...s } : {});
+        for (const fn of settingsFns) fn(settings);
+      }
+
       function onWelcome(m) {
         if (m.protocol !== 1 || welcome) return;
         welcome = {
@@ -181,6 +188,7 @@
         };
         forward = strings(m.forward);
         appOrigins = strings(m.origins);
+        setSettings(m.settings);
         setStatus('live');
         if (welcome.themes.length) for (const fn of themesFns) fn(pickerThemes());
         themesFns.clear();
@@ -215,6 +223,9 @@
           }
           case 'hub:terminalToken':
             for (const done of [...tokenWaiters]) done(typeof m.token === 'string' ? m.token : null);
+            return;
+          case 'hub:settings':
+            if (welcome) setSettings(m.settings);
             return;
         }
       }
@@ -356,6 +367,18 @@
           }
           if (welcome.themes.length) fn(pickerThemes());
           return () => {};
+        },
+        // The values of the settings in the app's manifest `settings`, as {key: value}. Null before
+        // welcome, standalone, or with no welcome: the app then uses its own defaults.
+        get settings() {
+          return settings;
+        },
+        // Calls fn with the values at welcome and after each change in the hub's settings. A call after
+        // welcome gets the current values at once.
+        onSettings(fn) {
+          settingsFns.add(fn);
+          if (settings) fn(settings);
+          return () => settingsFns.delete(fn);
         },
         subscribe(topic, fn) {
           const fns = topicFns(topic);

@@ -145,7 +145,7 @@ Each message is `{type: 'hub:<name>', …payload}`, sent with `postMessage`.
 | Direction | Type | Payload |
 |---|---|---|
 | App → hub | `hub:hello` | `{protocol: [1], subscribes?: string[]}` |
-| Hub → app | `hub:welcome` | `{protocol: 1, forward: string[], keys?: {[action]: string \| null}, themes: Theme[], actions: string[], origins?: string[]}` |
+| Hub → app | `hub:welcome` | `{protocol: 1, forward: string[], keys?: {[action]: string \| null}, themes: Theme[], actions: string[], origins?: string[], settings?: {[key]: boolean \| string}}` |
 
 1. The app sends `hello` after its own `load` event, once `/hub-config` resolves with `enabled: true` and its message listeners are in place. It sends it once per document.
 2. `protocol` lists the versions the app speaks. The hub answers with the highest version in both lists. When there is none, the hub does not answer, and the app works as an app with no `welcome` ([No welcome](#no-welcome)).
@@ -157,6 +157,7 @@ Each message is `{type: 'hub:<name>', …payload}`, sent with `postMessage`.
    - `themes`: the list for the theme picker ([Theme](#6-theme)).
    - `actions`: the actions that an enabled app handles ([Actions](#7-actions)).
    - `origins`: the origin of each enabled app. A link to one of them stays in the hub ([Links](#121-links)). A hub older than this field does not send it.
+   - `settings`: the values of the app's own settings ([Settings](#122-settings)). `{}` for an app with none. A hub older than this field does not send it.
 
 ### 5.1 Nested pages
 
@@ -170,6 +171,7 @@ An app page can be framed inside another app's page, for example a Swarm page in
 | `hub:invoke`, `hub:result` | Yes. The result goes to the nested page |
 | `hub:keydown` | Yes, for the combos in `welcome.forward`, as from a tab |
 | `hub:openExternal` | Yes |
+| `hub:settings` | Yes, the settings of the app the page belongs to |
 | Other topics, `hub:publish` | No. Topics such as `project.changed` and `session.changed` belong to the tab |
 | `hub:active` | No. It names the tab on screen; a nested page is on screen when its parent shows it |
 | `hub:action` | No. The hub routes an action to the handler's tab |
@@ -310,12 +312,13 @@ An element that handles keys before the document sees them, such as a terminal, 
 | `publishes` | The topics the app publishes ([Events](#10-events)). Optional |
 | `provides` | Capabilities, for example `{"projects": {"path": "/api/projects"}, "terminal": {"liveWork": "/api/terminals"}}`. The hub finds a capability's provider here |
 | `keys.keeps` | The combos the app keeps for its own commands, by combo name ([Keys](#8-keys)), for example `["ctrl+alt+n"]`. The hub does not bind them. Optional |
+| `settings` | The user settings the app reads from the hub ([Settings](#122-settings)). Optional |
 
 ### Rules
 
 1. **Discovery, not runtime.** The manifest holds what the hub needs before the app runs. The protocol version comes from `hello` only, because the running document may be an older bundle.
 2. **Where the hub reads it.** For an `apps` entry with a `path`, the hub reads the manifest from that folder. For a built-in app, it reads it from the submodule, else from the installed package, and keeps no copy. The hub's tests validate the manifest of each pinned package. See [The apps entry and the launch](/claude-code-hub/extensibility/reference/apps-entry/).
-3. **Skip.** The hub skips an app, with a log line, when its file is missing or not valid JSON, `manifest` is a version it does not know, `id` does not match the id rule ([Terms](#terms)) or is not the app's id, `run.entry` is not inside the app directory, a `provides` path does not start with `/`, a `publishes` topic breaks the topic rule or is the hub's ([Events](#10-events)), or a `keys.keeps` entry is not a combo name with one modifier at least. It skips one action, with a log line, when the action is not valid ([Actions](#7-actions)).
+3. **Skip.** The hub skips an app, with a log line, when its file is missing or not valid JSON, `manifest` is a version it does not know, `id` does not match the id rule ([Terms](#terms)) or is not the app's id, `run.entry` is not inside the app directory, a `provides` path does not start with `/`, a `publishes` topic breaks the topic rule or is the hub's ([Events](#10-events)), a `keys.keeps` entry is not a combo name with one modifier at least, or a `settings` entry is not valid ([Settings](#122-settings)). It skips one action, with a log line, when the action is not valid ([Actions](#7-actions)).
 4. **Providers.** For each capability, the first enabled app in tab order whose `provides` declares it is the provider. `projects.path` and `terminal.liveWork` must be paths on the provider's origin. `projects.path` answers `[{path, modifiedAt, worktrees?}]`, where `worktrees` lists the linked worktree paths folded into that repo row. `terminal.liveWork` answers `{sessions: []}`, and a pool whose provider has sessions is not evicted. With no provider, the capability is off: no terminal, and the project palette has no list.
 
 ## 10. Events
@@ -395,6 +398,19 @@ A link with no target loads in the app's frame, and most sites refuse framing. I
 2. An `http` or `https` link goes to `hub:openExternal`, unless its origin is the page's own origin or one in `welcome.origins` and it has no `target="_blank"`. Those load in the frame. A link to the hub's origin goes outside, because the hub page refuses framing.
 3. A link with another scheme, a `download` attribute or a named `target` (not starting with `_`) is left to the page, as is a click that an earlier capture listener prevented.
 4. Before `welcome`, and standalone, the SDK does not touch links.
+
+### 12.2 Settings
+
+An app lists its user settings in the manifest's `settings` ([Manifest](/claude-code-hub/extensibility/reference/manifest/#settings) has the entry rules). The hub stores the values, shows them in its settings modal (<kbd>Ctrl+,</kbd>) and sends them to the app. The app keeps no settings UI of its own for them.
+
+| Direction | Type | Payload | Meaning |
+|---|---|---|---|
+| Hub → app | `hub:settings` | `{settings: {[key]: boolean \| string}}` | The app's settings after the user changed one. Sent to the app's tab and its nested pages |
+
+1. **Values.** `welcome.settings` and `hub:settings` carry every key in the manifest, with the default for a key the user did not set. A saved value that the manifest no longer allows gives the default.
+2. **Scope.** One value per app for every config dir. The hub writes only a value that differs from the default, to `settings` of the app's entry in `config.json`. A change applies at once, with no restart.
+3. **Delivery.** Only the app that lists the setting gets it. The hub sends `hub:settings` after each change the user saves.
+4. **No hub.** Standalone or with no `welcome`, the app uses its own defaults. The SDK's `settings` is `null` then.
 
 ## Planned
 

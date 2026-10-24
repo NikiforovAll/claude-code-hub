@@ -152,6 +152,27 @@ describe('handshake', () => {
     assert.deepEqual(seen, ['live']);
   });
 
+  it('takes the app settings from welcome and from hub:settings', async () => {
+    const { env, hub } = await connected();
+    const seen = [];
+    hub.onSettings((s) => seen.push(s));
+    env.fromHub({ type: 'hub:settings', settings: { zenCentered: true } });
+    assert.equal(hub.settings, null);
+    env.fromHub(welcome({ settings: { zenCentered: false } }));
+    assert.deepEqual(hub.settings, { zenCentered: false });
+    env.fromHub({ type: 'hub:settings', settings: { zenCentered: true } });
+    assert.deepEqual(seen, [{ zenCentered: false }, { zenCentered: true }]);
+    const late = [];
+    hub.onSettings((s) => late.push(s));
+    assert.deepEqual(late, [{ zenCentered: true }]);
+  });
+
+  it('gives empty settings for a welcome with none', async () => {
+    const { env, hub } = await connected();
+    env.fromHub(welcome());
+    assert.deepEqual(hub.settings, {});
+  });
+
   it('ignores a welcome with another protocol', async () => {
     const { env, hub } = await connected();
     env.fromHub(welcome({ protocol: 2 }));

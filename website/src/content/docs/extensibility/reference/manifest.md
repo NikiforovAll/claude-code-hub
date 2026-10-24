@@ -41,6 +41,7 @@ description: Every field of hub-app.json and the validation rules.
 | `plugin` | No | The Claude Code plugin the app ships. See [Plugin](#plugin) |
 | `requires` | No | The lowest hub and Node versions, and the apps that must be on. See [Requires](#requires) |
 | `listing` | No | What the Extensions page shows. See [Listing](#listing) |
+| `settings` | No | The user settings the hub shows and stores for the app. See [Settings](#settings) |
 
 ## Actions
 
@@ -148,6 +149,28 @@ The launcher shows the installed version. When the plugin is not installed, is d
 
 Text fields must not contain `<` or `>`.
 
+## Settings
+
+`settings` lists the user settings of your app. The hub shows them in its settings modal (<kbd>Ctrl+,</kbd>), under the app's name, and stores the values in `~/.claude-hub/config.json`. The page reads them with `hub.settings` and `hub.onSettings` ([SDK](/claude-code-hub/extensibility/reference/sdk/#settings)). A change applies at once.
+
+```json
+"settings": [
+  { "key": "zenCentered", "type": "boolean", "label": "Center zen mode", "help": "Centers the session in the sidebar.", "default": false },
+  { "key": "density", "type": "choice", "label": "Density", "options": [{ "value": "cozy", "label": "Cozy" }, { "value": "compact", "label": "Compact" }], "default": "cozy" }
+]
+```
+
+| Field | Rule |
+| --- | --- |
+| `key` | Letters and digits, starting with a letter, 32 characters or fewer. Unique in the list |
+| `type` | `boolean` or `choice` |
+| `label` | 60 characters or fewer |
+| `help` | Optional. 200 characters or fewer |
+| `options` | For `choice`: 2 to 6 of `{value, label}`, a non-empty string and 30 characters or fewer. No two with the same value |
+| `default` | A boolean for `boolean`, one of the option values for `choice` |
+
+Up to 20 settings. Text fields must not contain `<` or `>`. A value is the same in every config dir. When the app runs alone, it uses its own defaults.
+
 ## Validation
 
 The hub skips the app, with a log line, when:
@@ -181,6 +204,8 @@ The hub skips the app, with a log line, when:
 | `listing.screenshots ...` | A screenshot has no `alt`, has both or neither of `path` and `url`, is not PNG, JPEG or WebP, has a `url` that is not `https://`, or a `path` outside the folder. Or there are more than 4 |
 | `listing.homepage is not an https URL` | `homepage` does not start with `https://` |
 | `listing.license is not an SPDX id` | `license` has characters other than letters, digits, `.`, `+` and `-` |
+| `settings is not a list of up to 20` | `settings` is not a list, or it has more than 20 entries |
+| `settings ...` | An entry breaks a [settings rule](#settings), or two entries share a key |
 
 The hub skips one action, and keeps the app, when the name starts with `hub.`, `url` has a `#` or is not a string, `mode` is not `url` or `message`, or a param type is not `string` or `string?`.
 

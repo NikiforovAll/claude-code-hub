@@ -70,6 +70,8 @@ The page loads `/vendor/claude-hub-sdk.js` as the first element in `<body>`, a c
 
 The SDK writes the hub's color variables (`--accent`, `--bg-surface`, …) on `document.body`, so the app's CSS reads them and follows every hub theme, the user's own themes too. `bindTheme` keeps light/dark and the color theme in step. `onActive` tells a hidden tab to pause polling. The SDK forwards the hub's keys by itself; an element that eats keys first, such as a terminal, asks `forwards(e)`. An app that uses a `Ctrl+Alt` combo of its own lists it in `keys.keeps` in `hub-app.json`, for example `{"keeps": ["ctrl+alt+n"]}`, so the hub does not bind it, and the user cannot give it to a hub action in `config.json` `keys`. The user can change the hub's own keys there, so an app takes them from `welcome.forward`, never from a fixed list, and a help dialog shows each hub key with `hub.keyLabel(action)`, for example `hub.keyLabel('hub.projectPicker')` → `['Ctrl', 'Alt', 'P']`. Page: `extensibility/reference/manifest/#kept-keys`.
 
+An app that has user preferences lists them in `settings` of `hub-app.json` (`boolean` or `choice`, each with `key`, `label` and `default`). The hub shows them in its settings modal (`Ctrl+,`), stores them in `config.json` once for every config dir, and sends them to the page: read `hub.settings`, or `hub.onSettings(fn)` for the values at welcome and on each change. Alone, the app uses its own defaults. Page: `extensibility/reference/manifest/#settings`.
+
 ## Connect to other tools
 
 Apps never talk to each other directly. Each page talks to the hub page through the SDK, and the hub passes the message on. There is no server-to-server channel. Page: `extensibility/reference/connect/`.

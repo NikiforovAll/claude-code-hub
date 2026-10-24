@@ -2,6 +2,10 @@
 
 The SDK follows semver. A new function or message is a minor version, a change that breaks an app is a major version. The protocol version is separate ([Versioning](https://nikiforovall.blog/claude-code-hub/reference/protocol/#versioning)).
 
+## 1.7.0
+
+- `hub.settings` and `hub.onSettings(fn)` give the values of the settings in the manifest's `settings`, from `welcome.settings` and each `hub:settings` message. In the stub, `settings` is `null` and `onSettings` never calls back.
+
 ## 1.6.0
 
 - After `welcome`, the client opens every `http` or `https` link to another site through `openExternal`, from a click or a middle click. Before, a link with no target loaded in the app's frame, where most sites refuse framing. The client listens on `window` in the capture phase, so a modal that stops the click's propagation does not hide it. Links to the app's own origin or an origin in `welcome.origins` stay in the frame unless they have `target="_blank"`. A link to the hub goes outside, because the hub page refuses framing. Other schemes, `download` links and links with a named `target` are left to the page. Standalone, the browser handles links as before.

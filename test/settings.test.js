@@ -1,6 +1,6 @@
 const { describe, it } = require('node:test');
 const assert = require('node:assert/strict');
-const { appSettings, appsShape, applySettings, configDirSwitch, poolSize } = require('../lib/settings');
+const { appSettings, appsShape, applySettings, configDirSwitch, poolSize, settingValues } = require('../lib/settings');
 
 const ids = (apps) => apps.map((a) => a.id);
 
@@ -48,6 +48,44 @@ describe('settings', () => {
     const saved = { apps: ['kanban', 'marketplace', 'cost'].map((id) => ({ id, enabled: false })) };
     assert.match(applySettings(saved, { app: { id: 'memory', state: 'off' } }).error, /stay on/);
     assert.match(applySettings({}, { app: { id: 'nope', state: 'off' } }).error, /Unknown app/);
+  });
+
+  const schemas = {
+    kanban: [
+      { key: 'zenCentered', type: 'boolean', default: false },
+      { key: 'density', type: 'choice', options: [{ value: 'cozy' }, { value: 'compact' }], default: 'cozy' },
+    ],
+  };
+
+  it('gives app setting values with defaults for missing and stale ones', () => {
+    assert.deepEqual(settingValues(schemas.kanban), { zenCentered: false, density: 'cozy' });
+    assert.deepEqual(settingValues(schemas.kanban, { zenCentered: true, density: 'tight', gone: 1 }), {
+      zenCentered: true,
+      density: 'cozy',
+    });
+  });
+
+  it('writes an app setting only while it differs from the default', () => {
+    const saved = { apps: [{ id: 'kanban', port: 4000 }] };
+    const on = applySettings(saved, { app: { id: 'kanban', settings: { zenCentered: true } } }, undefined, schemas);
+    assert.deepEqual(on.config.apps, [{ id: 'kanban', port: 4000, settings: { zenCentered: true } }]);
+    const off = applySettings(on.config, { app: { id: 'kanban', settings: { zenCentered: false } } }, undefined, schemas);
+    assert.deepEqual(off.config.apps, [{ id: 'kanban', port: 4000 }]);
+  });
+
+  it('keeps the tab order when an app setting adds an entry', () => {
+    const { config } = applySettings({}, { app: { id: 'kanban', settings: { density: 'compact' } } }, undefined, schemas);
+    assert.deepEqual(ids(config.apps), ['kanban', 'marketplace', 'cost', 'memory']);
+    assert.deepEqual(config.apps[0], { id: 'kanban', settings: { density: 'compact' } });
+  });
+
+  it('refuses an unknown app setting or a value the manifest does not allow', () => {
+    const set = (id, settings) => applySettings({}, { app: { id, settings } }, undefined, schemas).error;
+    assert.match(set('cost', { zenCentered: true }), /no setting/);
+    assert.match(set('kanban', { nope: true }), /no setting/);
+    assert.match(set('kanban', { zenCentered: 'yes' }), /boolean/);
+    assert.match(set('kanban', { density: 'tight' }), /one of cozy, compact/);
+    assert.match(set('kanban', 'on'), /must be an object/);
   });
 
   it('changes the apps shape only for what a restart changes', () => {

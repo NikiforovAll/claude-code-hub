@@ -163,6 +163,31 @@ describe('manifestError', () => {
     assert.match(manifestError({ ...ok, run: { entry: '.' } }, 'cost', root), /outside/);
   });
 
+  it('accepts settings and rejects ones that break a rule', () => {
+    const flag = { key: 'zenCentered', type: 'boolean', label: 'Center zen mode', default: false };
+    const pick = {
+      key: 'density',
+      type: 'choice',
+      label: 'Density',
+      options: [
+        { value: 'cozy', label: 'Cozy' },
+        { value: 'compact', label: 'Compact' },
+      ],
+      default: 'cozy',
+    };
+    const err = (settings) => manifestError({ ...ok, settings }, 'cost', root);
+    assert.equal(err([flag, pick]), null);
+    assert.match(err({}), /settings is not a list/);
+    assert.match(err([{ ...flag, key: '1x' }]), /no key/);
+    assert.match(err([flag, flag]), /share a key/);
+    assert.match(err([{ ...flag, label: '<b>' }]), /label/);
+    assert.match(err([{ ...flag, default: 'no' }]), /default is not a boolean/);
+    assert.match(err([{ ...flag, type: 'number' }]), /type/);
+    assert.match(err([{ ...pick, options: pick.options.slice(0, 1) }]), /2 to 6/);
+    assert.match(err([{ ...pick, options: [pick.options[0], pick.options[0]] }]), /share a value/);
+    assert.match(err([{ ...pick, default: 'tight' }]), /not one of the option values/);
+  });
+
   it('accepts capability paths and rejects ones that are not paths', () => {
     const provides = { projects: { path: '/api/projects' }, terminal: { liveWork: '/api/terminals' } };
     assert.equal(manifestError({ ...ok, provides }, 'cost', root), null);
@@ -350,6 +375,7 @@ describe('loadApp', () => {
       provides: {},
       publishes: [],
       keeps: [],
+      settings: [],
     });
     assert.deepEqual(logs, []);
   });

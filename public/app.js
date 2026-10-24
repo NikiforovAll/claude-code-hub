@@ -549,7 +549,7 @@ function onIframeLoad(appId) {
   if (appId === activeApp) hideLoading();
 }
 
-function welcomeFor(data) {
+function welcomeFor(data, appId) {
   const common = Array.isArray(data.protocol) ? HUB_PROTOCOLS.filter((v) => data.protocol.includes(v)) : [];
   if (!common.length) return null;
   return {
@@ -560,13 +560,24 @@ function welcomeFor(data) {
     themes: hubThemes,
     actions: Object.keys(actions),
     origins: Object.keys(apps).map(originOf),
+    settings: apps[appId]?.settings ?? {},
   };
+}
+
+// Protocol §12.2. An app's settings go to its tab and the pages nested in it, no other app.
+function sendSettings(appId, list) {
+  if (!apps[appId]) return;
+  const settings = Object.fromEntries(list.map((s) => [s.key, s.value]));
+  apps[appId].settings = settings;
+  const message = { type: 'hub:settings', settings };
+  if (liveApps.has(appId)) postTo(appId, message);
+  for (const [win, nested] of nestedApps) if (nested.appId === appId) postNested(win, message);
 }
 
 const helloTopics = (data) => new Set(Array.isArray(data.subscribes) ? data.subscribes : []);
 
 function onHello(appId, data) {
-  const welcome = welcomeFor(data);
+  const welcome = welcomeFor(data, appId);
   if (!welcome) return;
   liveApps.set(appId, helloTopics(data));
   postTo(appId, welcome);
@@ -669,7 +680,7 @@ function onNestedMessage(e) {
   const appId = data.type === 'hub:hello' && underTab(e.source) ? appIdByOrigin(e.origin) : known?.appId;
   if (!appId || e.origin !== originOf(appId)) return;
   if (data.type === 'hub:hello') {
-    const welcome = welcomeFor(data);
+    const welcome = welcomeFor(data, appId);
     if (!welcome) return;
     const topics = helloTopics(data);
     nestedApps.set(e.source, { appId, topics });
@@ -1337,6 +1348,8 @@ async function saveSetting(patch) {
     settingsModal.data = await sendJson('POST', '/api/settings', patch);
     settingsModal.error = null;
     configDirSwitch = settingsModal.data.configDirSwitch;
+    const appId = patch.app?.settings && patch.app.id;
+    if (appId) sendSettings(appId, settingsModal.data.apps.find((a) => a.id === appId)?.settings ?? []);
   } catch (err) {
     settingsModal.error = err.message;
   } finally {
@@ -1463,7 +1476,7 @@ function renderSettings() {
       '“Launcher only” keeps the app running but gives it no tab or number key; open it from the app launcher. “On demand” starts it the first time you open it.',
     ),
   );
-  body.replaceChildren(dirs, appsSec);
+  body.replaceChildren(dirs, appsSec, ...s.apps.filter((a) => a.settings?.length).map(appSettingsSection));
 
   let status = el('span', '', 'Saved as you change it');
   if (settingsModal.error) status = el('span', 'set-error', settingsModal.error);
@@ -1482,6 +1495,26 @@ function renderSettings() {
         target?.parentElement.querySelector('button:not(:disabled)'));
     (focusable ?? document.querySelector('#settings .settings-box')).focus();
   }
+}
+
+const BOOLEAN_CHOICES = [
+  [false, 'Off'],
+  [true, 'On'],
+];
+
+// The settings an app lists in its manifest. They apply at once, with no restart.
+function appSettingsSection(a) {
+  const sec = el('section', 'set-sec');
+  sec.append(el('h4', '', a.name));
+  for (const setting of a.settings) {
+    const choices = setting.type === 'boolean' ? BOOLEAN_CHOICES : setting.options.map((o) => [o.value, o.label]);
+    const seg = segmented(setting.label, choices, setting.value, (v) =>
+      saveSetting({ app: { id: a.id, settings: { [setting.key]: v } } }),
+    );
+    seg.dataset.focus = `app:${a.id}:${setting.key}`;
+    sec.append(settingRow(setting.label, seg, setting.help));
+  }
+  return sec;
 }
 
 function kbd(text) {

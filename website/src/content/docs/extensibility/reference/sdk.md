@@ -66,6 +66,15 @@ See [Topics](/claude-code-hub/extensibility/reference/connect/#topics) for the h
 
 Under the hub, the SDK writes the hub's color variables, such as `--accent` and `--bg-surface`, on `document.body`. Use them in your CSS. See [Core variables](/claude-code-hub/reference/protocol/#core-variables).
 
+## Settings
+
+| Member | Meaning |
+| --- | --- |
+| `settings` | The values of the settings that the manifest lists in `settings`, as a frozen `{key: value}`. `null` before welcome, alone, or with no welcome: use your own defaults then |
+| `onSettings(fn)` | Calls `fn({key: value})` at welcome and after each change in the hub's settings modal. A call after welcome gets the current values at once. Returns a function that removes `fn`. Not called when the app runs alone |
+
+The hub shows these settings in its settings modal and stores them. The app needs no settings UI of its own for them. See [Settings](/claude-code-hub/reference/protocol/#122-settings).
+
 ## Keys and window
 
 | Member | Meaning |
@@ -80,4 +89,4 @@ Under the hub, the SDK writes the hub's color variables, such as `--accent` and 
 
 ## Alone
 
-With the stub, `status` is `standalone`, `inHub` is false, `subscribe`, `publish`, `handle`, `bindTheme` and `closeGuard` do nothing, `forwards` is false, `forwardCombos` is empty, `keyLabel` is `null`, and `terminalToken` resolves `null`. `invoke` and `can` use the `standalone` option. `openExternal` opens a new tab.
+With the stub, `status` is `standalone`, `inHub` is false, `settings` is `null`, `onSettings`, `subscribe`, `publish`, `handle`, `bindTheme` and `closeGuard` do nothing, `forwards` is false, `forwardCombos` is empty, `keyLabel` is `null`, and `terminalToken` resolves `null`. `invoke` and `can` use the `standalone` option. `openExternal` opens a new tab.

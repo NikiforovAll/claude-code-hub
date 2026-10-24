@@ -30,6 +30,7 @@ const {
   poolSize,
   copyLive,
   MAX_POOL_SIZE,
+  settingValues,
 } = require('./lib/settings');
 const { version: HUB_VERSION } = require('./package.json');
 
@@ -929,6 +930,7 @@ function appsConfig() {
         publishes: a.publishes,
       };
       if (a.hidden) entry.hidden = true;
+      if (a.settings.length) entry.settings = appValues.get(a.id);
       if (TERMINAL_TOKEN && a.id === TERMINAL_APP.id) entry.terminalToken = TERMINAL_TOKEN;
       return [a.id, entry];
     }),
@@ -1066,14 +1068,34 @@ function appName(a) {
   return appNames.get(a.id);
 }
 
+// Only a running app has its manifest loaded, so only it lists settings.
+const SETTING_SCHEMAS = Object.fromEntries(
+  ENABLED_APPS.filter((a) => a.settings.length).map((a) => [a.id, a.settings]),
+);
+const savedEntry = (saved, id) => (Array.isArray(saved.apps) ? saved.apps.find((e) => e?.id === id) : undefined);
+// App settings apply at once, so the hub keeps their values here and in each page's welcome.
+const appValues = new Map();
+function loadAppValues(saved) {
+  for (const [id, schema] of Object.entries(SETTING_SCHEMAS))
+    appValues.set(id, settingValues(schema, savedEntry(saved, id)?.settings));
+}
+loadAppValues(hubConfig);
+
 function settingsView(saved) {
   const apps = appSettings(Array.isArray(saved.apps) ? saved.apps : [], CONFIG_BASE);
+  const settingsOf = (id) => SETTING_SCHEMAS[id].map((s) => ({ ...s, value: appValues.get(id)[s.key] }));
   return {
     configDirSwitch: configDirSwitch(hubConfig),
     poolSize: currentPoolSize(),
     poolSizeFlag: POOL_SIZE_FLAG !== null,
     maxPoolSize: MAX_POOL_SIZE,
-    apps: apps.map((a) => ({ id: a.id, state: a.state, deferredStart: a.deferredStart, name: appName(a) })),
+    apps: apps.map((a) => ({
+      id: a.id,
+      state: a.state,
+      deferredStart: a.deferredStart,
+      name: appName(a),
+      ...(SETTING_SCHEMAS[a.id] && { settings: settingsOf(a.id) }),
+    })),
     restartNeeded: appsShape(apps) !== RUNNING_APPS,
   };
 }
@@ -1102,13 +1124,14 @@ app.post('/api/settings', (req, res) => {
   }
   const saved = readSettingsConfig(res);
   if (!saved) return;
-  const r = applySettings(saved, req.body, CONFIG_BASE);
+  const r = applySettings(saved, req.body, CONFIG_BASE, SETTING_SCHEMAS);
   if (r.error) {
     res.status(400).json({ error: r.error });
     return;
   }
   writeHubConfig(r.config);
   copyLive(r.config, hubConfig);
+  loadAppValues(r.config);
   res.json(settingsView(r.config));
 });
 
