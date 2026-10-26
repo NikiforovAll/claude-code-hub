@@ -51,6 +51,33 @@ describe('themeConfig', () => {
     assert.equal(config.themeVars.ember.dark['--accent-glow'], 'rgba(232, 111, 51, 0.55)');
   });
 
+  it('keeps tertiary and muted text readable on every background', () => {
+    // WCAG 2.x relative luminance and contrast ratio; 4.5:1 is AA for small text.
+    const lum = (hex) => {
+      const [r, g, b] = [1, 3, 5].map((i) => {
+        const v = Number.parseInt(hex.slice(i, i + 2), 16) / 255;
+        return v <= 0.03928 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4;
+      });
+      return 0.2126 * r + 0.7152 * g + 0.0722 * b;
+    };
+    const ratio = (a, b) => {
+      const [hi, lo] = [lum(a), lum(b)].sort((x, y) => y - x);
+      return (hi + 0.05) / (lo + 0.05);
+    };
+    const MIN = { inkMuted: 4.5, ink3: 5.5 };
+    for (const t of registry) {
+      for (const mode of ['dark', 'light']) {
+        const p = t[mode];
+        for (const bg of ['field', 'surface', 'elevated', 'sidebar', 'sidebarItem'].filter((k) => p[k])) {
+          for (const [ink, min] of Object.entries(MIN)) {
+            const r = ratio(p[ink], p[bg]);
+            assert.ok(r >= min, `${t.id}/${mode} ${ink} ${p[ink]} on ${bg} ${p[bg]} is ${r.toFixed(2)}:1, under ${min}:1`);
+          }
+        }
+      }
+    }
+  });
+
   it('gives empty maps for a missing or bad registry', () => {
     const empty = { themes: [], themeVars: {} };
     assert.deepEqual(themeConfig(readRegistry(path.join(os.tmpdir(), 'no-such-themes.json'))), empty);
