@@ -17,7 +17,7 @@ The hub ships four tools. This page lists what each tool gives to other apps and
 <BuiltinLinks />
 
 - **Topics.** The hub publishes `project.changed` when you pick a project. Kanban filters its sessions to the project, Marketplace and Memory Diagnoser show that project, and Cost limits its totals to it. Kanban publishes [`session.changed`](#sessionchanged) when you open a session. No built-in tool subscribes to it, but your own apps can, as the Inspector does.
-- **Actions.** Kanban calls [`project.plugins`](#projectplugins), [`session.cost`](#sessioncost) and [`project.memory`](#projectmemory) from the session view, and [`agent.cost`](#agentcost) from its CLI. Any app can call them.
+- **Actions.** Kanban calls [`project.plugins`](#projectplugins), [`session.cost`](#sessioncost) and [`project.memory`](#projectmemory) from the session view, and [`agent.cost`](#agentcost) from its CLI. Kanban handles [`session.open`](#sessionopen). Any app can call them.
 - **Capabilities.** The hub reads [`projects`](#projects) and [`terminal`](#terminal) from Kanban.
 - **Kept keys.** Kanban keeps <kbd>Ctrl+Alt+N</kbd> (new session), <kbd>Ctrl+Alt+R</kbd> (resume session) and <kbd>Ctrl+Alt+S</kbd> (swap to the previous session) in `keys.keeps`. See [Kept keys](/claude-code-hub/extensibility/reference/manifest/#kept-keys).
 
@@ -87,6 +87,21 @@ await hub.invoke('agent.cost', { session: 'd3a7c2e1-5b4f-4c8e-9a12-6f0e8b7d4c31'
 ```
 
 Kanban calls it when `claude-code-kanban session cost <id> --agent <agent id>` names a subagent, and falls back to `session.cost` when no app handles it.
+
+### `session.open`
+
+| | |
+| --- | --- |
+| Handler | Kanban |
+| Params | `session`: a session id |
+| Mode | `message` |
+| Shows | Kanban comes on screen with that session open |
+
+```js
+await hub.invoke('session.open', { session: 'd3a7c2e1-5b4f-4c8e-9a12-6f0e8b7d4c31' });
+```
+
+Kanban calls it on itself when `claude-code-kanban new` starts a session, so the hub switches to Kanban before the session opens.
 
 ### `project.plugins`
 
