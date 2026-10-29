@@ -159,6 +159,51 @@ The marketplace name comes from the extension's `marketplace.json`. Pick a name 
 
 An extension that needs more steps sets [`plugin.install`](/claude-code-hub/extensibility/reference/manifest/#plugin) to its own command.
 
+## Add-ons
+
+An add-on is a page on the dock rail beside Kanban's embedded terminal, not a hub app. It has no tab, and the hub does not run it: Kanban starts its server the first time you open it from the rail and stops it with the board. The board fills the page's URL for the session in the terminal, so the page can follow that session's folder. The [Extensions page](/claude-code-hub/extensions/) lists add-ons next to apps, with an **Add-on** badge.
+
+The folder of an add-on holds an `addon.json` in place of `hub-app.json`:
+
+```json
+{
+  "manifest": 1,
+  "kind": "addon",
+  "id": "git-changes",
+  "title": "Changes",
+  "icon": "±",
+  "url": "http://localhost:4117/?cwd={cwd}",
+  "run": "node server.js",
+  "requires": { "node": "20.0.0", "apps": ["kanban"] },
+  "listing": { "tagline": "The session's git changes, beside its terminal" }
+}
+```
+
+| Field | Meaning |
+| --- | --- |
+| `url` | The page. Kanban fills `{cwd}`, `{sessionId}` and `{project}` for each session. The port is fixed: pick one that no other add-on uses |
+| `title`, `icon` | The rail button: the title, and one or two characters |
+| `run` | The command that starts the server, run in the add-on folder with `PORT` set. Kanban runs it only when nothing answers on the port |
+| `requires`, `listing` | As in an [app manifest](/claude-code-hub/extensibility/reference/manifest/) |
+
+### Make an add-on
+
+Kanban's plugin has an `addon` skill that builds an add-on for you. In a Claude Code session, run `/claude-code-kanban:addon build <what the page shows>`. The skill writes the page and its server and puts it on the dock. To install it with `ext`, add an `addon.json` to its folder, then run `claude-code-hub ext install <dir>`.
+
+### Install an add-on
+
+`ext install` takes an add-on in the same forms as an app: a registry name, a `github:` source or a local folder.
+
+```bash
+claude-code-hub ext install git-changes
+claude-code-hub ext install ./my-addon
+```
+
+In place of a plugin, `ext install` puts the add-on on the Kanban dock of the config dir (`--dir`, else `CLAUDE_CONFIG_DIR`, else `~/.claude`). It writes `.cck/addons.json` there through Kanban's CLI, so it needs no board running, and a running board shows the add-on at once, with no restart. Every session on that config dir shows it. The hub keeps the add-on in `addons` of `config.json`, not in `apps`, because it does not run it. For another config dir, run `ext install <id>` with that `--dir`.
+
+- **Update.** `claude-code-hub ext update <id>` gets the latest code of a GitHub add-on and updates its dock entry. Then restart its server: <kbd>Ctrl+R</kbd> on its row under Kanban in the app launcher.
+- **Remove.** `claude-code-hub ext remove <id>` takes it off the dock of the config dir, removes its entry and deletes the clone of a GitHub add-on. <kbd>Ctrl+D</kbd> on its row in the app launcher takes it off the dock only.
+
 ## Trust
 
 An extension runs as you, with no sandbox. It can read the hub token and every file you can read, and its plugin can run hooks in each Claude Code session. Add only an extension whose source you trust, the same as a Claude Code plugin.

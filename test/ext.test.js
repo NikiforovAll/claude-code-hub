@@ -42,6 +42,16 @@ describe('ext', () => {
     ...registerCmds(dir),
     'claude plugin install probe@probe-market',
   ];
+  const kanbanDir = () => path.join(configDir, 'kanban');
+  const addonManifest = (fields) => {
+    fs.rmSync(path.join(root, 'hub-app.json'), { force: true });
+    writeJson(path.join(root, 'addon.json'), { manifest: 1, kind: 'addon', id: 'probe', url: 'http://localhost:4117/?cwd={cwd}', run: 'node server.js', requires: { apps: ['kanban'] }, ...fields });
+    writeJson(path.join(kanbanDir(), 'package.json'), { name: 'claude-code-kanban', bin: { 'claude-code-kanban': 'server.js' } });
+    writeJson(configFile(), { apps: [{ id: 'kanban', path: kanbanDir() }] });
+  };
+  const kanbanCmd = (args) => `"${process.execPath}" "${path.join(kanbanDir(), 'server.js')}" ${args}`;
+  const dockAdd = (dir = root) => kanbanCmd(`addon add --manifest "${dir}" --offline`);
+  const dockRm = () => kanbanCmd('addon rm --key probe --offline');
 
   beforeEach(() => {
     root = tmp('hub-ext-src-');
@@ -272,6 +282,19 @@ describe('ext', () => {
       });
     }
 
+    it('installs a Kanban add-on by its registry name into the hub dir, and removes it with its clone', () => {
+      addonManifest();
+      const sha = commit('one');
+      writeJson(registry(), { extensions: [{ id: 'probe', kind: 'addon', source: 'github:o/r/ext', sha, pinned: false }] });
+      assert.equal(gh('install', 'probe'), true);
+      assert.deepEqual(commands, [dockAdd(extRoot())]);
+      assert.deepEqual(config().addons, [{ id: 'probe', path: 'extensions/probe/ext', source: 'github:o/r/ext', sha }]);
+      assert.equal(gh('remove', 'probe'), true);
+      assert.deepEqual(commands, [dockAdd(extRoot()), dockRm()]);
+      assert.deepEqual(config().addons, []);
+      assert.equal(fs.existsSync(clone()), false);
+    });
+
     describe('by a registry name', () => {
       const listing = (...extensions) => writeJson(registry(), { extensions });
 
@@ -427,6 +450,55 @@ describe('ext', () => {
     out = [];
     assert.equal(ext('list'), true);
     assert.deepEqual(out, [`  probe  local ${root.replaceAll('\\', '/')}  probe@probe-market missing`]);
+  });
+
+  describe('a Kanban dock add-on', () => {
+    beforeEach(() => addonManifest());
+
+    it('links a folder: puts it on the dock of the config dir and keeps it in addons, not apps', () => {
+      assert.equal(ext('install', root), true);
+      assert.deepEqual(commands, [dockAdd()]);
+      assert.deepEqual(config(), {
+        apps: [{ id: 'kanban', path: kanbanDir() }],
+        addons: [{ id: 'probe', path: root.replaceAll('\\', '/'), source: 'local' }],
+      });
+      assert.match(out.join('\n'), /on the Kanban dock of every session/);
+    });
+
+    it('puts an installed add-on on the dock again by its id or folder, updates, lists and removes it', () => {
+      ext('install', root);
+      for (const target of ['probe', root]) assert.equal(ext('install', target), true);
+      assert.equal(ext('update', 'probe'), true);
+      assert.match(out.join('\n'), /Ctrl\+R on its row/);
+      out = [];
+      assert.equal(ext('list'), true);
+      assert.deepEqual(out, [`  probe  local ${root.replaceAll('\\', '/')}  dock add-on`]);
+      assert.equal(ext('remove', 'probe'), true);
+      assert.deepEqual(commands, [dockAdd(), dockAdd(), dockAdd(), dockAdd(), dockRm()]);
+      assert.match(out.at(-1), /off the Kanban dock/);
+      assert.deepEqual(config().addons, []);
+      assert.ok(fs.existsSync(path.join(root, 'addon.json')));
+    });
+
+    it('writes no entry when the dock step fails, and refuses with Kanban off', () => {
+      results[dockAdd()] = { ok: false, error: 'boom' };
+      assert.equal(ext('install', root), false);
+      assert.match(out.join('\n'), /boom[\s\S]*Putting it on the dock failed, so probe is not added/);
+      assert.equal(config().addons, undefined);
+      writeJson(configFile(), { apps: [{ id: 'kanban', enabled: false }] });
+      assert.equal(ext('install', root), false);
+      assert.match(out.join('\n'), /it needs kanban enabled in the hub/);
+    });
+
+    it('refuses an id an app has, and a manifest with a bad id', () => {
+      writeJson(configFile(), { apps: [{ id: 'kanban', path: kanbanDir() }, { id: 'probe', path: 'x' }] });
+      assert.equal(ext('install', root), false);
+      assert.match(out.join('\n'), /already has an entry for it/);
+      addonManifest({ id: 'Probe_1' });
+      assert.equal(ext('install', root), false);
+      assert.match(out.join('\n'), /addon\.json: an add-on manifest needs "kind": "addon" and an id/);
+      assert.deepEqual(commands, []);
+    });
   });
 
   it('prints the usage for an unknown command or option', () => {

@@ -13,7 +13,8 @@ const extensions = await loadExtensions();
   <section class="head">
     <h1>Extensions</h1>
     <p class="lede">
-      Apps that run in the hub next to the four built-in tools. Official extensions install from their latest code;
+      Apps that run in the hub next to the four built-in tools, and add-ons that sit on the dock rail beside Kanban's
+      terminal. Official extensions install from their latest code;
       every other extension was reviewed at a fixed commit before it was listed.
       <a href={url('extensibility/extensions/')}>Read how extensions work</a>.
     </p>
@@ -25,8 +26,8 @@ const extensions = await loadExtensions();
         <li class="card">
           <a class="card-link" href={url(`extensions/${x.id}/`)}>
             <span class="preview">
-              {x.screenshots[0] ? (
-                <img src={onSite(x.screenshots[0].src)} alt="" loading="lazy" decoding="async" />
+              {x.card ? (
+                <img src={onSite(x.card)} alt="" loading="lazy" decoding="async" />
               ) : (
                 <span class="no-shot" aria-hidden="true">{x.name}</span>
               )}
@@ -34,6 +35,7 @@ const extensions = await loadExtensions();
             <span class="title">
               <span class="name">{x.name}</span>
               {x.official && <span class="badge">Official</span>}
+              {x.kind === 'addon' && <span class="badge">Add-on</span>}
             </span>
             <span class="tagline">{x.tagline}</span>
             {x.tags.length > 0 && (

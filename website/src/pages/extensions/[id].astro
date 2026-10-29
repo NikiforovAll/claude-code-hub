@@ -9,12 +9,14 @@ export async function getStaticPaths() {
 
 const { x } = Astro.props as { x: Extension };
 const { requires } = x;
+const addon = x.kind === 'addon';
 const needs = [
   requires.hub && `Claude Code Hub ${requires.hub} or later`,
   requires.node && `Node.js ${requires.node} or later`,
-  ...(requires.apps ?? []).map((id) => `the ${id} app enabled in the hub`),
+  ...(addon ? ['Claude Code Kanban'] : (requires.apps ?? []).map((id) => `the ${id} app enabled in the hub`)),
 ].filter(Boolean) as string[];
 const facts = [
+  ['Kind', addon ? 'Kanban dock add-on' : 'Hub app'],
   ['Author', x.author],
   ['License', x.license],
   ['Requires', needs.join(', ')],
@@ -42,6 +44,7 @@ const ld = {
     <h1>
       {x.name}
       {x.official && <span class="badge">Official</span>}
+      {addon && <span class="badge">Add-on</span>}
     </h1>
     <p class="lede">{x.tagline}</p>
     {x.description && <p class="description">{x.description}</p>}
@@ -58,10 +61,20 @@ const ld = {
     <section aria-labelledby="install">
       <h2 id="install">Install</h2>
       <pre><code>{x.install}</code></pre>
-      <p>
-        <code>ext install</code> finds {x.id} in this registry and clones it into the hub dir with git{x.plugin && <> and installs the {x.plugin} plugin in your Claude config dir</>}.
-        Restart the hub, and the app gets the next tab.
-      </p>
+      {
+        addon ? (
+          <p>
+            <code>ext install</code> finds {x.id} in this registry, clones it into the hub dir with git and puts it on the Kanban dock of your Claude config dir.
+            No restart is needed: every session shows it, and Kanban starts its server the first time you open it from the dock rail.{' '}
+            <a href={url('extensibility/extensions/#add-ons')}>Read how add-ons work</a>.
+          </p>
+        ) : (
+          <p>
+            <code>ext install</code> finds {x.id} in this registry and clones it into the hub dir with git{x.plugin && <> and installs the {x.plugin} plugin in your Claude config dir</>}.
+            Restart the hub, and the app gets the next tab.
+          </p>
+        )
+      }
     </section>
 
     <section aria-labelledby="about">

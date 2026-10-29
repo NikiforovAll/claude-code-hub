@@ -142,7 +142,7 @@ The launcher shows the installed version. When the plugin is not installed, is d
 | `tagline` | 80 characters or fewer. The Extensions page needs it |
 | `description` | 500 characters or fewer |
 | `tags` | Up to 5. Lowercase letters, digits and `-` |
-| `screenshots` | Up to 4. Each has `alt` and one of `path` (a file in the extension folder) or `url` (an `https://` link). PNG, JPEG or WebP. Optional: `title` (40 characters or fewer) and `caption` (200 or fewer), which the Extensions page shows under the image |
+| `screenshots` | Up to 4. Each has `alt` and one of `path` (a file in the extension folder) or `url` (an `https://` link). PNG, JPEG or WebP. Optional: `title` (40 characters or fewer) and `caption` (200 or fewer), which the Extensions page shows under the image, and `card: true`, which makes it the image on the extension's card in place of the first one |
 | `author` | 60 characters or fewer |
 | `homepage` | An `https://` URL |
 | `license` | An SPDX id, for example `MIT` |
