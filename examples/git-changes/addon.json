@@ -1,0 +1,38 @@
+{
+  "manifest": 1,
+  "kind": "addon",
+  "id": "git-changes",
+  "title": "Changes",
+  "icon": "±",
+  "url": "http://localhost:4117/?cwd={cwd}",
+  "run": "node server.js",
+  "requires": { "node": "20.0.0", "apps": ["kanban"] },
+  "listing": {
+    "tagline": "The session's git changes, beside its terminal",
+    "description": "A Kanban dock add-on. It shows the staged, unstaged and untracked files of the session's folder with their diffs, the recent commits with the ones not pushed yet marked, and the worktrees of the repository. It follows the session into a worktree, and it updates as files change.",
+    "tags": ["git", "dock", "worktrees"],
+    "screenshots": [
+      {
+        "url": "https://nikiforovall.blog/claude-code-hub/shots/extensibility/git-changes-dock.webp",
+        "alt": "Kanban with a Claude Code session in the embedded terminal and Changes docked on its right: the working tree is clean, and the recent commits list six not pushed",
+        "title": "Beside the terminal",
+        "caption": "Changes sits on the dock rail and follows the folder of the session in the terminal."
+      },
+      {
+        "url": "https://nikiforovall.blog/claude-code-hub/shots/extensibility/git-changes.webp",
+        "alt": "Changes for a repository on main, two commits ahead: one staged file, two changed files and one untracked file with their line counts, the recent commits with the two not pushed marked, and the worktrees with an edit in fix/retry-payments",
+        "title": "Everything the session changed",
+        "caption": "Staged, changed and untracked files, the commits not pushed yet, and which worktree has new edits.",
+        "card": true
+      },
+      {
+        "url": "https://nikiforovall.blog/claude-code-hub/shots/extensibility/git-changes-diff.webp",
+        "alt": "Changes with the staged file src/routes/orders.js open: its diff with two hunks and three added lines",
+        "title": "Read the diff in place",
+        "caption": "Click a file to open its diff. It updates as the session edits the file."
+      }
+    ],
+    "author": "NikiforovAll",
+    "license": "MIT"
+  }
+}
