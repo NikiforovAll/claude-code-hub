@@ -16,6 +16,8 @@
     { "name": "Windows US: plain p", "platform": "win", "key": "p", "code": "KeyP", "mods": [], "expect": "text" },
     { "name": "Windows US: cck new session", "platform": "win", "key": "n", "code": "KeyN", "mods": ["ctrl", "alt"], "expect": "text" },
     { "name": "Windows US: cck swap session", "platform": "win", "key": "s", "code": "KeyS", "mods": ["ctrl", "alt"], "expect": "text" },
+    { "name": "Windows US: cck next dock item", "platform": "win", "key": "ArrowDown", "code": "ArrowDown", "mods": ["alt"], "expect": "text" },
+    { "name": "Windows US: cck previous dock item", "platform": "win", "key": "ArrowUp", "code": "ArrowUp", "mods": ["alt"], "expect": "text" },
     { "name": "Windows Polish: AltGr+A types ą", "platform": "win", "key": "ą", "code": "KeyA", "mods": ["ctrl", "alt"], "altGraph": true, "expect": "text" },
     { "name": "Windows Polish: AltGr+S types ś", "platform": "win", "key": "ś", "code": "KeyS", "mods": ["ctrl", "alt"], "altGraph": true, "expect": "text" },
     { "name": "Windows Polish: AltGr+N types ń", "platform": "win", "key": "ń", "code": "KeyN", "mods": ["ctrl", "alt"], "altGraph": true, "expect": "text" },
