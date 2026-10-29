@@ -123,9 +123,10 @@ describe('app manifests', () => {
     });
   }
 
-  it('kanban provides projects and the terminal', () => {
+  it('kanban provides projects and the terminal, and lists launcher items', () => {
     const kanban = loadApp(KANBAN, { log: () => {} });
     assert.deepEqual(Object.keys(kanban.provides).sort(), ['projects', 'terminal']);
+    assert.equal(kanban.launcher.items, '/api/hub/launcher-items');
   });
 
   it('kanban names its plugin, and the plugin manifest is where it says', () => {
@@ -161,6 +162,12 @@ describe('manifestError', () => {
     assert.match(manifestError({ ...ok, run: { entry: '../evil.js' } }, 'cost', root), /outside/);
     assert.match(manifestError({ ...ok, run: { entry: path.resolve('/elsewhere/x.js') } }, 'cost', root), /outside/);
     assert.match(manifestError({ ...ok, run: { entry: '.' } }, 'cost', root), /outside/);
+  });
+
+  it('takes a launcher items path and rejects anything else', () => {
+    assert.equal(manifestError({ ...ok, launcher: { items: '/x' } }, 'cost', root), null);
+    assert.match(manifestError({ ...ok, launcher: { items: 'x' } }, 'cost', root), /launcher.items is not a path/);
+    assert.match(manifestError({ ...ok, launcher: null }, 'cost', root), /launcher.items is not a path/);
   });
 
   it('accepts settings and rejects ones that break a rule', () => {
@@ -373,6 +380,7 @@ describe('loadApp', () => {
       loading: COST_MANIFEST.loading,
       actions: COST_MANIFEST.actions,
       provides: {},
+      launcher: {},
       publishes: [],
       keeps: [],
       settings: [],

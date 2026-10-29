@@ -1173,6 +1173,36 @@ async function checkPortHealth() {
 }
 
 const STATS_TIMEOUT_MS = 1000;
+const ITEM_OPS = ['restart', 'remove'];
+// A restart can wait 20 s for the old server to free its port and 20 s for the new one to answer.
+const ITEM_OP_TIMEOUT_MS = 45000;
+
+// The app's own rows for the launcher (`launcher.items`), or null when it has none or does not answer in time.
+async function launcherItems(pool, a) {
+  const itemsPath = a.launcher.items;
+  const port = pool?.ports[a.id];
+  if (!itemsPath || !port || pool.stopped.has(a.id)) return null;
+  try {
+    const r = await fetch(`http://127.0.0.1:${port}${itemsPath}`, { signal: AbortSignal.timeout(STATS_TIMEOUT_MS) });
+    if (!r.ok) return null;
+    const { items } = await r.json();
+    if (!Array.isArray(items)) return null;
+    return items
+      .filter((i) => typeof i?.id === 'string' && typeof i.name === 'string')
+      .map((i) => ({
+        id: i.id,
+        name: i.name,
+        kind: typeof i.kind === 'string' ? i.kind : '',
+        detail: typeof i.detail === 'string' ? i.detail : '',
+        state: typeof i.state === 'string' ? i.state : '',
+        path: typeof i.path === 'string' ? i.path : '',
+        ops: Array.isArray(i.ops) ? i.ops.filter((op) => ITEM_OPS.includes(op)) : [],
+      }));
+  } catch {
+    return null;
+  }
+}
+
 app.get('/api/apps/stats', async (_req, res) => {
   res.setHeader('Cache-Control', 'no-store');
   const pool = activePool();
@@ -1182,10 +1212,12 @@ app.get('/api/apps/stats', async (_req, res) => {
     ENABLED_APPS.map(async (a) => {
       const child = pool?.children.get(a.id);
       const slowMs = (child && portHealth.flagged(child)?.worstMs) ?? null;
+      const [usage, items] = await Promise.all([stats(child, STATS_TIMEOUT_MS), launcherItems(pool, a)]);
       return [
         a.id,
         {
-          ...(await stats(child, STATS_TIMEOUT_MS)),
+          ...usage,
+          items,
           slowMs,
           stopped: !!pool?.stopped.has(a.id),
           linked: a.linked,
@@ -1231,6 +1263,33 @@ app.post('/api/apps/:id/:op(restart|start|stop)', async (req, res) => {
     else res.status(503).json({ error: `${target.name} did not start` });
   } finally {
     restarting.delete(key);
+  }
+});
+
+// An op on one of an app's launcher rows, sent to `<items path>/<item id>/<op>` on that app.
+app.post(`/api/apps/:id/items/:item/:op(${ITEM_OPS.join('|')})`, async (req, res) => {
+  const { id, item, op } = req.params;
+  const target = ENABLED_APPS.find((a) => a.id === id);
+  const itemsPath = target?.launcher.items;
+  if (!itemsPath) {
+    res.status(404).json({ error: 'Unknown app or app with no launcher items' });
+    return;
+  }
+  const port = await waitForPort(id, Date.now() + API_PORT_WAIT_MS);
+  if (!port) {
+    res.status(503).json({ error: `${target.name} ${noPortReason(id).headline}` });
+    return;
+  }
+  console.log(`[${id}] ${op} ${item} asked for by the hub page`);
+  try {
+    const upstream = await fetch(`http://127.0.0.1:${port}${itemsPath}/${encodeURIComponent(item)}/${op}`, {
+      method: 'POST',
+      signal: AbortSignal.timeout(ITEM_OP_TIMEOUT_MS),
+    });
+    const body = await upstream.json().catch(() => ({}));
+    res.status(upstream.status).json(body);
+  } catch (err) {
+    res.status(502).json({ error: `${target.name} unavailable: ${err.message}` });
   }
 });
 

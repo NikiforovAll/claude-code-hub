@@ -1029,6 +1029,14 @@ const APP_ICONS = {
     ['path', { d: 'M5 16v-3a1 1 0 0 1 1-1h12a1 1 0 0 1 1 1v3' }],
     ['path', { d: 'M12 12V8' }],
   ],
+  puzzle: [
+    [
+      'path',
+      {
+        d: 'M15.39 4.39a1 1 0 0 0 1.68-.474 2.5 2.5 0 1 1 3.014 3.015 1 1 0 0 0-.474 1.68l1.683 1.682a2.414 2.414 0 0 1 0 3.414L19.61 15.39a1 1 0 0 1-1.68-.474 2.5 2.5 0 1 0-3.014 3.015 1 1 0 0 1 .474 1.68l-1.683 1.682a2.414 2.414 0 0 1-3.414 0L8.61 19.61a1 1 0 0 0-1.68.474 2.5 2.5 0 1 1-3.014-3.015 1 1 0 0 0 .474-1.68l-1.683-1.682a2.414 2.414 0 0 1 0-3.414L4.39 8.61a1 1 0 0 1 1.68.474 2.5 2.5 0 1 0 3.014-3.015 1 1 0 0 1-.474-1.68l1.683-1.682a2.414 2.414 0 0 1 3.414 0z',
+      },
+    ],
+  ],
 };
 
 const ROW_ICONS = {
@@ -1074,12 +1082,80 @@ function appIcon(app) {
   return box;
 }
 
+// An app's own rows (`items` in its stats) follow its row and match on their own name.
 function appRows(q) {
   const tabs = tabIds();
-  const list = Object.entries(apps).map(([id, a]) => ({ kind: 'app', id, app: a, index: tabs.indexOf(id) }));
+  const list = Object.entries(apps).flatMap(([id, a]) => [
+    { kind: 'app', id, app: a, index: tabs.indexOf(id), name: a.name },
+    ...(palette.appStats?.[id]?.items ?? []).map((item) => ({ kind: 'item', id, app: a, item, name: item.name })),
+  ]);
   if (!q) return list;
-  const hit = list.filter((r) => r.app.name.toLowerCase().includes(q) || r.id.includes(q));
-  return hit.length ? hit : list.filter((r) => subseq(r.app.name.toLowerCase(), q));
+  const hit = list.filter((r) => r.name.toLowerCase().includes(q) || (r.kind === 'app' && r.id.includes(q)));
+  return hit.length ? hit : list.filter((r) => subseq(r.name.toLowerCase(), q));
+}
+
+function fillItemRow(li, row, q) {
+  const { item } = row;
+  li.classList.add('palette-item');
+  li.append(appIcon({ icon: 'puzzle' }), markedSpan('name', item.name, q), el('span', 'url', item.detail));
+  li.append(el('span', 'stats', item.state), el('span', 'age', item.kind || row.app.name));
+  if (item.path)
+    li.append(rowButton('palette-copy', 'copy', 'c', 'Copy the path (Ctrl+C)', `Copy the path of ${item.name}`));
+  for (const op of item.ops) {
+    const { key, glyph, title } = ITEM_OPS[op];
+    li.append(rowButton(`palette-${op}`, glyph, key, `${title} (Ctrl+${key.toUpperCase()})`, `${title} ${item.name}`));
+  }
+}
+
+// The ops the hub knows for an app's launcher rows; the app lists which ones each row offers.
+const ITEM_OPS = {
+  restart: { key: 'r', glyph: 'restart', title: 'Restart', doing: 'Restarting', done: 'Restarted' },
+  remove: { key: 'd', glyph: '×', title: 'Remove', doing: 'Removing', done: 'Removed', confirm: true },
+};
+
+const itemKeys = (item) =>
+  [item.path && 'Ctrl+C copy path', ...item.ops.map((op) => `Ctrl+${ITEM_OPS[op].key.toUpperCase()} ${op}`)]
+    .filter(Boolean)
+    .join(' · ');
+
+const APP_ROW_KEYS = {
+  c: (row) => copyToHint(apps[row.id].url),
+  r: (row) => appOpFromPalette(row.id, 'restart'),
+  s: (row) => toggleFromPalette(row.id),
+};
+
+const ITEM_ROW_KEYS = {
+  c: (row) => row.item.path && copyToHint(row.item.path),
+  ...Object.fromEntries(Object.entries(ITEM_OPS).map(([op, { key }]) => [key, (row) => itemOpFromPalette(row, op)])),
+};
+
+// An op with `confirm` asks once: the same key again on the same row sends it.
+async function itemOpFromPalette(row, op) {
+  const { id, item } = row;
+  if (!item.ops.includes(op)) return;
+  const { key, doing, done } = ITEM_OPS[op];
+  const confirm = `item\n${op}\n${id}\n${item.id}`;
+  if (ITEM_OPS[op].confirm && palette.confirmOp !== confirm) {
+    palette.confirmOp = confirm;
+    setPaletteHint(`Press Ctrl+${key.toUpperCase()} again to ${op} ${item.name} from ${row.app.name}.`);
+    return;
+  }
+  palette.confirmOp = null;
+  setPaletteHint(`${doing} ${item.name}…`);
+  let body;
+  try {
+    body = await withPaletteBusy(() =>
+      sendJson('POST', `/api/apps/${encodeURIComponent(id)}/items/${encodeURIComponent(item.id)}/${op}`),
+    );
+  } catch (err) {
+    setPaletteHint(`Could not ${op} ${item.name}: ${err.message}`);
+    return;
+  }
+  setPaletteHint(body?.message ?? `${done} ${item.name}`);
+  if (op === 'remove' && palette.appStats?.[id]?.items) {
+    palette.appStats[id].items = palette.appStats[id].items.filter((i) => i.id !== item.id);
+  } else if (body?.state) item.state = body.state;
+  renderPalette();
 }
 
 // A click on the button runs the mode's rowKeys entry for `key`, the same as Ctrl+<key>.
@@ -1247,7 +1323,11 @@ const PALETTE_MODES = {
     placeholder: 'Search apps...',
     label: 'Switch app',
     get hint() {
-      const keys = 'Enter switch · Ctrl+C copy URL · Ctrl+R restart · Ctrl+S start/stop';
+      const row = palette.rows?.[palette.sel];
+      const keys =
+        row?.kind === 'item'
+          ? itemKeys(row.item)
+          : 'Enter switch · Ctrl+C copy URL · Ctrl+R restart · Ctrl+S start/stop';
       if (!hubInfo.version) return keys;
       const plugin = hubInfo.plugin ? [pluginNode(hubInfo.plugin), ' · '] : [];
       return [`Hub ${hubInfo.version} · `, ...plugin, keys];
@@ -1260,6 +1340,10 @@ const PALETTE_MODES = {
       return prev < 0 ? 0 : prev;
     },
     fillRow(li, row, q) {
+      if (row.kind === 'item') {
+        fillItemRow(li, row, q);
+        return;
+      }
       li.append(appIcon(row.app), markedSpan('name', row.app.name, q), el('span', 'url', new URL(row.app.url).host));
       const s = palette.appStats?.[row.id];
       if (s?.version) li.append(el('span', 'ver', s.version));
@@ -1289,11 +1373,9 @@ const PALETTE_MODES = {
           : rowButton('palette-toggle', 'stop', 's', 'Stop the app (Ctrl+S)', `Stop ${row.app.name}`),
       );
     },
-    rowKeys: {
-      c: (row) => copyToHint(apps[row.id].url),
-      r: (row) => appOpFromPalette(row.id, 'restart'),
-      s: (row) => toggleFromPalette(row.id),
-    },
+    rowKeys: Object.fromEntries(
+      ['c', 'd', 'r', 's'].map((k) => [k, (row) => (row.kind === 'item' ? ITEM_ROW_KEYS : APP_ROW_KEYS)[k]?.(row)]),
+    ),
     commit(row) {
       closePalette();
       switchTab(row.id);
@@ -1552,6 +1634,7 @@ function renderPalette() {
   // sel is null until the first render that has rows: the cached list may be empty until load() lands.
   if (palette.sel === null && rows.length > 0) palette.sel = spec.initialSel?.(rows) ?? 0;
   palette.sel = Math.min(palette.sel, Math.max(0, rows.length - 1));
+  drawPaletteHint();
   if (rows.length === 0) {
     list.replaceChildren(el('li', 'palette-empty', spec.empty));
     return;
@@ -1597,7 +1680,6 @@ function openPalette(mode) {
   input.value = '';
   input.placeholder = spec.placeholder;
   document.querySelector('#palette .palette-box').setAttribute('aria-label', spec.label);
-  drawPaletteHint();
   showOverlay('palette', closePalette);
   renderPalette();
   input.focus();
@@ -1605,7 +1687,6 @@ function openPalette(mode) {
   Promise.resolve(spec.load?.())
     .then(() => {
       if (!palette.open || palette.mode !== mode) return;
-      drawPaletteHint();
       renderPalette();
     })
     .catch((err) => {
