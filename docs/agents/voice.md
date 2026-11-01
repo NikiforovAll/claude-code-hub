@@ -4,7 +4,11 @@ User guide: `website/src/content/docs/guides/voice.mdx`.
 
 ## Switch and keys
 
-Off unless `config.json` has `voice: {enabled: true}` (also `provider`, default `hex`; `decider`, default `grammar`; `autoSubmit`, default `true`). Only then does the server load `lib/voice/` and the page bind `hub.voice` to `Ctrl+Shift+Space` (Hex keeps `Ctrl+Space` for plain dictation). `ext install voice` turns it on through `features/voice/feature.json` (see `docs/agents/extensions.md`), and `ext remove voice` sets `enabled: false`. The website lists it in the Extensions catalog through `website/src/content/extensions/voice.json`.
+Off unless `config.json` has `voice: {enabled: true}` (also `provider`: `auto`, the default, `hex` or `browser`; `decider`, default `grammar`; `autoSubmit`, default `true`). Only then does the server load `lib/voice/` and the page bind `hub.voice` to `Ctrl+Shift+Space` (Hex keeps `Ctrl+Space` for plain dictation). `ext install voice` turns it on through `features/voice/feature.json` (see `docs/agents/extensions.md`), and `ext remove voice` sets `enabled: false`. The website lists it in the Extensions catalog through `website/src/content/extensions/voice.json`.
+
+## Providers
+
+`resolveProvider` in `lib/voice/index.js` turns `auto` into `hex` when `hexExe()` finds Hex, else `browser`, once at startup. `/api/config` carries `voice: {provider, auto}`. With `browser`, the server runs no speech: the page's `SpeechRecognition` hears the mic and posts the text so far to `POST /api/voice/text` (`{text}`, answered with `live()`), then `{text, final: true}` on release, answered with the command from `decide()`, so the grammar stays on the server. The page then follows the live path below. In browser mode `start`, `stop`, `dictate` and `cancel` answer `ok: false`, and the hub does not offer `voice.dictate`. When `auto` picked the browser, the page shows the `#voice-note` toast once (`localStorage` key `hub-voice-browser-noted`), because the browser's speech service is online.
 
 ## Hold to talk
 
@@ -22,4 +26,4 @@ Backspace mid-hold (`voiceCancel`) cancels the stream and sends `session.live` w
 
 ## Dictate action and log
 
-With voice on, the hub also handles the action `voice.dictate` itself (`{op: start|stop|cancel}`, listed in `welcome.actions`; stop answers `{ok, text}` from `POST /api/voice/dictate`, which skips the deciders): cck's New session mic uses it in place of the browser's speech API. Each stop or dictate appends a line to `<hub-dir>/voice.jsonl`.
+With voice on through Hex, the hub also handles the action `voice.dictate` itself (`{op: start|stop|cancel}`, listed in `welcome.actions`; stop answers `{ok, text}` from `POST /api/voice/dictate`, which skips the deciders): cck's New session mic uses it in place of the browser's speech API. Each stop or dictate appends a line to `<hub-dir>/voice.jsonl`.

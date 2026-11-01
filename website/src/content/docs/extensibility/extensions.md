@@ -221,7 +221,7 @@ Restart the hub after either command. A feature's folder holds a `feature.json`:
   "kind": "feature",
   "id": "voice",
   "title": "Voice control",
-  "requires": { "hub": "1.27.0", "os": ["win32"], "apps": ["kanban"], "tools": [{ "name": "Hex", "check": "voice.hex", "url": "https://github.com/anomalyco/hex/releases" }] },
+  "requires": { "hub": "1.27.0", "apps": ["kanban"], "tools": [{ "name": "Hex", "check": "voice.hex", "url": "https://anoma.ly/hex", "optional": true, "without": "Voice uses the browser's speech recognition." }] },
   "config": { "voice": { "enabled": true } },
   "listing": { "tagline": "Hold a key and speak" }
 }
@@ -231,7 +231,7 @@ Restart the hub after either command. A feature's folder holds a `feature.json`:
 | --- | --- |
 | `config` | What `ext install` merges into `config.json`. `ext remove` sets `enabled` to `false` and keeps your other keys |
 | `requires.os` | The platforms the feature runs on |
-| `requires.tools` | The tools it needs. `check` names a check the hub ships, which finds the tool. `url` is where to get it: `ext install` prints it when the tool is missing, and the Extensions page links it |
+| `requires.tools` | The tools it needs. `check` names a check the hub ships, which finds the tool. `url` is where to get it: `ext install` prints it when the tool is missing, and the Extensions page links it. With `optional: true`, a missing tool does not stop the install: `ext install` prints `without`, what the feature does without it, and the Extensions page lists the tool under "Works better with" |
 | `requires.apps`, `listing` | As in an [app manifest](/claude-code-hub/extensibility/reference/manifest/) |
 
 Only the hub's own repository has features today: [Voice control](/claude-code-hub/guides/voice/).

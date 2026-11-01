@@ -44,6 +44,9 @@ let defaultConfigDir = null;
 let configDirSwitch = 'palette';
 // config.json voice.enabled; hub.voice has no default key without it.
 let voiceOn = false;
+// 'hex' or 'browser', which the hub picked for voice.provider 'auto'.
+let voiceProvider = null;
+const voiceInBrowser = () => voiceProvider === 'browser';
 // The app launcher's footer: the hub version from /api/config and its plugin from /api/apps/stats.
 const hubInfo = { version: null, plugin: null };
 // mode: 'project' (Ctrl+Alt+P), 'configDir' (Ctrl+Alt+W) or 'app' (Ctrl+Alt+A). One widget, three row sources.
@@ -282,7 +285,8 @@ async function init() {
   defaultConfigDir = config.defaultConfigDir ?? null;
   activeConfigDir = config.activeConfigDir ?? null;
   configDirSwitch = config.configDirSwitch ?? 'palette';
-  voiceOn = config.voice === true;
+  voiceOn = !!config.voice;
+  voiceProvider = config.voice?.provider ?? null;
   applyTitle(config.activeConfigDir);
   themeVars = config.themeVars ?? {};
   hubThemes = config.themes ?? [];
@@ -295,6 +299,7 @@ async function init() {
   listenMessages();
   listenKeys();
   if (voiceOn) listenVoiceRelease();
+  if (config.voice?.auto && voiceInBrowser()) noteBrowserVoice();
   bindPalette();
   bindSettings();
   registerSW();
@@ -409,6 +414,23 @@ function showErrorToast(action, err) {
   if (!unauthorized) errorToastTimer = setTimeout(hideErrorToast, ERROR_TOAST_MS);
 }
 
+// voice.provider 'auto' fell back to the browser, whose speech service is online: say so once.
+const VOICE_NOTE_KEY = 'hub-voice-browser-noted';
+
+function noteBrowserVoice() {
+  try {
+    if (localStorage.getItem(VOICE_NOTE_KEY)) return;
+  } catch {}
+  const toast = document.getElementById('voice-note');
+  document.getElementById('voice-note-ok').addEventListener('click', () => {
+    try {
+      localStorage.setItem(VOICE_NOTE_KEY, '1');
+    } catch {}
+    hideToast(toast);
+  });
+  showToast(toast);
+}
+
 // Hold to talk. Frames forward keydown only, so the press moves focus to the pill on the hub page:
 // the release lands there, and focus goes back to the frame after it.
 const voice = { state: 'idle', frame: null, started: null, live: null, pillTimer: 0 };
@@ -481,7 +503,67 @@ function startLive() {
     voiceStream = false;
     return false;
   });
+  live.finish = async () => {
+    live.close();
+    sendAudio(live);
+    await live.queue;
+    return sendJson('POST', '/api/voice/stream/finish');
+  };
+  live.cancel = async () => {
+    live.close();
+    await live.queue;
+    await sendJson('POST', '/api/voice/stream/cancel');
+  };
   return live;
+}
+
+const SpeechRec = window.SpeechRecognition || window.webkitSpeechRecognition;
+
+// voice.provider 'browser': the browser's speech recognition hears the mic, and the hub gets only
+// the text. One text post in flight at a time; a newer result waits for it and replaces older ones.
+function startBrowserLive() {
+  if (!SpeechRec) throw new Error('This browser has no speech recognition. Use Chrome or Edge, or install Hex.');
+  const rec = new SpeechRec();
+  const live = { opened: false, sent: '', text: '', error: null, posting: null, ready: Promise.resolve(true) };
+  rec.lang = navigator.language;
+  rec.interimResults = true;
+  rec.continuous = true;
+  live.ended = new Promise((resolve) => (rec.onend = resolve));
+  rec.onerror = (e) => (live.error = e.error);
+  rec.onresult = (e) => {
+    live.text = Array.from(e.results, (r) => r[0].transcript).join('');
+    postText(live);
+  };
+  const settle = async () => {
+    while (live.posting) await live.posting;
+  };
+  live.finish = async () => {
+    rec.stop();
+    await live.ended;
+    await settle();
+    if (!live.text && ['not-allowed', 'service-not-allowed', 'network', 'audio-capture'].includes(live.error)) {
+      throw new Error(`Speech recognition: ${live.error}`);
+    }
+    return sendJson('POST', '/api/voice/text', { text: live.text, final: true });
+  };
+  live.cancel = async () => {
+    rec.abort();
+    await settle();
+  };
+  rec.start();
+  return live;
+}
+
+function postText(live) {
+  if (live.posting) return;
+  const text = live.text;
+  live.posting = sendJson('POST', '/api/voice/text', { text })
+    .then((r) => showLive(live, r))
+    .catch(() => {})
+    .finally(() => {
+      live.posting = null;
+      if (live.text !== text) postText(live);
+    });
 }
 
 // Posts run one at a time, so the provider gets the audio in order.
@@ -532,10 +614,7 @@ function showLive(live, { text, newSession }) {
 }
 
 async function finishLive(live) {
-  live.close();
-  sendAudio(live);
-  await live.queue;
-  const r = await sendJson('POST', '/api/voice/stream/finish');
+  const r = await live.finish();
   if (!canLive()) return runVoiceCommand(r);
   openOnce(live, r.newSession);
   if (!r.text && !live.sent && !live.opened) return runVoiceCommand(r);
@@ -555,6 +634,15 @@ function voiceDown() {
   const active = document.activeElement;
   voice.frame = active?.tagName === 'IFRAME' ? active : null;
   voicePill('Listening', true).focus();
+  if (voiceInBrowser()) {
+    voice.started = null;
+    try {
+      voice.live = startBrowserLive();
+    } catch (err) {
+      voice.started = err;
+    }
+    return;
+  }
   voice.live = voiceStream ? startLive() : null;
   const cli = () => {
     voice.started = sendJson('POST', '/api/voice/start').catch((err) => err);
@@ -601,6 +689,8 @@ function runVoiceCommand({ text, command = {} }) {
 
 // `voice.dictate`, the one action the hub handles itself: an app's mic gets the provider's text with no command.
 const DICTATE = 'voice.dictate';
+// With the browser provider an app's mic runs its own browser speech, so the hub does not offer it.
+const hubDictates = () => voiceOn && !voiceInBrowser();
 
 async function dictate(op, reply) {
   const busy = op === 'start' ? voice.state !== 'idle' : voice.state !== 'dictating';
@@ -632,9 +722,7 @@ async function voiceCancel() {
   flashPill('Cancelled');
   try {
     if (live && (await live.ready)) {
-      live.close();
-      await live.queue;
-      await sendJson('POST', '/api/voice/stream/cancel');
+      await live.cancel();
       if (canLive() && (live.sent || live.opened)) {
         invokeVoice('session.live', { text: '', final: 'true', cancel: live.opened ? 'close' : 'true' });
       }
@@ -645,6 +733,14 @@ async function voiceCancel() {
   } catch {}
 }
 
+// The hold ends when any key of the hub.voice combo comes up, the user's combo included.
+function releasesVoice(e) {
+  const combo = Object.values(bindings()).find((b) => b.id === 'hub.voice')?.combo ?? 'ctrl+shift+Space';
+  const parts = combo.split('+');
+  const mod = { Control: 'ctrl', Alt: 'alt', Shift: 'shift', Meta: 'meta' }[e.key];
+  return mod ? parts.includes(mod) : comboOf({ key: e.key, code: e.code }) === parts.at(-1);
+}
+
 function listenVoiceRelease() {
   document.addEventListener('keydown', (e) => {
     if (voice.state !== 'listening' || e.key !== 'Backspace') return;
@@ -652,7 +748,7 @@ function listenVoiceRelease() {
     voiceCancel();
   });
   document.addEventListener('keyup', (e) => {
-    if (e.key !== ' ' && e.key !== 'Control') return;
+    if (!releasesVoice(e)) return;
     if (voice.state === 'cancelled') {
       voice.frame?.focus();
       voice.frame = null;
@@ -824,7 +920,7 @@ function welcomeFor(data, appId) {
     forward: Object.keys(bindings()),
     keys: actionKeys(),
     themes: hubThemes,
-    actions: [...Object.keys(actions), ...(voiceOn ? [DICTATE] : [])],
+    actions: [...Object.keys(actions), ...(hubDictates() ? [DICTATE] : [])],
     origins: Object.keys(apps).map(originOf),
     settings: apps[appId]?.settings ?? {},
   };
@@ -887,7 +983,7 @@ function fillUrl(template, params) {
 function onInvoke({ id, action, params = {}, open }, send) {
   if (typeof id !== 'string') return;
   const reply = (result) => send({ type: 'hub:result', id, ...result });
-  if (action === DICTATE && voiceOn) return dictate(params.op, reply);
+  if (action === DICTATE && hubDictates()) return dictate(params.op, reply);
   const spec = typeof action === 'string' && Object.hasOwn(actions, action) ? actions[action] : null;
   if (!spec) return reply({ ok: false, reason: 'unhandled' });
   if (badParams(spec.params, params)) return reply({ ok: false, reason: 'bad-params' });
@@ -1037,7 +1133,7 @@ function hubActions() {
       run: (i) => switchTab(tabIds()[i]),
       count: 9,
     },
-    { id: 'hub.voice', combo: voiceOn ? 'ctrl+shift+Space' : null, run: () => voiceDown() },
+    { id: 'hub.voice', combo: 'ctrl+shift+Space', off: !voiceOn, run: () => voiceDown() },
   ];
 }
 
@@ -1051,7 +1147,7 @@ function bindings() {
   const own = (b) => Object.hasOwn(userKeys, b.id);
   const expand = (action) => {
     const combo = comboFor(action);
-    if (!combo) return [];
+    if (!combo || action.off) return [];
     if (!action.count) return [[combo, { ...action, combo }]];
     return Array.from({ length: Math.min(action.count, tabs) }, (_, i) => {
       const c = combo.replace('{n}', i + 1);

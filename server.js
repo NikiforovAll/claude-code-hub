@@ -965,7 +965,7 @@ app.get('/api/config', (_req, res) => {
     activeConfigDir: hubConfig.activeConfigDir,
     defaultConfigDir,
     configDirSwitch: configDirSwitch(hubConfig),
-    voice: !!voice,
+    voice: voice && { provider: voice.provider, auto: voice.auto },
     version: HUB_VERSION,
   });
 });
@@ -1340,6 +1340,17 @@ function loadVoice() {
     return null;
   }
 }
+
+// The browser provider: the page posts the recognized text so far while the key is held, and the
+// final text on release. It sits above /api/voice/:op, which would take "text" as an op.
+app.post('/api/voice/text', express.json({ limit: '64kb' }), async (req, res) => {
+  if (!voice) return res.status(404).json({ error: 'voice is off' });
+  if (typeof req.body?.text !== 'string') return res.status(400).json({ error: 'text is required' });
+  const t0 = Date.now();
+  const r = await voice.text(req.body.text, req.body.final === true);
+  if (req.body.final === true) logVoice(r, t0, { provider: 'browser' });
+  res.json(r);
+});
 
 app.post('/api/voice/:op', async (req, res) => {
   if (!voice) return res.status(404).json({ error: 'voice is off' });

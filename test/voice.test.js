@@ -10,7 +10,7 @@ const ALL = { 'session.paste': {}, 'session.new': {} };
 
 function voiceWith({ actions = ALL, said = '', cfg = {} } = {}) {
   const speech = () => ({ start: async () => ({ ok: true }), stop: async () => ({ ok: true, text: said }) });
-  return createVoice(cfg, () => ({ actions }), { speech });
+  return createVoice({ provider: 'hex', ...cfg }, () => ({ actions }), { speech });
 }
 
 describe('voice', () => {
@@ -68,13 +68,13 @@ describe('voice', () => {
       audio: async () => ({ ok: true, text: 'New session. Fix the' }),
       finish: async () => ({ ok: true, text: 'New session. Fix the test' }),
     });
-    const v = createVoice({}, () => ({ actions: ALL }), { speech: () => ({}), stream });
+    const v = createVoice({ provider: 'hex' }, () => ({ actions: ALL }), { speech: () => ({}), stream });
     assert.deepEqual(v.live('fix the test'), { text: 'fix the test', newSession: false });
     assert.deepEqual(await v.stream.audio(Buffer.alloc(4)), { ok: true, text: 'Fix the', newSession: true });
     const done = await v.stream.finish();
     assert.equal(done.text, 'Fix the test');
     assert.equal(done.command.action, 'session.new');
-    const plain = createVoice({}, () => ({ actions: { 'session.paste': {} } }), { speech: () => ({}), stream });
+    const plain = createVoice({ provider: 'hex' }, () => ({ actions: { 'session.paste': {} } }), { speech: () => ({}), stream });
     assert.deepEqual(plain.live('New session. Fix'), { text: 'New session. Fix', newSession: false });
   });
 
@@ -108,6 +108,30 @@ describe('voice', () => {
     assert.ok(sent.includes('POST /streams/7/audio'));
     const missing = createHexStream({ apiFile: path.join(dir, 'none.json'), fetchImpl });
     assert.equal((await missing.start()).unsupported, true);
+  });
+
+  it('picks Hex for auto when it is installed, else the browser', () => {
+    const speech = () => ({});
+    assert.equal(createVoice({}, () => ({}), { speech, hasHex: () => true }).provider, 'hex');
+    const auto = createVoice({}, () => ({}), { hasHex: () => false });
+    assert.deepEqual([auto.provider, auto.auto, auto.stream], ['browser', true, null]);
+    const chosen = createVoice({ provider: 'browser' }, () => ({}), { hasHex: () => true });
+    assert.deepEqual([chosen.provider, chosen.auto], ['browser', false]);
+  });
+
+  it('decides on the text the browser heard', async () => {
+    const v = createVoice({ provider: 'browser' }, () => ({ actions: ALL }));
+    assert.deepEqual(await v.text('New session, fix the'), { ok: true, text: 'fix the', newSession: true });
+    const done = await v.text(' Fix the test ', true);
+    assert.deepEqual(done, {
+      ok: true,
+      text: 'Fix the test',
+      newSession: false,
+      submit: 'true',
+      command: { kind: 'invoke', action: 'session.paste', params: { text: 'Fix the test', submit: 'true' } },
+    });
+    assert.deepEqual((await v.text('', true)).command, { kind: 'none' });
+    assert.equal((await v.start()).ok, false);
   });
 
   it('refuses an unknown provider or decider', () => {

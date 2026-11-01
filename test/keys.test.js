@@ -137,6 +137,17 @@ describe('user keymap', () => {
     assert.equal(hub.actionOf(press), 'hub.voice');
     assert.equal(hub.actionKeys()['hub.voice'], 'ctrl+shift+Space');
     assert.equal(loadHubKeys({ voice: true, keys: { 'hub.voice': 'ctrl+alt+Space' } }).actionOf(press), 'text');
+    const userKeyVoiceOff = loadHubKeys({ keys: { 'hub.voice': 'ctrl+alt+v' } });
+    assert.equal(userKeyVoiceOff.actionOf({ ...press, key: 'v', code: 'KeyV', shiftKey: false, altKey: true }), 'text');
+    assert.equal(userKeyVoiceOff.actionKeys()['hub.voice'], null);
+  });
+
+  it('ends the hold when any key of the hold combo comes up', () => {
+    const up = (key, code = '') => ({ key, code });
+    const hub = loadHubKeys({ voice: true });
+    assert.deepEqual([up(' ', 'Space'), up('Control'), up('Shift'), up('Alt'), up('v', 'KeyV')].map(hub.releasesVoice), [true, true, true, false, false]);
+    const mine = loadHubKeys({ voice: true, keys: { 'hub.voice': 'ctrl+alt+v' } });
+    assert.deepEqual([up('v', 'KeyV'), up('Alt'), up('Control'), up(' ', 'Space'), up('Shift')].map(mine.releasesVoice), [true, true, true, false, false]);
   });
 
   it('lists the same action ids as lib/keymap.js', () => {

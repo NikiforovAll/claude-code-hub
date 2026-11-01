@@ -90,11 +90,23 @@ describe('ext', () => {
       assert.deepEqual(commands, []);
     });
 
-    it('refuses when Hex is missing, the OS is not Windows or Kanban is off, and writes nothing', () => {
+    it('turns voice on without Hex, on any OS, and says what that means', () => {
       writeJson(configFile(), { apps: [{ id: 'kanban' }] });
-      assert.equal(feature({ toolChecks: { 'voice.hex': () => false } }), false);
-      assert.match(out.join('\n'), /install Hex \(https:\/\/github\.com\/anomalyco\/hex\/releases\) first/);
-      assert.equal(feature({ platform: 'linux' }), false);
+      assert.equal(feature({ platform: 'linux', toolChecks: { 'voice.hex': () => false } }), true);
+      assert.match(out.join('\n'), /Hex \(https:\/\/anoma\.ly\/hex\) is not installed\. Voice uses the browser's speech recognition/);
+      assert.equal(config().voice.enabled, true);
+    });
+
+    it('refuses when a required tool is missing or Kanban is off, and writes nothing', () => {
+      writeJson(configFile(), { apps: [{ id: 'kanban' }] });
+      const features = path.join(root, 'features');
+      const real = JSON.parse(fs.readFileSync(path.join(__dirname, '..', 'features', 'voice', 'feature.json'), 'utf8'));
+      const tools = [{ name: 'Probe', check: 'probe', url: 'https://example.test' }];
+      fs.mkdirSync(path.join(features, 'voice'), { recursive: true });
+      writeJson(path.join(features, 'voice', 'feature.json'), { ...real, requires: { ...real.requires, os: ['win32'], tools } });
+      assert.equal(feature({ features, toolChecks: { probe: () => false } }), false);
+      assert.match(out.join('\n'), /install Probe \(https:\/\/example\.test\) first/);
+      assert.equal(feature({ features, platform: 'linux', toolChecks: { probe: () => true } }), false);
       assert.match(out.join('\n'), /runs on Windows only/);
       writeJson(configFile(), { apps: [{ id: 'kanban', enabled: false }] });
       assert.equal(feature(), false);

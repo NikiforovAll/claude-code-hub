@@ -14,6 +14,7 @@ const FUNCTIONS = [
   'comboLabel',
   'handleForwardedKey',
   'tabIds',
+  'releasesVoice',
 ];
 const { comboOf, keyParts } = require('../../packages/claude-hub-sdk/src/keys');
 
@@ -44,8 +45,7 @@ function loadHubKeys({
     userKeys: keys,
     apps: Object.fromEntries(ids.map((id) => [id, hidden.includes(id) ? { hidden: true } : {}])),
     configDirSwitch,
-    voiceOn: voice,
-    voiceDown: () => ran.push('hub.voice'),
+    voiceOn: voice,    voiceDown: () => ran.push('hub.voice'),
     togglePalette: (mode) =>
       ran.push({ project: 'hub.projectPicker', configDir: 'hub.configDirPicker', app: 'hub.appLauncher' }[mode]),
     toggleSettings: () => ran.push('hub.settings'),

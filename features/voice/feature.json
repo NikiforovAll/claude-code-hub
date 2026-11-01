@@ -5,14 +5,21 @@
   "title": "Voice control",
   "requires": {
     "hub": "1.27.0",
-    "os": ["win32"],
     "apps": ["kanban"],
-    "tools": [{ "name": "Hex", "check": "voice.hex", "url": "https://github.com/anomalyco/hex/releases" }]
+    "tools": [
+      {
+        "name": "Hex",
+        "check": "voice.hex",
+        "url": "https://anoma.ly/hex",
+        "optional": true,
+        "without": "Voice uses the browser's speech recognition, which is online. Install Hex to keep speech on your machine."
+      }
+    ]
   },
   "config": { "voice": { "enabled": true } },
   "listing": {
     "tagline": "Hold a key and speak: start a session or send a prompt with no Enter press",
-    "description": "Hold Ctrl+Shift+Space, speak and let go. \"New session, fix the flaky test\" opens the New session dialog with that prompt, and anything else goes to the session on screen as a prompt and is submitted. Kanban's New session microphone uses the same speech to text. Hex does the speech to text on your machine.",
+    "description": "Hold Ctrl+Shift+Space, speak and let go. \"New session, fix the flaky test\" opens the New session dialog with that prompt, and anything else goes to the session on screen as a prompt and is submitted. Kanban's New session microphone uses the same speech to text. Hex does the speech to text on your machine; without it, the browser's speech recognition does it.",
     "tags": ["voice", "experimental"],
     "screenshots": [
       {

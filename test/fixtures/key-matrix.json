@@ -47,9 +47,11 @@
       "hub.projectPicker": "ctrl+alt+o",
       "hub.nextApp": "ctrl+alt+a",
       "hub.configDirPicker": null,
-      "hub.appByNumber": "ctrl+shift+{n}"
+      "hub.appByNumber": "ctrl+shift+{n}",
+      "hub.voice": "ctrl+alt+v"
     },
     "rows": [
+      { "name": "Remapped: a user key for hold to talk types with voice off", "platform": "win", "key": "v", "code": "KeyV", "mods": ["ctrl", "alt"], "expect": "text" },
       { "name": "Remapped: Ctrl+Alt+O opens the project picker", "platform": "win", "key": "o", "code": "KeyO", "mods": ["ctrl", "alt"], "expect": "hub.projectPicker" },
       { "name": "Remapped: Ctrl+Alt+P is text", "platform": "win", "key": "p", "code": "KeyP", "mods": ["ctrl", "alt"], "expect": "text" },
       { "name": "Remapped: Ctrl+Alt+A, taken from the app launcher, is next app", "platform": "win", "key": "a", "code": "KeyA", "mods": ["ctrl", "alt"], "expect": "hub.nextApp" },

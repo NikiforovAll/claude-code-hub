@@ -29,7 +29,7 @@ export interface Extension {
   author?: string;
   homepage?: string;
   license?: string;
-  requires: { hub?: string; node?: string; apps?: string[]; os?: string[]; tools?: { name: string; url?: string }[] };
+  requires: { hub?: string; node?: string; apps?: string[]; os?: string[]; tools?: { name: string; url?: string; optional?: boolean }[] };
   plugin?: string;
   source: string;
   sha: string;

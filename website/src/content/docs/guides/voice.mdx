@@ -1,6 +1,6 @@
 ---
 title: Control the hub by voice
-description: Hold a key, speak, and the hub starts a session or sends your words as a prompt. Experimental, Windows only, needs Hex.
+description: Hold a key, speak, and the hub starts a session or sends your words as a prompt. Experimental. Uses Hex on Windows, else the browser's speech recognition.
 sidebar:
   badge:
     text: Experimental
@@ -18,8 +18,7 @@ Voice is off by default. You turn it on with the [Voice control extension](/clau
 
 ## Before you start
 
-- **Windows.** The hub uses the Hex CLI, which runs on Windows only.
-- **Hex.** [Hex](https://anoma.ly/hex) does the speech to text, on your machine. Get the Windows installer from its [website](https://anoma.ly/hex) or its [releases](https://github.com/anomalyco/hex/releases). Install it and start it once, so that it downloads its speech model. Hex must be running while you use voice.
+- **Hex (recommended, Windows).** [Hex](https://anoma.ly/hex) does the speech to text, on your machine. Get the Windows installer from its [website](https://anoma.ly/hex) or its [releases](https://github.com/anomalyco/hex/releases). Install it and start it once, so that it downloads its speech model. Hex must be running while you use voice. Without Hex, see [Without Hex](#without-hex).
 - **The embedded terminal.** Kanban sends prompts to the session in its [embedded terminal](/claude-code-hub/guides/terminal/). A session that runs in another terminal does not get them.
 
 <Shot src="shots/extensions/voice-hex.webp" alt="The Hex website: &quot;Speak. It appears.&quot;, local voice dictation for Windows, with the Windows installer and a PowerShell install command" width={2800} height={1560} />
@@ -30,7 +29,7 @@ Voice is off by default. You turn it on with the [Voice control extension](/clau
 claude-code-hub ext install voice
 ```
 
-The command checks that Hex is installed and turns voice on in the hub's `config.json`. Then restart the hub.
+The command turns voice on in the hub's `config.json`, and tells you when Hex is not installed. Then restart the hub.
 
 To turn voice off again:
 
@@ -49,6 +48,12 @@ To change your mind, press <kbd>Backspace</kbd> while you still hold the keys. T
 The first time, the hub window asks to use your microphone. Allow it: the hub records while you hold the keys and sends the sound to Hex on your machine. If you block it, or your Hex has no live text, Hex records and your words show up only when you let go.
 
 Hex keeps <kbd>Ctrl+Space</kbd> for plain dictation into any app, so both work side by side.
+
+### Without Hex
+
+When Hex is not installed, the hub uses the browser's speech recognition (Chrome or Edge), on any OS. It works the same way: hold the keys, speak, let go. The difference is privacy: the browser sends the sound to an online speech service while you hold the keys. The first time, a note in the hub window tells you so.
+
+To pick one yourself, set `provider` in [Settings](#settings).
 
 | Say | The hub |
 | --- | --- |
@@ -70,9 +75,9 @@ Kanban does not send a prompt while Claude shows a dialog, because the Enter pre
 
 ## Dictate in the New session dialog
 
-The microphone button in Kanban's New session dialog uses Hex too, when voice is on. Click it, speak, and click it again: the text goes into the Prompt field where the cursor is. Nothing is sent until you press **Start**.
+The microphone button in Kanban's New session dialog uses Hex too, when voice uses Hex. Click it, speak, and click it again: the text goes into the Prompt field where the cursor is. Nothing is sent until you press **Start**.
 
-With voice off, or when you run Kanban alone, the button uses the browser's speech recognition.
+Otherwise (voice off, voice through the browser, or Kanban alone), the button uses the browser's speech recognition.
 
 ## Settings
 
@@ -87,6 +92,7 @@ The extension writes `voice` in the hub's `config.json`. You can change it by ha
 | Key | Default | Meaning |
 | --- | --- | --- |
 | `enabled` | `false` | Turns voice on |
+| `provider` | `auto` | What turns speech into text: `hex`, `browser`, or `auto` (Hex when it is installed, else the browser) |
 | `autoSubmit` | `true` | Submits a prompt after it is pasted. With `false`, the prompt stays in the session's input box until you press <kbd>Enter</kbd> |
 
 To use another key, set `hub.voice` in [`keys`](/claude-code-hub/reference/shortcuts/#change-the-keys).
@@ -95,6 +101,7 @@ To use another key, set `hub.voice` in [`keys`](/claude-code-hub/reference/short
 
 - **Nothing happens when you hold the keys.** Voice is off, or the hub did not restart after you turned it on.
 - **"Voice: hex …" toast.** Hex is not installed or not running. Start Hex and try again.
+- **"Speech recognition: not-allowed" or "network".** The browser blocked the microphone, or cannot reach its speech service. Allow the microphone, check the network, or install Hex.
 - **"No speech".** Hex heard nothing. Check the microphone that the hub window uses (the camera icon in the address bar of a browser tab, or Chrome's site settings for the app), and the one that Hex uses.
 - **The words are wrong.** Each attempt is in `<hub dir>/voice.jsonl`, one line per attempt, with what Hex heard and what the hub did with it.
 
