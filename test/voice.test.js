@@ -41,7 +41,13 @@ describe('voice', () => {
       });
     }
     assert.deepEqual((await v.decide('hub add task')).params, {});
-    assert.deepEqual(v.live('Hub add task fix the'), { text: 'fix the', newSession: false, command: 'Add task' });
+    assert.deepEqual(v.live('Hub add task fix the'), {
+      text: 'fix the',
+      newSession: false,
+      command: 'Add task',
+      action: 'task.add',
+      params: { description: 'fix the' },
+    });
     assert.equal((await voiceWith().decide('hub add a task fix it')).kind, 'unknown');
   });
 
@@ -51,37 +57,29 @@ describe('voice', () => {
     assert.deepEqual(await v.decide('Hub, play music'), { kind: 'unknown' });
   });
 
-  it('splits a long task at the first break, keeping every word', async () => {
+  const LONG = 'fix the login page, the submit button does nothing on Safari';
+  const NO_BREAK = 'rename the voice pill to voice status because people get confused';
+
+  it('keeps a long task whole in the description, titled by its first clause with no model', async () => {
     const v = voiceWith({ actions: { ...ALL, 'task.add': {} } });
     const add = async (said) => (await v.decide(`Hub, add a task, ${said}`)).params;
     assert.deepEqual(await add('update the docs'), { subject: 'update the docs' });
-    assert.deepEqual(await add('fix the login page, the submit button does nothing on Safari'), {
-      subject: 'fix the login page',
-      description: 'the submit button does nothing on Safari',
-    });
-    assert.deepEqual(await add('rename the voice pill to voice status because people get confused'), {
-      subject: 'rename the voice pill to voice status because people get confused',
-    });
+    assert.deepEqual(await add(LONG), { subject: 'fix the login page', description: LONG });
+    assert.deepEqual(await add(NO_BREAK), { subject: '', description: NO_BREAK });
   });
 
-  it('asks the split model only for a long task with no break, and keeps its cut only when verbatim', async () => {
+  it('asks the title model only for a long task, and drops a title that is not one line', async () => {
     const asked = [];
-    const answers = { 'rename the voice pill to voice status because people get confused': 'rename the voice pill to voice status' };
+    const answers = { [LONG]: '"Fix Safari login submit."', [NO_BREAK]: 'Rename the voice pill\nbecause' };
     const ask = async (text) => {
       asked.push(text);
-      return answers[text] ?? 'Rename the pill';
+      return answers[text];
     };
-    const v = voiceWith({ actions: { ...ALL, 'task.add': {} }, cfg: { taskSplitModel: 'haiku' }, deps: { ask } });
+    const v = voiceWith({ actions: { ...ALL, 'task.add': {} }, cfg: { taskTitleModel: 'haiku' }, deps: { ask } });
     const add = async (said) => (await v.decide(`Hub, add a task, ${said}`)).params;
-    assert.deepEqual(await add('rename the voice pill to voice status because people get confused'), {
-      subject: 'rename the voice pill to voice status',
-      description: 'because people get confused',
-    });
-    assert.deepEqual(await add('rename the voice pill to the new name because people get confused'), {
-      subject: 'rename the voice pill to the new name because people get confused',
-    });
+    assert.deepEqual(await add(LONG), { subject: 'Fix Safari login submit', description: LONG });
+    assert.deepEqual(await add(NO_BREAK), { subject: '', description: NO_BREAK });
     await add('update the docs');
-    await add('fix the login page, the submit button does nothing on Safari');
     assert.equal(asked.length, 2);
   });
 

@@ -17,7 +17,7 @@ The hub ships four tools. This page lists what each tool gives to other apps and
 <BuiltinLinks />
 
 - **Topics.** The hub publishes `project.changed` when you pick a project. Kanban filters its sessions to the project, Marketplace and Memory Diagnoser show that project, and Cost limits its totals to it. Kanban publishes [`session.changed`](#sessionchanged) when you open a session. No built-in tool subscribes to it, but your own apps can, as the Inspector does.
-- **Actions.** Kanban calls [`project.plugins`](#projectplugins), [`session.cost`](#sessioncost) and [`project.memory`](#projectmemory) from the session view, and [`agent.cost`](#agentcost) from its CLI. Kanban handles [`session.open`](#sessionopen), [`session.paste`](#sessionpaste), [`session.live`](#sessionlive), [`session.new`](#sessionnew) and [`task.add`](#taskadd). Any app can call them.
+- **Actions.** Kanban calls [`project.plugins`](#projectplugins), [`session.cost`](#sessioncost) and [`project.memory`](#projectmemory) from the session view, and [`agent.cost`](#agentcost) from its CLI. Kanban handles [`session.open`](#sessionopen), [`session.paste`](#sessionpaste), [`session.live`](#sessionlive), [`session.new`](#sessionnew), [`task.add`](#taskadd) and [`task.live`](#tasklive). Any app can call them.
 - **Capabilities.** The hub reads [`projects`](#projects) and [`terminal`](#terminal) from Kanban.
 - **Kept keys.** Kanban keeps <kbd>Ctrl+Alt+N</kbd> (new session), <kbd>Ctrl+Alt+R</kbd> (resume session) and <kbd>Ctrl+Alt+S</kbd> (swap to the previous session) in `keys.keeps`. See [Kept keys](/claude-code-hub/extensibility/reference/manifest/#kept-keys).
 
@@ -132,7 +132,7 @@ await hub.invoke('session.live', { text: 'Fix the' });
 await hub.invoke('session.live', { text: 'Fix the flaky test', final: 'true', submit: 'true' });
 ```
 
-Each call sends the whole text so far, not only the new words. In the input box, Kanban types keys: it removes with backspaces what changed since the last call and types the rest. While the New session dialog is open and no `session` is named, the text goes into its Prompt field where the cursor was, and the last call focuses Start; `submit` does not start the session. With no session on screen, the calls before the last do nothing and the last shows the text in a toast with a Copy button. The same refusal as `session.paste` applies while Claude shows a dialog. The hub's voice control calls it while the key is held.
+Each call sends the whole text so far, not only the new words. In the input box, Kanban types keys: it removes with backspaces what changed since the last call and types the rest. While the New session dialog is open and no `session` is named, the text goes into its Prompt field where the cursor was. Until the last call, the dialog glows, shows Listening, and the Prompt is read-only. The last call focuses Start; `submit` does not start the session. With no session on screen, the calls before the last do nothing and the last shows the text in a toast with a Copy button. The same refusal as `session.paste` applies while Claude shows a dialog. The hub's voice control calls it while the key is held.
 
 ### `session.new`
 
@@ -162,7 +162,24 @@ Kanban does not start the session itself: it opens its New session dialog with t
 await hub.invoke('task.add', { subject: 'Fix the flaky login test' });
 ```
 
-With no `subject`, Kanban opens the board's Add task input. With no session on screen, Kanban shows a toast and adds nothing. The hub's voice control calls it for "Hub, add a task", with the words after it split into the subject and the description.
+With no `subject`, Kanban opens its Add task dialog. With no session on screen, Kanban shows a toast and adds nothing.
+
+### `task.live`
+
+| | |
+| --- | --- |
+| Handler | Kanban |
+| Params | `subject`, `description`: the title and description so far, optional · `pending`: `"true"` when the words are done and the last call is on its way · `final`: `"true"` on the last call · `submit`: `"true"` to add the task on the last call, optional · `cancel`: `"true"` to close the dialog and add nothing, optional |
+| Mode | `message` |
+| Shows | Kanban comes on screen with its Add task dialog, and the fields change as the calls come |
+
+```js
+await hub.invoke('task.live', { description: 'The login button does nothing' });
+await hub.invoke('task.live', { pending: 'true' });
+await hub.invoke('task.live', { subject: 'Fix the login button', description: 'The login button does nothing on Safari', final: 'true' });
+```
+
+The first call opens the dialog for the session on screen. Until the last call, the dialog glows, shows Listening, and its fields are read-only; the calls before it change only the description. After `pending`, a last call that takes over 300 ms shows "Writing a title". The last call sets both fields (with no `subject`, it keeps them) and focuses Add, so the user reviews the task and presses Enter. A last call that comes after the user closed the dialog does nothing. The hub's voice control calls it for "Hub, add a task" while the key is held.
 
 ### `project.plugins`
 

@@ -467,8 +467,9 @@ function hideVoicePill(afterMs = 0) {
 
 const VOICE_HELP_LINGER_MS = 6000;
 
-function helpRow(say, hint, what, app, kind = '') {
+function helpRow(action, say, hint, what, app, kind = '') {
   const row = el('div', `voice-help-row ${kind}`.trim());
+  row.dataset.action = action;
   const line = el('div', 'say', say);
   if (hint) line.append(' ', el('i', '', hint));
   row.append(line, el('div', 'what', what));
@@ -476,20 +477,20 @@ function helpRow(say, hint, what, app, kind = '') {
   return row;
 }
 
-// Opens when the hold has heard "hub" and no command yet: what the user can say on this tab.
+// Open for the whole hold: what the user can say on this tab, with the row the words match lit.
 function showVoiceHelp() {
   const panel = document.getElementById('voice-help');
   clearTimeout(voice.helpTimer);
-  if (!panel.hidden) return;
   const appOf = (action) => apps[actions[action]?.app]?.name ?? '';
   const rows = voiceCommands
     .filter((c) => Object.hasOwn(actions, c.action))
-    .map((c) => helpRow(`Hub, ${c.say}`, `<${c.param}>`, c.help, appOf(c.action)));
+    .map((c) => helpRow(c.action, `Hub, ${c.say}`, `<${c.param}>`, c.help, appOf(c.action)));
   if (Object.hasOwn(actions, 'session.paste')) {
     const what = voice.bare
       ? 'Not typed here: drafts go only to the session on screen'
       : 'Typed into the session as a draft';
-    rows.push(helpRow('anything else', '', what, appOf('session.paste'), voice.bare ? 'other off' : 'other'));
+    const kind = voice.bare ? 'other off' : 'other';
+    rows.push(helpRow('session.paste', 'anything else', '', what, appOf('session.paste'), kind));
   }
   document.getElementById('voice-help-rows').replaceChildren(...rows);
   document.getElementById('voice-help-tip').textContent = voice.bare
@@ -505,7 +506,11 @@ function hideVoiceHelp(afterMs = 0) {
   }, afterMs);
 }
 
-const voiceHelpOpen = () => !document.getElementById('voice-help').hidden;
+function markVoiceHelp(action) {
+  for (const row of document.getElementById('voice-help-rows').children) {
+    row.classList.toggle('on', row.dataset.action === action);
+  }
+}
 
 // Live speech: the page records the mic and the hub relays it to the provider, which answers with
 // the text so far. False after the hub answers 501 or the mic is refused: then the provider records.
@@ -673,14 +678,33 @@ function openOnce(live, newSession) {
   invokeVoice('session.new', {});
 }
 
-function showLive(live, { text, newSession, command }) {
+// A command row with `live` names a dialog its app fills as the user speaks: the dialog opens on the
+// phrase and takes the command's params live, and the last call carries the final params.
+const dialogFor = (action) => {
+  const dialog = voiceCommands.find((c) => c.action === action)?.live?.action;
+  return dialog && Object.hasOwn(actions, dialog) ? dialog : null;
+};
+
+function fillDialog(live, dialog, params = {}) {
+  const sent = JSON.stringify(params);
+  if (live.dialogSent === sent) return;
+  live.dialog = dialog;
+  live.dialogSent = sent;
+  invokeVoice(dialog, params);
+}
+
+function showLive(live, { text, newSession, command, action, params }) {
   if (!canLive() || voice.live !== live || voice.state !== 'listening') return;
   openOnce(live, newSession);
-  if (command === 'Hub' && !text) showVoiceHelp();
-  else hideVoiceHelp();
+  live.helpOnly = command === 'Hub' && !text;
+  const marked = newSession ? 'session.new' : command ? action : text && 'session.paste';
+  if (marked !== live.marked) markVoiceHelp(marked);
+  live.marked = marked;
   if (command) {
     clearTyped(live);
-    const pill = text ? `${command}: ${text}` : command;
+    const dialog = dialogFor(action);
+    if (dialog) fillDialog(live, dialog, params);
+    const pill = text && !dialog ? `${command}: ${text}` : command;
     if (pill !== live.pill) voicePill(pill, true);
     live.pill = pill;
     return;
@@ -692,8 +716,11 @@ function showLive(live, { text, newSession, command }) {
 }
 
 async function finishLive(live) {
+  // The final params can wait on a model (a task title), so the dialog shows it is busy.
+  if (live.dialog) invokeVoice(live.dialog, { pending: 'true' });
   const r = await live.finish();
   if (!canLive()) return runVoiceCommand(r);
+  if (live.dialog) return finishDialog(live, r);
   openOnce(live, r.newSession);
   if (!live.opened && !isDraft(r.command)) {
     clearTyped(live);
@@ -703,6 +730,18 @@ async function finishLive(live) {
   invokeVoice('session.live', { text: r.text, final: 'true', submit: String(voice.send && !live.opened) });
   if (live.opened) flashPill('New session');
   else hideVoicePill();
+}
+
+// The dialog stays open with the final params for the user to review; Enter during the hold saves it.
+function finishDialog(live, r) {
+  const c = r.command;
+  if (c?.kind === 'invoke' && dialogFor(c.action) === live.dialog) {
+    hideVoiceHelp();
+    invokeVoice(live.dialog, { ...c.params, final: 'true', submit: String(voice.send) });
+    return flashPill(c.label);
+  }
+  invokeVoice(live.dialog, { final: 'true', cancel: 'true' });
+  return runVoiceCommand(r);
 }
 
 function flashPill(text) {
@@ -715,7 +754,7 @@ function voiceDown() {
   voice.state = 'listening';
   voice.send = false;
   voice.bare = actions['session.paste']?.app !== activeApp;
-  hideVoiceHelp();
+  showVoiceHelp();
   const active = document.activeElement;
   voice.frame = active?.tagName === 'IFRAME' ? active : null;
   voicePill('Listening', true).focus();
@@ -758,6 +797,7 @@ async function voiceUp() {
     showErrorToast('Voice', err);
     // Ends Kanban's live text, keeping the words, so the next hold does not erase from a stale start.
     if (live?.sent && canLive()) invokeVoice('session.live', { text: live.sent, final: 'true', submit: 'false' });
+    if (live?.dialog) invokeVoice(live.dialog, { final: 'true' });
   } finally {
     voice.live = null;
     voice.state = 'idle';
@@ -775,7 +815,7 @@ function runVoiceCommand({ text, command = {} }) {
   }
   hideVoicePill();
   // "Hub" alone asks what to say: the panel stays a while in place of the toast.
-  if (voiceHelpOpen()) return hideVoiceHelp(VOICE_HELP_LINGER_MS);
+  if (voice.live?.helpOnly) return hideVoiceHelp(VOICE_HELP_LINGER_MS);
   showErrorToast("Didn't get that", new Error(`“${text}”`));
 }
 
@@ -821,6 +861,7 @@ async function voiceCancel() {
       if (canLive() && (live.sent || live.opened)) {
         invokeVoice('session.live', { text: '', final: 'true', cancel: live.opened ? 'close' : 'true' });
       }
+      if (live.dialog) invokeVoice(live.dialog, { final: 'true', cancel: 'true' });
     } else {
       await voice.started;
       await sendJson('POST', '/api/voice/cancel');
