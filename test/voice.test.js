@@ -5,6 +5,7 @@ const os = require('node:os');
 const path = require('node:path');
 const { createVoice } = require('../lib/voice');
 const { createHexStream } = require('../lib/voice/hex-stream');
+const { hexDir, hexExe } = require('../lib/voice/hex');
 
 const ALL = { 'session.paste': {}, 'session.new': {} };
 
@@ -201,6 +202,39 @@ describe('voice', () => {
     assert.ok(sent.includes('POST /streams/7/audio'));
     const missing = createHexStream({ apiFile: path.join(dir, 'none.json'), fetchImpl });
     assert.equal((await missing.start()).unsupported, true);
+  });
+
+  it("finds Hex's data folder on each OS", () => {
+    const home = 'h';
+    assert.equal(hexDir({ env: { APPDATA: 'ad' }, platform: 'win32', home }), path.join('ad', 'hex'));
+    assert.equal(hexDir({ env: {}, platform: 'darwin', home }), path.join(home, 'Library', 'Application Support', 'hex'));
+    assert.equal(hexDir({ env: {}, platform: 'linux', home }), path.join(home, '.local', 'share', 'hex'));
+    assert.equal(hexDir({ env: { XDG_DATA_HOME: 'xd' }, platform: 'linux', home }), path.join('xd', 'hex'));
+    assert.equal(hexDir({ env: { HEX_APPLICATION_SUPPORT_DIR: 'own', APPDATA: 'ad' }, platform: 'win32', home }), 'own');
+  });
+
+  it("finds the Hex CLI where each OS's installer puts it", () => {
+    const put = (file) => {
+      fs.mkdirSync(path.dirname(file), { recursive: true });
+      fs.writeFileSync(file, '');
+      return file;
+    };
+    const win = fs.mkdtempSync(path.join(os.tmpdir(), 'hex-'));
+    const env = { HEX_APPLICATION_SUPPORT_DIR: win };
+    assert.equal(hexExe({ env, platform: 'win32', home: win }), null);
+    fs.writeFileSync(path.join(win, 'current-version'), '2.3.1\n');
+    const exe = put(path.join(win, 'versions', '2.3.1', 'hex.exe'));
+    assert.equal(hexExe({ env, platform: 'win32', home: win }), exe);
+
+    const linux = fs.mkdtempSync(path.join(os.tmpdir(), 'hex-'));
+    assert.equal(hexExe({ env: {}, platform: 'linux', home: linux }), null);
+    const cli = put(path.join(linux, '.local', 'share', 'hex', 'current', 'hex'));
+    assert.equal(hexExe({ env: {}, platform: 'linux', home: linux }), cli);
+
+    const mac = fs.mkdtempSync(path.join(os.tmpdir(), 'hex-'));
+    const app = put(path.join(mac, 'Applications', 'Hex.app', 'Contents', 'MacOS', 'hex'));
+    assert.equal(hexExe({ env: {}, platform: 'darwin', home: mac }), fs.existsSync('/Applications/Hex.app/Contents/MacOS/hex') ? '/Applications/Hex.app/Contents/MacOS/hex' : app);
+    assert.equal(hexExe({ env: { HEX_EXE: 'x' }, platform: 'darwin', home: mac }), 'x');
   });
 
   it('picks Hex for auto when it is installed, else the browser', () => {
