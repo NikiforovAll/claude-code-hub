@@ -17,7 +17,7 @@ The hub ships four tools. This page lists what each tool gives to other apps and
 <BuiltinLinks />
 
 - **Topics.** The hub publishes `project.changed` when you pick a project. Kanban filters its sessions to the project, Marketplace and Memory Diagnoser show that project, and Cost limits its totals to it. Kanban publishes [`session.changed`](#sessionchanged) when you open a session. No built-in tool subscribes to it, but your own apps can, as the Inspector does.
-- **Actions.** Kanban calls [`project.plugins`](#projectplugins), [`session.cost`](#sessioncost) and [`project.memory`](#projectmemory) from the session view, and [`agent.cost`](#agentcost) from its CLI. Kanban handles [`session.open`](#sessionopen), [`session.paste`](#sessionpaste), [`session.live`](#sessionlive), [`session.new`](#sessionnew), [`task.add`](#taskadd) and [`task.live`](#tasklive). Any app can call them.
+- **Actions.** Kanban calls [`project.plugins`](#projectplugins), [`session.cost`](#sessioncost) and [`project.memory`](#projectmemory) from the session view, and [`agent.cost`](#agentcost) from its CLI. Kanban handles [`session.open`](#sessionopen), [`session.find`](#sessionfind), [`session.paste`](#sessionpaste), [`session.live`](#sessionlive), [`session.new`](#sessionnew), [`task.add`](#taskadd) and [`task.live`](#tasklive). Any app can call them.
 - **Capabilities.** The hub reads [`projects`](#projects) and [`terminal`](#terminal) from Kanban.
 - **Kept keys.** Kanban keeps <kbd>Ctrl+Alt+N</kbd> (new session), <kbd>Ctrl+Alt+R</kbd> (resume session) and <kbd>Ctrl+Alt+S</kbd> (swap to the previous session) in `keys.keeps`. See [Kept keys](/claude-code-hub/extensibility/reference/manifest/#kept-keys).
 
@@ -102,6 +102,21 @@ await hub.invoke('session.open', { session: 'd3a7c2e1-5b4f-4c8e-9a12-6f0e8b7d4c3
 ```
 
 Kanban calls it on itself when `claude-code-kanban new` starts a session, so the hub switches to Kanban before the session opens.
+
+### `session.find`
+
+| | |
+| --- | --- |
+| Handler | Kanban |
+| Params | `name`: words from the session's name, project or branch |
+| Mode | `message` |
+| Shows | Kanban comes on screen with the session that best matches the words, or its session picker |
+
+```js
+await hub.invoke('session.find', { name: 'docs panel' });
+```
+
+Kanban scores each session in its list by the share of the words found in its name, project folder and branch. Words of 4 letters or more match on a shared start, so "test" finds "tests". A session that matches at least 60% of the words, 25 points ahead of the next, opens at once. Otherwise Kanban opens its session picker with the words typed in and the best matches first, so <kbd>Enter</kbd> opens the top one. With no match, the picker filters and searches with the words as if you had typed them. The hub's voice control calls it for "Hub, open session …".
 
 ### `session.paste`
 

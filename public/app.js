@@ -439,7 +439,8 @@ function noteBrowserVoice() {
 const voice = {
   state: 'idle',
   send: false,
-  bare: false,
+  app: null,
+  drafts: false,
   frame: null,
   started: null,
   live: null,
@@ -467,35 +468,32 @@ function hideVoicePill(afterMs = 0) {
 
 const VOICE_HELP_LINGER_MS = 6000;
 
-function helpRow(action, say, hint, what, app, kind = '') {
+function helpRow(action, say, hint, what, kind = '') {
   const row = el('div', `voice-help-row ${kind}`.trim());
   row.dataset.action = action;
   const line = el('div', 'say', say);
   if (hint) line.append(' ', el('i', '', hint));
   row.append(line, el('div', 'what', what));
-  if (app) row.append(el('div', 'app', app));
   return row;
 }
+
+// Voice runs only what the app on screen handles, so a hold never switches tabs.
+const handledHere = (action) => actions[action]?.app === activeApp;
+const voiceRowsHere = () => voiceCommands.filter((c) => handledHere(c.action));
+const tabName = () => apps[activeApp]?.name ?? 'this tab';
 
 // Open for the whole hold: what the user can say on this tab, with the row the words match lit.
 function showVoiceHelp() {
   const panel = document.getElementById('voice-help');
   clearTimeout(voice.helpTimer);
-  const appOf = (action) => apps[actions[action]?.app]?.name ?? '';
-  const rows = voiceCommands
-    .filter((c) => Object.hasOwn(actions, c.action))
-    .map((c) => helpRow(c.action, `Hub, ${c.say}`, `<${c.param}>`, c.help, appOf(c.action)));
-  if (Object.hasOwn(actions, 'session.paste')) {
-    const what = voice.bare
-      ? 'Not typed here: drafts go only to the session on screen'
-      : 'Typed into the session as a draft';
-    const kind = voice.bare ? 'other off' : 'other';
-    rows.push(helpRow('session.paste', 'anything else', '', what, appOf('session.paste'), kind));
-  }
+  const rows = voiceRowsHere().map((c) => helpRow(c.action, `Hub, ${c.say}`, `<${c.param}>`, c.help));
+  if (voice.drafts)
+    rows.push(helpRow('session.paste', 'anything else', '', 'Typed into the session as a draft', 'other'));
   document.getElementById('voice-help-rows').replaceChildren(...rows);
-  document.getElementById('voice-help-tip').textContent = voice.bare
-    ? '"Hub" is optional on this tab · Backspace cancels'
-    : 'Enter during the hold sends · Backspace cancels';
+  document.getElementById('voice-help-title').textContent = `What you can say on ${tabName()}`;
+  document.getElementById('voice-help-tip').textContent = voice.drafts
+    ? 'Enter during the hold sends · Backspace cancels'
+    : 'Backspace cancels';
   panel.hidden = false;
 }
 
@@ -658,10 +656,8 @@ function invokeVoice(action, params) {
 }
 
 const canLive = () => Object.hasOwn(actions, 'session.live');
-// Words that match no command go to the session only while its app is on screen. On another tab the
-// hold is bare: the server takes a command without the "hub" prefix and makes no draft, so a hold
-// there never switches to Kanban to type.
-const heard = (path) => (voice.bare ? `${path}?bare=1` : path);
+// The server matches only the actions of the tab the hold started on.
+const heard = (path) => `${path}?app=${encodeURIComponent(voice.app)}`;
 const isDraft = (command) => command?.action === 'session.paste';
 
 // Words typed into the terminal before a phrase was heard come back out of its input box.
@@ -709,7 +705,7 @@ function showLive(live, { text, newSession, command, action, params }) {
     live.pill = pill;
     return;
   }
-  if (!live.opened && voice.bare) return;
+  if (!live.opened && !voice.drafts) return;
   if (text === live.sent) return;
   live.sent = text;
   invokeVoice('session.live', { text });
@@ -751,9 +747,11 @@ function flashPill(text) {
 
 function voiceDown() {
   if (voice.state !== 'idle') return;
+  voice.drafts = handledHere('session.paste');
+  if (!voice.drafts && !voiceRowsHere().length) return flashPill(`No voice commands on ${tabName()}`);
   voice.state = 'listening';
   voice.send = false;
-  voice.bare = actions['session.paste']?.app !== activeApp;
+  voice.app = activeApp;
   showVoiceHelp();
   const active = document.activeElement;
   voice.frame = active?.tagName === 'IFRAME' ? active : null;

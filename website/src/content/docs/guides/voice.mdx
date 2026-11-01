@@ -63,6 +63,7 @@ A command starts with the word "Hub". Everything else is a prompt.
 | --- | --- |
 | "Hub, new session" (also "Hub, start a session", "Hub, session") | Opens Kanban's New session dialog |
 | "Hub, new session, fix the flaky login test" | Opens the dialog with "fix the flaky login test" as the first prompt |
+| "Hub, open session docs panel" (also "Hub, switch to session …", "Hub, go to session …") | Opens the Kanban session whose name, project or branch has your words. With no clear winner, the session picker opens with your words and the best matches first: press <kbd>Enter</kbd> to open the top one, or pick another |
 | "Hub, add a task, fix the login page" (also "Hub, new task …", "Hub, task …") | Opens Kanban's Add task dialog for the session on screen. Your words go into Description as you speak. When you let go, a task of 8 words or fewer moves up into Title. A longer one stays in Description as said and gets a title: from `taskTitleModel` when it is set (see [Settings](#settings)), else the words before its first comma or period. Press <kbd>Enter</kbd> to add the task, or press <kbd>Enter</kbd> during the hold to add it when you let go |
 | Anything else | Types it into the session on screen as a prompt. <kbd>Enter</kbd> during the hold also sends it |
 
@@ -72,7 +73,7 @@ While you hold the keys, a panel at the bottom right lists the commands you can 
 
 ### On another tab
 
-On a tab other than Kanban, voice runs only commands, and "Hub" is optional: "add a task, fix the login page" works. Kanban comes on screen and does what you said. Other words are not typed into a session you cannot see. A toast shows them instead.
+Voice works on the tab on screen and never switches tabs. Its commands all belong to Kanban, so on another tab, such as Cost, holding the keys shows **No voice commands on Cost** and the hub does not listen.
 
 ### Where a new session starts
 

@@ -88,17 +88,41 @@ describe('voice', () => {
       voiceWith().commands.map((c) => [c.action, c.say, c.param]),
       [
         ['session.new', 'new session', 'prompt'],
+        ['session.find', 'open session', 'name'],
         ['task.add', 'add a task', 'subject'],
       ],
     );
+    for (const c of voiceWith().commands) assert.ok(c.help.length <= 45, `help fits one panel line: ${c.help}`);
   });
 
-  it('takes a command with no prefix only when bare', async () => {
-    const v = voiceWith({ actions: { ...ALL, 'task.add': {} } });
-    assert.equal((await v.decide('New task check the docs')).action, 'session.paste');
-    assert.equal((await v.decide('New task check the docs', true)).action, 'task.add');
-    assert.deepEqual(v.live('new session fix', true), { text: 'fix', newSession: true });
-    assert.deepEqual(await v.decide('fix the test', true), { kind: 'unknown' });
+  it('opens a session by name, and keeps "session" alone a new one', async () => {
+    const v = voiceWith({ actions: { ...ALL, 'session.find': {} } });
+    for (const said of ['Hub, open session docs panel.', 'hub switch to the session docs panel', 'Hub go to session, docs panel']) {
+      assert.deepEqual(await v.decide(said), {
+        kind: 'invoke',
+        action: 'session.find',
+        params: { name: 'docs panel' },
+        label: 'Open session',
+      });
+    }
+    assert.equal((await v.decide('hub session')).action, 'session.new');
+    assert.equal((await v.decide('hub open a new session')).kind, 'unknown');
+    assert.equal((await voiceWith().decide('hub open session docs')).kind, 'unknown');
+  });
+
+  it('runs only the actions of the tab the hold is on', async () => {
+    const actions = {
+      'session.paste': { app: 'kanban' },
+      'session.new': { app: 'kanban' },
+      'task.add': { app: 'kanban' },
+    };
+    const v = voiceWith({ actions });
+    assert.equal((await v.decide('Hub, new task check the docs', 'kanban')).action, 'task.add');
+    assert.equal((await v.decide('fix the test', 'kanban')).action, 'session.paste');
+    assert.deepEqual(await v.decide('Hub, new task check the docs', 'cost'), { kind: 'unknown' });
+    assert.deepEqual(await v.decide('fix the test', 'cost'), { kind: 'unknown' });
+    assert.deepEqual(v.live('hub new session fix', 'cost'), { text: 'new session fix', newSession: false, command: 'Hub' });
+    assert.equal((await v.decide('New task check the docs', 'kanban')).action, 'session.paste');
   });
 
   it('pastes anything else as a draft, with no Enter', async () => {
