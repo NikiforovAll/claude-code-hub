@@ -1341,13 +1341,15 @@ function loadVoice() {
   }
 }
 
+const bareHold = (req) => req.query.bare === '1';
+
 // The browser provider: the page posts the recognized text so far while the key is held, and the
 // final text on release. It sits above /api/voice/:op, which would take "text" as an op.
 app.post('/api/voice/text', express.json({ limit: '64kb' }), async (req, res) => {
   if (!voice) return res.status(404).json({ error: 'voice is off' });
   if (typeof req.body?.text !== 'string') return res.status(400).json({ error: 'text is required' });
   const t0 = Date.now();
-  const r = await voice.text(req.body.text, req.body.final === true);
+  const r = await voice.text(req.body.text, req.body.final === true, bareHold(req));
   if (req.body.final === true) logVoice(r, t0, { provider: 'browser' });
   res.json(r);
 });
@@ -1357,7 +1359,7 @@ app.post('/api/voice/:op', async (req, res) => {
   const { op } = req.params;
   if (!['start', 'stop', 'dictate', 'cancel'].includes(op)) return res.status(404).json({ error: 'unknown op' });
   const t0 = Date.now();
-  const r = await voice[op]();
+  const r = await voice[op](bareHold(req));
   if ((op === 'stop' || op === 'dictate') && r.ok) logVoice(r, t0);
   res.status(r.ok ? 200 : 502).json(r);
 });
@@ -1379,7 +1381,7 @@ app.post(
     if (!voice.stream) return res.status(501).json({ error: 'no live speech' });
     if (op === 'audio' && !Buffer.isBuffer(req.body)) return res.status(400).json({ error: 'audio is required' });
     const t0 = Date.now();
-    const r = await voice.stream[op](req.body);
+    const r = await voice.stream[op](req.body, bareHold(req));
     if (op === 'finish' && r.ok) logVoice(r, t0, { live: true });
     res.status(r.ok ? 200 : r.unsupported ? 501 : 502).json(r);
   },

@@ -17,7 +17,7 @@ The hub ships four tools. This page lists what each tool gives to other apps and
 <BuiltinLinks />
 
 - **Topics.** The hub publishes `project.changed` when you pick a project. Kanban filters its sessions to the project, Marketplace and Memory Diagnoser show that project, and Cost limits its totals to it. Kanban publishes [`session.changed`](#sessionchanged) when you open a session. No built-in tool subscribes to it, but your own apps can, as the Inspector does.
-- **Actions.** Kanban calls [`project.plugins`](#projectplugins), [`session.cost`](#sessioncost) and [`project.memory`](#projectmemory) from the session view, and [`agent.cost`](#agentcost) from its CLI. Kanban handles [`session.open`](#sessionopen), [`session.paste`](#sessionpaste), [`session.live`](#sessionlive) and [`session.new`](#sessionnew). Any app can call them.
+- **Actions.** Kanban calls [`project.plugins`](#projectplugins), [`session.cost`](#sessioncost) and [`project.memory`](#projectmemory) from the session view, and [`agent.cost`](#agentcost) from its CLI. Kanban handles [`session.open`](#sessionopen), [`session.paste`](#sessionpaste), [`session.live`](#sessionlive), [`session.new`](#sessionnew) and [`task.add`](#taskadd). Any app can call them.
 - **Capabilities.** The hub reads [`projects`](#projects) and [`terminal`](#terminal) from Kanban.
 - **Kept keys.** Kanban keeps <kbd>Ctrl+Alt+N</kbd> (new session), <kbd>Ctrl+Alt+R</kbd> (resume session) and <kbd>Ctrl+Alt+S</kbd> (swap to the previous session) in `keys.keeps`. See [Kept keys](/claude-code-hub/extensibility/reference/manifest/#kept-keys).
 
@@ -116,7 +116,7 @@ Kanban calls it on itself when `claude-code-kanban new` starts a session, so the
 await hub.invoke('session.paste', { text: 'Run the tests', submit: 'true' });
 ```
 
-The session must run in Kanban's embedded terminal. With no `session`, the text goes to the session whose terminal is on screen; with none on screen, Kanban shows the text in a toast with a Copy button. Claude queues a prompt sent while it works. Kanban refuses the paste, with a toast, while Claude shows a dialog, so Enter cannot answer it. The hub's voice control calls it with dictated text and `submit: "true"`.
+The session must run in Kanban's embedded terminal. With no `session`, the text goes to the session whose terminal is on screen; with none on screen, Kanban shows the text in a toast with a Copy button. Claude queues a prompt sent while it works. Kanban refuses the paste, with a toast, while Claude shows a dialog, so Enter cannot answer it. The hub's voice control calls it with dictated text, and `submit: "true"` only when the user pressed Enter during the hold.
 
 ### `session.live`
 
@@ -147,7 +147,22 @@ Each call sends the whole text so far, not only the new words. In the input box,
 await hub.invoke('session.new', { prompt: 'Fix the flaky login test', model: 'sonnet', args: '--permission-mode plan' });
 ```
 
-Kanban does not start the session itself: it opens its New session dialog with these values filled in (with no folder from any of these, the most recent project) and Start focused, so the user sees what starts and presses Enter. Kanban refuses it, with a toast, when the embedded terminal is off. The hub's voice control calls it for "new session", with the words after it as the prompt.
+Kanban does not start the session itself: it opens its New session dialog with these values filled in (with no folder from any of these, the most recent project) and Start focused, so the user sees what starts and presses Enter. Kanban refuses it, with a toast, when the embedded terminal is off. The hub's voice control calls it for "Hub, new session", with the words after it as the prompt.
+
+### `task.add`
+
+| | |
+| --- | --- |
+| Handler | Kanban |
+| Params | `subject`: the task subject, optional |
+| Mode | `message` |
+| Shows | Kanban comes on screen with a new pending task on the board of the session on screen |
+
+```js
+await hub.invoke('task.add', { subject: 'Fix the flaky login test' });
+```
+
+With no `subject`, Kanban opens the board's Add task input. With no session on screen, Kanban shows a toast and adds nothing. The hub's voice control calls it for "Hub, add a task", with the words after it as the subject.
 
 ### `project.plugins`
 

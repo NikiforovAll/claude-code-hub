@@ -57,17 +57,24 @@ When Hex is not installed, the hub uses the browser's speech recognition (Chrome
 
 To pick one yourself, set `provider` in [Settings](#settings).
 
+A command starts with the word "Hub". Everything else is a prompt.
+
 | Say | The hub |
 | --- | --- |
-| "New session" | Opens Kanban's New session dialog |
-| "New session, fix the flaky login test" | Opens the dialog with "fix the flaky login test" as the first prompt |
+| "Hub, new session" (also "Hub, start a session", "Hub, session") | Opens Kanban's New session dialog |
+| "Hub, new session, fix the flaky login test" | Opens the dialog with "fix the flaky login test" as the first prompt |
+| "Hub, add a task, fix the login page" (also "Hub, new task …", "Hub, task …") | Adds a pending task "fix the login page" to the board of the session on screen. With no words after it, opens the board's Add task input |
 | Anything else | Types it into the session on screen as a prompt. <kbd>Enter</kbd> during the hold also sends it |
 
-A phrase works only at the start of what you say. "I need a new session for this" is a prompt, not a command.
+"Hub" must be the first word. Once the hub hears it, nothing more goes into the session: the pill shows the command as you speak. "Hub" followed by words that are not a command shows a toast.
+
+### On another tab
+
+On a tab other than Kanban, voice runs only commands, and "Hub" is optional: "add a task, fix the login page" works. Kanban comes on screen and does what you said. Other words are not typed into a session you cannot see. A toast shows them instead.
 
 ### Where a new session starts
 
-"New session" opens Kanban's New session dialog as soon as Hex hears it, while you keep speaking. The words after it go into the Prompt field, so you see what starts before it starts. The folder is that of the session on screen, else the project that Kanban's project filter shows, else the most recent project. Press <kbd>Enter</kbd> to start it, or change a field first.
+"Hub, new session" opens Kanban's New session dialog as soon as Hex hears it, while you keep speaking. The words after it go into the Prompt field, so you see what starts before it starts. The folder is that of the session on screen, else the project that Kanban's project filter shows, else the most recent project. Press <kbd>Enter</kbd> to start it, or change a field first.
 
 ### When a prompt is not sent
 

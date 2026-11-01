@@ -436,6 +436,7 @@ function noteBrowserVoice() {
 const voice = {
   state: 'idle',
   send: false,
+  bare: false,
   frame: null,
   started: null,
   live: null,
@@ -516,7 +517,7 @@ function startLive() {
     live.close();
     sendAudio(live);
     await live.queue;
-    return sendJson('POST', '/api/voice/stream/finish');
+    return sendJson('POST', heard('/api/voice/stream/finish'));
   };
   live.cancel = async () => {
     live.close();
@@ -553,7 +554,7 @@ function startBrowserLive() {
     if (!live.text && ['not-allowed', 'service-not-allowed', 'network', 'audio-capture'].includes(live.error)) {
       throw new Error(`Speech recognition: ${live.error}`);
     }
-    return sendJson('POST', '/api/voice/text', { text: live.text, final: true });
+    return sendJson('POST', heard('/api/voice/text'), { text: live.text, final: true });
   };
   live.cancel = async () => {
     rec.abort();
@@ -566,7 +567,7 @@ function startBrowserLive() {
 function postText(live) {
   if (live.posting) return;
   const text = live.text;
-  live.posting = sendJson('POST', '/api/voice/text', { text })
+  live.posting = sendJson('POST', heard('/api/voice/text'), { text })
     .then((r) => showLive(live, r))
     .catch(() => {})
     .finally(() => {
@@ -588,7 +589,7 @@ function sendAudio(live) {
   live.len = 0;
   live.queue = live.queue
     .then(() =>
-      fetch('/api/voice/stream/audio', {
+      fetch(heard('/api/voice/stream/audio'), {
         method: 'POST',
         headers: { 'Content-Type': 'application/octet-stream' },
         body: pcm.buffer,
@@ -606,20 +607,37 @@ function invokeVoice(action, params) {
 }
 
 const canLive = () => Object.hasOwn(actions, 'session.live');
+// Words that match no command go to the session only while its app is on screen. On another tab the
+// hold is bare: the server takes a command without the "hub" prefix and makes no draft, so a hold
+// there never switches to Kanban to type.
+const heard = (path) => (voice.bare ? `${path}?bare=1` : path);
+const isDraft = (command) => command?.action === 'session.paste';
+
+// Words typed into the terminal before a phrase was heard come back out of its input box.
+function clearTyped(live) {
+  if (live.sent) invokeVoice('session.live', { text: '', final: 'true', cancel: 'true' });
+  live.sent = '';
+}
 
 // "new session" opens the dialog at once; the words after it, or any other words, show in Kanban as they come.
 function openOnce(live, newSession) {
   if (!newSession || live.opened) return;
   live.opened = true;
-  // Words typed into the terminal before "new session" was heard come back out of its input box.
-  if (live.sent) invokeVoice('session.live', { text: '', final: 'true', cancel: 'true' });
-  live.sent = '';
+  clearTyped(live);
   invokeVoice('session.new', {});
 }
 
-function showLive(live, { text, newSession }) {
+function showLive(live, { text, newSession, command }) {
   if (!canLive() || voice.live !== live || voice.state !== 'listening') return;
   openOnce(live, newSession);
+  if (command) {
+    clearTyped(live);
+    const pill = text ? `${command}: ${text}` : command;
+    if (pill !== live.pill) voicePill(pill, true);
+    live.pill = pill;
+    return;
+  }
+  if (!live.opened && voice.bare) return;
   if (text === live.sent) return;
   live.sent = text;
   invokeVoice('session.live', { text });
@@ -629,7 +647,10 @@ async function finishLive(live) {
   const r = await live.finish();
   if (!canLive()) return runVoiceCommand(r);
   openOnce(live, r.newSession);
-  if (!r.text && !live.sent && !live.opened) return runVoiceCommand(r);
+  if (!live.opened && !isDraft(r.command)) {
+    clearTyped(live);
+    return runVoiceCommand(r);
+  }
   invokeVoice('session.live', { text: r.text, final: 'true', submit: String(voice.send && !live.opened) });
   if (live.opened) flashPill('New session');
   else hideVoicePill();
@@ -644,6 +665,7 @@ function voiceDown() {
   if (voice.state !== 'idle') return;
   voice.state = 'listening';
   voice.send = false;
+  voice.bare = actions['session.paste']?.app !== activeApp;
   const active = document.activeElement;
   voice.frame = active?.tagName === 'IFRAME' ? active : null;
   voicePill('Listening', true).focus();
@@ -679,7 +701,7 @@ async function voiceUp() {
     if (live && (await live.ready)) return await finishLive(live);
     const started = await voice.started;
     if (started instanceof Error) throw started;
-    runVoiceCommand(await sendJson('POST', '/api/voice/stop'));
+    runVoiceCommand(await sendJson('POST', heard('/api/voice/stop')));
   } catch (err) {
     hideVoicePill();
     showErrorToast('Voice', err);
@@ -694,7 +716,7 @@ async function voiceUp() {
 function runVoiceCommand({ text, command = {} }) {
   if (command.kind === 'none') return flashPill('No speech');
   if (command.kind === 'invoke') {
-    const draft = command.action === 'session.paste';
+    const draft = isDraft(command);
     invokeVoice(command.action, draft ? { ...command.params, submit: String(voice.send) } : command.params);
     // A paste shows in the session, or in Kanban's copy toast, so the pill does not repeat the text.
     return command.label ? flashPill(command.label) : hideVoicePill();
