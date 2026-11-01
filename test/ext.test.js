@@ -81,11 +81,11 @@ describe('ext', () => {
     const feature = (more) => runExt(['install', 'voice'], ctx({ platform: 'win32', toolChecks: { 'voice.hex': () => true }, ...more }));
 
     it('turns voice on, keeps the other keys, and turns it off again', () => {
-      writeJson(configFile(), { apps: [{ id: 'kanban' }], voice: { autoSubmit: false } });
+      writeJson(configFile(), { apps: [{ id: 'kanban' }], voice: { provider: 'browser' } });
       assert.equal(feature(), true);
-      assert.deepEqual(config().voice, { autoSubmit: false, enabled: true });
+      assert.deepEqual(config().voice, { provider: 'browser', enabled: true });
       assert.equal(ext('remove', 'voice'), true);
-      assert.deepEqual(config().voice, { autoSubmit: false, enabled: false });
+      assert.deepEqual(config().voice, { provider: 'browser', enabled: false });
       assert.deepEqual(config().apps, [{ id: 'kanban' }]);
       assert.deepEqual(commands, []);
     });

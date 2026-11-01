@@ -10,7 +10,7 @@ sidebar:
 import Shot from '../../../kit/Shot.astro';
 import Lightbox from '../../../kit/Lightbox.astro';
 
-Hold <kbd>Ctrl+Shift+Space</kbd>, speak, and let go. The hub turns what you said into an action: it starts a new session, or sends your words to the session on screen as a prompt. Your words show up as you speak. You do not touch the keyboard again, not even to press <kbd>Enter</kbd>.
+Hold <kbd>Ctrl+Shift+Space</kbd>, speak, and let go. The hub turns what you said into an action: it starts a new session, or types your words into the session on screen as a prompt for you to review. Your words show up as you speak. To send the prompt at once, press <kbd>Enter</kbd> before you let go.
 
 <Shot src="shots/extensions/voice-live-new-session.webp" alt="Kanban's New session dialog opened by voice while the user still speaks: the Prompt field shows &quot;Fix the flaky login test and then run the&quot; and a Listening pill sits at the bottom of the hub window" width={3840} height={2160} />
 
@@ -41,7 +41,9 @@ claude-code-hub ext remove voice
 
 Hold <kbd>Ctrl+Shift+Space</kbd> while you speak. A pill at the bottom of the window shows **Listening**. Let go of the keys when you are done.
 
-Your words show up while you speak, about once a second: in the session's input box, or in the Prompt field of the New session dialog. When you let go, Hex gives the final text, which replaces them, and the hub submits it.
+Your words show up while you speak, about once a second: in the session's input box, or in the Prompt field of the New session dialog. When you let go, the final text replaces them and stays in the input box. Read it, then press <kbd>Enter</kbd> to send it.
+
+To send without the review, press <kbd>Enter</kbd> while you still hold the keys. The pill shows **sends on release**, and the prompt is sent when you let go.
 
 To change your mind, press <kbd>Backspace</kbd> while you still hold the keys. The hub stops listening, removes the words it typed and sends nothing. A New session dialog that your words opened closes. Then let go.
 
@@ -59,7 +61,7 @@ To pick one yourself, set `provider` in [Settings](#settings).
 | --- | --- |
 | "New session" | Opens Kanban's New session dialog |
 | "New session, fix the flaky login test" | Opens the dialog with "fix the flaky login test" as the first prompt |
-| Anything else | Sends it to the session on screen as a prompt, and submits it |
+| Anything else | Types it into the session on screen as a prompt. <kbd>Enter</kbd> during the hold also sends it |
 
 A phrase works only at the start of what you say. "I need a new session for this" is a prompt, not a command.
 
@@ -85,7 +87,7 @@ The extension writes `voice` in the hub's `config.json`. You can change it by ha
 
 ```json
 {
-  "voice": { "enabled": true, "autoSubmit": true }
+  "voice": { "enabled": true, "provider": "auto" }
 }
 ```
 
@@ -93,8 +95,6 @@ The extension writes `voice` in the hub's `config.json`. You can change it by ha
 | --- | --- | --- |
 | `enabled` | `false` | Turns voice on |
 | `provider` | `auto` | What turns speech into text: `hex`, `browser`, or `auto` (Hex when it is installed, else the browser) |
-| `autoSubmit` | `true` | Submits a prompt after it is pasted. With `false`, the prompt stays in the session's input box until you press <kbd>Enter</kbd> |
-
 To use another key, set `hub.voice` in [`keys`](/claude-code-hub/reference/shortcuts/#change-the-keys).
 
 ## When it does not work

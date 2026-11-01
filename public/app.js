@@ -435,6 +435,7 @@ function noteBrowserVoice() {
 // the release lands there, and focus goes back to the frame after it.
 const voice = {
   state: 'idle',
+  send: false,
   frame: null,
   started: null,
   live: null,
@@ -629,7 +630,7 @@ async function finishLive(live) {
   if (!canLive()) return runVoiceCommand(r);
   openOnce(live, r.newSession);
   if (!r.text && !live.sent && !live.opened) return runVoiceCommand(r);
-  invokeVoice('session.live', { text: r.text, final: 'true', submit: live.opened ? 'false' : r.submit });
+  invokeVoice('session.live', { text: r.text, final: 'true', submit: String(voice.send && !live.opened) });
   if (live.opened) flashPill('New session');
   else hideVoicePill();
 }
@@ -642,6 +643,7 @@ function flashPill(text) {
 function voiceDown() {
   if (voice.state !== 'idle') return;
   voice.state = 'listening';
+  voice.send = false;
   const active = document.activeElement;
   voice.frame = active?.tagName === 'IFRAME' ? active : null;
   voicePill('Listening', true).focus();
@@ -692,7 +694,8 @@ async function voiceUp() {
 function runVoiceCommand({ text, command = {} }) {
   if (command.kind === 'none') return flashPill('No speech');
   if (command.kind === 'invoke') {
-    invokeVoice(command.action, command.params);
+    const draft = command.action === 'session.paste';
+    invokeVoice(command.action, draft ? { ...command.params, submit: String(voice.send) } : command.params);
     // A paste shows in the session, or in Kanban's copy toast, so the pill does not repeat the text.
     return command.label ? flashPill(command.label) : hideVoicePill();
   }
@@ -758,7 +761,14 @@ function releasesVoice(e) {
 
 function listenVoiceRelease() {
   document.addEventListener('keydown', (e) => {
-    if (voice.state !== 'listening' || e.key !== 'Backspace') return;
+    if (voice.state !== 'listening') return;
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      voice.send = true;
+      voicePill('Listening · sends on release', true);
+      return;
+    }
+    if (e.key !== 'Backspace') return;
     e.preventDefault();
     voice.cancelling = voiceCancel();
   });

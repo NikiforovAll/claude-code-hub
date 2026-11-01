@@ -27,20 +27,15 @@ describe('voice', () => {
     });
   });
 
-  it('submits anything else as a prompt', async () => {
+  it('pastes anything else as a draft, with no Enter', async () => {
     const v = voiceWith();
     for (const text of ['Fix the failing test.', 'open session auth refactor', 'a new session is what I need']) {
       assert.deepEqual(await v.decide(` ${text} `), {
         kind: 'invoke',
         action: 'session.paste',
-        params: { text, submit: 'true' },
+        params: { text },
       });
     }
-  });
-
-  it('pastes without Enter when autoSubmit is off', async () => {
-    const v = voiceWith({ cfg: { autoSubmit: false } });
-    assert.deepEqual((await v.decide('Fix it')).params, { text: 'Fix it', submit: 'false' });
   });
 
   it('pastes "new session" when no app starts sessions', async () => {
@@ -127,8 +122,7 @@ describe('voice', () => {
       ok: true,
       text: 'Fix the test',
       newSession: false,
-      submit: 'true',
-      command: { kind: 'invoke', action: 'session.paste', params: { text: 'Fix the test', submit: 'true' } },
+      command: { kind: 'invoke', action: 'session.paste', params: { text: 'Fix the test' } },
     });
     assert.deepEqual((await v.text('', true)).command, { kind: 'none' });
     assert.equal((await v.start()).ok, false);

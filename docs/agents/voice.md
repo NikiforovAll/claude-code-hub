@@ -4,7 +4,7 @@ User guide: `website/src/content/docs/guides/voice.mdx`.
 
 ## Switch and keys
 
-Off unless `config.json` has `voice: {enabled: true}` (also `provider`: `auto`, the default, `hex` or `browser`; `decider`, default `grammar`; `autoSubmit`, default `true`). Only then does the server load `lib/voice/` and the page bind `hub.voice` to `Ctrl+Shift+Space` (Hex keeps `Ctrl+Space` for plain dictation). `ext install voice` turns it on through `features/voice/feature.json` (see `docs/agents/extensions.md`), and `ext remove voice` sets `enabled: false`. The website lists it in the Extensions catalog through `website/src/content/extensions/voice.json`.
+Off unless `config.json` has `voice: {enabled: true}` (also `provider`: `auto`, the default, `hex` or `browser`; `decider`, default `grammar`). Only then does the server load `lib/voice/` and the page bind `hub.voice` to `Ctrl+Shift+Space` (Hex keeps `Ctrl+Space` for plain dictation). `ext install voice` turns it on through `features/voice/feature.json` (see `docs/agents/extensions.md`), and `ext remove voice` sets `enabled: false`. The website lists it in the Extensions catalog through `website/src/content/extensions/voice.json`.
 
 ## Providers
 
@@ -16,11 +16,13 @@ Frames forward keydown only, so the press moves focus to `#voice-pill` on the hu
 
 ## CLI path
 
-`POST /api/voice/start` and `/stop` run the speech provider (`lib/voice/hex.js`, the Hex CLI's `dictation start|stop --print`); stop turns the text into a command: the grammar (`lib/voice/grammar.js`: "new session <prompt>" → `session.new`, which opens Kanban's dialog filled in), then the decider named in `voice.decider`, else `session.paste` (Kanban) with the text and `submit: "true"`, so a prompt is sent with no Enter press (`"false"` with `autoSubmit: false`).
+`POST /api/voice/start` and `/stop` run the speech provider (`lib/voice/hex.js`, the Hex CLI's `dictation start|stop --print`); stop turns the text into a command: the grammar (`lib/voice/grammar.js`: "new session <prompt>" → `session.new`, which opens Kanban's dialog filled in), then the decider named in `voice.decider`, else `session.paste` (Kanban) with the text, a draft. The page adds `submit: "true"` only when the user pressed Enter during the hold (`voice.send`), else `"false"`.
 
 ## Live text
 
 The page tries the live path first: it records the mic (`getUserMedia`, an AudioWorklet at 16 kHz, f32) and posts ~200 ms chunks to `POST /api/voice/stream/audio`; `lib/voice/hex-stream.js` relays them to Hex's local API (`/streams`, token from `%APPDATA%\hex\local-api.json`, kept in the hub) and each answer carries the text so far, split by `live()`. Once the text starts with "new session" the page invokes `session.new` at once, then sends the words (after the prefix, or all of them) to Kanban's `session.live` as they change, and on release a last `session.live` with `final` and `submit`. `stream/start` answering 501 (no local API or no `/streams`) or a refused mic sets `voiceStream = false` for the page's life and the CLI path takes over.
+
+Enter mid-hold sets `voice.send`, so the release sends the prompt; without it the prompt stays in the input box as a draft. A dialog that the hold opened is never started by it: focus lands on Start.
 
 Backspace mid-hold (`voiceCancel`) cancels the stream and sends `session.live` with empty `text` and `cancel` (`"close"` when the hold opened the dialog); the state stays `cancelled` until the release, so the key's auto-repeat does not start a new hold.
 
