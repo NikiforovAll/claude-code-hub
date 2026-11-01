@@ -1,6 +1,6 @@
 ---
 title: Control the hub by voice
-description: Hold a key, speak, and the hub starts a session or sends your words as a prompt. Experimental. Uses Hex on Windows, else the browser's speech recognition.
+description: Hold a key, speak, and the hub starts a session or sends your words as a prompt. Experimental. Uses Hex when it is installed, else the browser's speech recognition.
 sidebar:
   badge:
     text: Experimental
@@ -12,13 +12,13 @@ import Lightbox from '../../../kit/Lightbox.astro';
 
 Hold <kbd>Ctrl+Shift+Space</kbd>, speak, and let go. The hub turns what you said into an action: it starts a new session, or types your words into the session on screen as a prompt for you to review. Your words show up as you speak. To send the prompt at once, press <kbd>Enter</kbd> before you let go.
 
-<Shot src="shots/extensions/voice-live-new-session.webp" alt="Kanban's New session dialog opened by voice while the user still speaks: the Prompt field shows &quot;Fix the flaky login test and then run the&quot; and a Listening pill sits at the bottom of the hub window" width={3840} height={2160} />
+<Shot src="shots/extensions/voice-demo.webp" alt="Animation: the user holds Ctrl+Shift+Space and says &quot;Hub, add a task, fix the login page redirect&quot;. Kanban's Add task dialog fills as they speak, and Enter adds the task to the board. Then &quot;Hub, new session, fix the flaky login test and run the suite&quot; opens the New session dialog with that prompt. A panel at the bottom right lists the commands and lights the one that matches" width={1280} height={800} />
 
 Voice is off by default. You turn it on with the [Voice control extension](/claude-code-hub/extensions/voice/).
 
 ## Before you start
 
-- **Hex (recommended, Windows).** [Hex](https://anoma.ly/hex) does the speech to text, on your machine. Get the Windows installer from its [website](https://anoma.ly/hex) or its [releases](https://github.com/anomalyco/hex/releases). Install it and start it once, so that it downloads its speech model. Hex must be running while you use voice. Without Hex, see [Without Hex](#without-hex).
+- **Hex (recommended).** [Hex](https://anoma.ly/hex) does the speech to text, on your machine, on Windows, macOS and Linux. Get it from its [website](https://anoma.ly/hex) or its [releases](https://github.com/anomalyco/hex/releases). Install it and start it once, so that it downloads its speech model. Hex must be running while you use voice. Without Hex, see [Without Hex](#without-hex).
 - **The embedded terminal.** Kanban sends prompts to the session in its [embedded terminal](/claude-code-hub/guides/terminal/). A session that runs in another terminal does not get them.
 
 <Shot src="shots/extensions/voice-hex.webp" alt="The Hex website: &quot;Speak. It appears.&quot;, local voice dictation for Windows, with the Windows installer and a PowerShell install command" width={2800} height={1560} />

@@ -23,10 +23,10 @@
     "tags": ["voice", "experimental"],
     "screenshots": [
       {
-        "url": "https://nikiforovall.blog/claude-code-hub/shots/extensions/voice-live-new-session.webp",
-        "alt": "Kanban's New session dialog opened by voice while the user still speaks: the Prompt field shows \"Fix the flaky login test and then run the\" and a Listening pill sits at the bottom of the hub window",
+        "url": "https://nikiforovall.blog/claude-code-hub/shots/extensions/voice-demo.webp",
+        "alt": "Animation: the user holds Ctrl+Shift+Space and says \"Hub, add a task, fix the login page redirect\". Kanban's Add task dialog fills as they speak, and Enter adds the task to the board. Then \"Hub, new session, fix the flaky login test and run the suite\" opens the New session dialog with that prompt",
         "title": "Words show up as you speak",
-        "caption": "\"New session\" opens the dialog at once, and the rest of what you say fills the Prompt field.",
+        "caption": "\"Hub, add a task\" fills the Add task dialog, and \"Hub, new session\" opens New session with the rest as the prompt.",
         "card": true
       },
       {
