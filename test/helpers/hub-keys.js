@@ -32,6 +32,7 @@ function loadHubKeys({
   keys = {},
   hidden = [],
   configDirSwitch = 'palette',
+  voice = false,
 } = {}) {
   const ids = Array.from({ length: appCount }, (_, i) => `app${i + 1}`);
   const ran = [];
@@ -43,6 +44,8 @@ function loadHubKeys({
     userKeys: keys,
     apps: Object.fromEntries(ids.map((id) => [id, hidden.includes(id) ? { hidden: true } : {}])),
     configDirSwitch,
+    voiceOn: voice,
+    voiceDown: () => ran.push('hub.voice'),
     togglePalette: (mode) =>
       ran.push({ project: 'hub.projectPicker', configDir: 'hub.configDirPicker', app: 'hub.appLauncher' }[mode]),
     toggleSettings: () => ran.push('hub.settings'),

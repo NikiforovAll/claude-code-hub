@@ -17,7 +17,7 @@ The hub ships four tools. This page lists what each tool gives to other apps and
 <BuiltinLinks />
 
 - **Topics.** The hub publishes `project.changed` when you pick a project. Kanban filters its sessions to the project, Marketplace and Memory Diagnoser show that project, and Cost limits its totals to it. Kanban publishes [`session.changed`](#sessionchanged) when you open a session. No built-in tool subscribes to it, but your own apps can, as the Inspector does.
-- **Actions.** Kanban calls [`project.plugins`](#projectplugins), [`session.cost`](#sessioncost) and [`project.memory`](#projectmemory) from the session view, and [`agent.cost`](#agentcost) from its CLI. Kanban handles [`session.open`](#sessionopen). Any app can call them.
+- **Actions.** Kanban calls [`project.plugins`](#projectplugins), [`session.cost`](#sessioncost) and [`project.memory`](#projectmemory) from the session view, and [`agent.cost`](#agentcost) from its CLI. Kanban handles [`session.open`](#sessionopen), [`session.paste`](#sessionpaste), [`session.live`](#sessionlive) and [`session.new`](#sessionnew). Any app can call them.
 - **Capabilities.** The hub reads [`projects`](#projects) and [`terminal`](#terminal) from Kanban.
 - **Kept keys.** Kanban keeps <kbd>Ctrl+Alt+N</kbd> (new session), <kbd>Ctrl+Alt+R</kbd> (resume session) and <kbd>Ctrl+Alt+S</kbd> (swap to the previous session) in `keys.keeps`. See [Kept keys](/claude-code-hub/extensibility/reference/manifest/#kept-keys).
 
@@ -102,6 +102,52 @@ await hub.invoke('session.open', { session: 'd3a7c2e1-5b4f-4c8e-9a12-6f0e8b7d4c3
 ```
 
 Kanban calls it on itself when `claude-code-kanban new` starts a session, so the hub switches to Kanban before the session opens.
+
+### `session.paste`
+
+| | |
+| --- | --- |
+| Handler | Kanban |
+| Params | `text`: the text · `submit`: `"true"` to press Enter after it, optional · `session`: a session id, optional, else the session on screen |
+| Mode | `message` |
+| Shows | Kanban comes on screen and the text is in the session's input box |
+
+```js
+await hub.invoke('session.paste', { text: 'Run the tests', submit: 'true' });
+```
+
+The session must run in Kanban's embedded terminal. With no `session`, the text goes to the session whose terminal is on screen; with none on screen, Kanban shows the text in a toast with a Copy button. Claude queues a prompt sent while it works. Kanban refuses the paste, with a toast, while Claude shows a dialog, so Enter cannot answer it. The hub's voice control calls it with dictated text and `submit: "true"`.
+
+### `session.live`
+
+| | |
+| --- | --- |
+| Handler | Kanban |
+| Params | `text`: all the words so far · `final`: `"true"` on the last call · `submit`: `"true"` to press Enter after the last call, optional · `cancel`: on a last call with empty `text`, `"true"` to remove the words and send nothing, `"close"` to also close the New session dialog, optional · `session`: a session id, optional, else the session on screen |
+| Mode | `message` |
+| Shows | Kanban comes on screen and the words show as they come, in the session's input box or in the New session dialog's Prompt field |
+
+```js
+await hub.invoke('session.live', { text: 'Fix the' });
+await hub.invoke('session.live', { text: 'Fix the flaky test', final: 'true', submit: 'true' });
+```
+
+Each call sends the whole text so far, not only the new words. In the input box, Kanban types keys: it removes with backspaces what changed since the last call and types the rest. While the New session dialog is open and no `session` is named, the text goes into its Prompt field where the cursor was, and the last call focuses Start; `submit` does not start the session. With no session on screen, the calls before the last do nothing and the last shows the text in a toast with a Copy button. The same refusal as `session.paste` applies while Claude shows a dialog. The hub's voice control calls it while the key is held.
+
+### `session.new`
+
+| | |
+| --- | --- |
+| Handler | Kanban |
+| Params | All optional, the fields of Kanban's New session dialog: `cwd`: the folder, else the folder of the session on screen, else the project filter · `name` · `prompt`: the first prompt · `worktree`: `"true"` or a worktree name · `model`: `fable`, `opus`, `sonnet` or `haiku` · `effort`: `low` to `max` · `args`: more `claude` args, split on spaces · `edit`: `"true"` to type the command in a shell and wait for Enter · `stay`: `"true"` to start in the background |
+| Mode | `message` |
+| Shows | Kanban comes on screen with a new session in its embedded terminal |
+
+```js
+await hub.invoke('session.new', { prompt: 'Fix the flaky login test', model: 'sonnet', args: '--permission-mode plan' });
+```
+
+Kanban does not start the session itself: it opens its New session dialog with these values filled in (with no folder from any of these, the most recent project) and Start focused, so the user sees what starts and presses Enter. Kanban refuses it, with a toast, when the embedded terminal is off. The hub's voice control calls it for "new session", with the words after it as the prompt.
 
 ### `project.plugins`
 

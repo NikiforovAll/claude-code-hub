@@ -10,13 +10,18 @@ export async function getStaticPaths() {
 const { x } = Astro.props as { x: Extension };
 const { requires } = x;
 const addon = x.kind === 'addon';
+const feature = x.kind === 'feature';
+const OS = { win32: 'Windows', darwin: 'macOS', linux: 'Linux' } as Record<string, string>;
 const needs = [
   requires.hub && `Claude Code Hub ${requires.hub} or later`,
   requires.node && `Node.js ${requires.node} or later`,
+  requires.os && requires.os.map((o) => OS[o] ?? o).join(' or '),
+  ...(requires.tools ?? []).filter((t) => !t.url).map((t) => t.name),
   ...(addon ? ['Claude Code Kanban'] : (requires.apps ?? []).map((id) => `the ${id} app enabled in the hub`)),
 ].filter(Boolean) as string[];
+const linkedTools = (requires.tools ?? []).filter((t) => t.url);
 const facts = [
-  ['Kind', addon ? 'Kanban dock add-on' : 'Hub app'],
+  ['Kind', addon ? 'Kanban dock add-on' : feature ? 'Hub feature' : 'Hub app'],
   ['Author', x.author],
   ['License', x.license],
   ['Requires', needs.join(', ')],
@@ -45,6 +50,7 @@ const ld = {
       {x.name}
       {x.official && <span class="badge">Official</span>}
       {addon && <span class="badge">Add-on</span>}
+      {feature && <span class="badge">Feature</span>}
     </h1>
     <p class="lede">{x.tagline}</p>
     {x.description && <p class="description">{x.description}</p>}
@@ -62,7 +68,13 @@ const ld = {
       <h2 id="install">Install</h2>
       <pre><code>{x.install}</code></pre>
       {
-        addon ? (
+        feature ? (
+          <p>
+            The hub ships the code of a feature, so nothing is cloned. <code>ext install</code> checks that {(requires.tools ?? []).map((t) => t.name).join(' and ') || 'the hub can run it'} {(requires.tools ?? []).length ? 'is installed' : ''} and turns {x.name.toLowerCase()} on in the hub's <code>config.json</code>.
+            Restart the hub. <code>claude-code-hub ext remove {x.id}</code> turns it off again.{' '}
+            {x.homepage && <a href={x.homepage}>Read the guide</a>}
+          </p>
+        ) : addon ? (
           <p>
             <code>ext install</code> finds {x.id} in this registry, clones it into the hub dir with git and puts it on the Kanban dock of your Claude config dir.
             No restart is needed: every session shows it, and Kanban starts its server the first time you open it from the dock rail.{' '}
@@ -84,7 +96,7 @@ const ld = {
           facts.map(([k, v]) => (
             <>
               <dt>{k}</dt>
-              <dd>{v}</dd>
+              <dd>{v}{k === 'Requires' && linkedTools.map((t) => <>, <a href={t.url}>{t.name}</a></>)}</dd>
             </>
           ))
         }

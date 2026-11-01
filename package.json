@@ -60,6 +60,7 @@
     "server.js",
     "public/**/*",
     "lib/**/*",
+    "features/**/*",
     "plugin/**/*",
     "tray/**/*",
     "packages/claude-hub-sdk/src/**/*"

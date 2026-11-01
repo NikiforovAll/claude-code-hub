@@ -11,6 +11,7 @@
     { "name": "Windows US: app 1", "platform": "win", "key": "1", "code": "Digit1", "mods": ["alt"], "expect": "hub.appByNumber:1" },
     { "name": "Windows US: app 4", "platform": "win", "key": "4", "code": "Digit4", "mods": ["alt"], "expect": "hub.appByNumber:4" },
     { "name": "Windows US: app 5 with 4 apps", "platform": "win", "key": "5", "code": "Digit5", "mods": ["alt"], "expect": "text" },
+    { "name": "Windows US: hold to talk with voice off", "platform": "win", "key": " ", "code": "Space", "mods": ["ctrl", "shift"], "expect": "text" },
     { "name": "Windows US: Ctrl+Alt+Shift+P", "platform": "win", "key": "P", "code": "KeyP", "mods": ["ctrl", "alt", "shift"], "expect": "text" },
     { "name": "Windows US: Ctrl+Alt+1", "platform": "win", "key": "1", "code": "Digit1", "mods": ["ctrl", "alt"], "expect": "text" },
     { "name": "Windows US: plain p", "platform": "win", "key": "p", "code": "KeyP", "mods": [], "expect": "text" },

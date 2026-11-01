@@ -1,0 +1,35 @@
+{
+  "manifest": 1,
+  "kind": "feature",
+  "id": "voice",
+  "title": "Voice control",
+  "requires": {
+    "hub": "1.27.0",
+    "os": ["win32"],
+    "apps": ["kanban"],
+    "tools": [{ "name": "Hex", "check": "voice.hex", "url": "https://github.com/anomalyco/hex/releases" }]
+  },
+  "config": { "voice": { "enabled": true } },
+  "listing": {
+    "tagline": "Hold a key and speak: start a session or send a prompt with no Enter press",
+    "description": "Hold Ctrl+Shift+Space, speak and let go. \"New session, fix the flaky test\" opens the New session dialog with that prompt, and anything else goes to the session on screen as a prompt and is submitted. Kanban's New session microphone uses the same speech to text. Hex does the speech to text on your machine.",
+    "tags": ["voice", "experimental"],
+    "screenshots": [
+      {
+        "url": "https://nikiforovall.blog/claude-code-hub/shots/extensions/voice-live-new-session.webp",
+        "alt": "Kanban's New session dialog opened by voice while the user still speaks: the Prompt field shows \"Fix the flaky login test and then run the\" and a Listening pill sits at the bottom of the hub window",
+        "title": "Words show up as you speak",
+        "caption": "\"New session\" opens the dialog at once, and the rest of what you say fills the Prompt field.",
+        "card": true
+      },
+      {
+        "url": "https://nikiforovall.blog/claude-code-hub/shots/extensions/voice-hex.webp",
+        "alt": "The Hex website: \"Speak. It appears.\", local voice dictation for Windows, with the Windows installer and a PowerShell install command",
+        "title": "Hex does the speech to text",
+        "caption": "Install Hex and start it once. It runs on your machine, and the hub sends it the sound while you hold the keys."
+      }
+    ],
+    "homepage": "https://nikiforovall.blog/claude-code-hub/guides/voice/",
+    "license": "MIT"
+  }
+}

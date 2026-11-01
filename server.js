@@ -160,6 +160,7 @@ function resolveHubConfig() {
   if (saved.terminal && typeof saved.terminal === 'object') config.terminal = saved.terminal;
   if (Array.isArray(saved.apps)) config.apps = saved.apps;
   if (saved.keys !== undefined) config.keys = saved.keys;
+  if (saved.voice && typeof saved.voice === 'object') config.voice = saved.voice;
   copyLive(saved, config);
   const savedPrevious = typeof saved.previousConfigDir === 'string' ? canonical(saved.previousConfigDir) : null;
   if (dirs.includes(savedPrevious) && savedPrevious !== active) config.previousConfigDir = savedPrevious;
@@ -964,6 +965,7 @@ app.get('/api/config', (_req, res) => {
     activeConfigDir: hubConfig.activeConfigDir,
     defaultConfigDir,
     configDirSwitch: configDirSwitch(hubConfig),
+    voice: !!voice,
     version: HUB_VERSION,
   });
 });
@@ -1324,6 +1326,53 @@ app.get('/api/projects', async (_req, res) => {
     res.status(502).json({ error: `${id} unavailable: ${err.message}` });
   }
 });
+
+// Voice control, off unless config.json has voice.enabled; lib/voice loads only then.
+const VOICE_LOG = path.join(HUB_DIR, 'voice.jsonl');
+const voice = hubConfig.voice?.enabled === true ? loadVoice() : null;
+
+function loadVoice() {
+  try {
+    const ctx = () => ({ apps: appsConfig(), actions: ACTIONS });
+    return require('./lib/voice').createVoice(hubConfig.voice, ctx);
+  } catch (err) {
+    console.log(`Voice is off: ${err.message}`);
+    return null;
+  }
+}
+
+app.post('/api/voice/:op', async (req, res) => {
+  if (!voice) return res.status(404).json({ error: 'voice is off' });
+  const { op } = req.params;
+  if (!['start', 'stop', 'dictate', 'cancel'].includes(op)) return res.status(404).json({ error: 'unknown op' });
+  const t0 = Date.now();
+  const r = await voice[op]();
+  if ((op === 'stop' || op === 'dictate') && r.ok) logVoice(r, t0);
+  res.status(r.ok ? 200 : 502).json(r);
+});
+
+function logVoice(r, t0, extra) {
+  const entry = { at: new Date().toISOString(), text: r.text, command: r.command, ms: Date.now() - t0, ...extra };
+  fs.appendFile(VOICE_LOG, `${JSON.stringify(entry)}\n`, () => {});
+}
+
+// Live speech: the page sends mic audio while the key is held, about 5 posts a second, and each
+// answer carries the text so far. 501 sends the page back to /api/voice/start and /stop.
+app.post(
+  '/api/voice/stream/:op',
+  express.raw({ type: 'application/octet-stream', limit: '256kb' }),
+  async (req, res) => {
+    if (!voice) return res.status(404).json({ error: 'voice is off' });
+    const { op } = req.params;
+    if (!['start', 'audio', 'finish', 'cancel'].includes(op)) return res.status(404).json({ error: 'unknown op' });
+    if (!voice.stream) return res.status(501).json({ error: 'no live speech' });
+    if (op === 'audio' && !Buffer.isBuffer(req.body)) return res.status(400).json({ error: 'audio is required' });
+    const t0 = Date.now();
+    const r = await voice.stream[op](req.body);
+    if (op === 'finish' && r.ok) logVoice(r, t0, { live: true });
+    res.status(r.ok ? 200 : r.unsupported ? 501 : 502).json(r);
+  },
+);
 
 // The tray stops the hub through this rather than taskkill, so the children and hub.json are cleaned up.
 app.post('/api/shutdown', (_req, res) => {

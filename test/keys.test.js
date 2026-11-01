@@ -129,6 +129,16 @@ describe('user keymap', () => {
     assert.equal(loadHubKeys({ keys: { 'hub.appByNumber': null } }).appNumberCombo(0), undefined);
   });
 
+  it('binds hold to talk only with voice on', () => {
+    const press = { key: ' ', code: 'Space', ctrlKey: true, shiftKey: true, altKey: false, metaKey: false };
+    assert.equal(loadHubKeys().actionOf(press), 'text');
+    assert.equal(loadHubKeys().actionKeys()['hub.voice'], null);
+    const hub = loadHubKeys({ voice: true });
+    assert.equal(hub.actionOf(press), 'hub.voice');
+    assert.equal(hub.actionKeys()['hub.voice'], 'ctrl+shift+Space');
+    assert.equal(loadHubKeys({ voice: true, keys: { 'hub.voice': 'ctrl+alt+Space' } }).actionOf(press), 'text');
+  });
+
   it('lists the same action ids as lib/keymap.js', () => {
     assert.deepEqual(Array.from(loadHubKeys().hubActions(), (a) => a.id), HUB_ACTIONS);
   });

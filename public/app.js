@@ -42,6 +42,8 @@ const MAX_EVENT_CHARS = 16 * 1024;
 let defaultConfigDir = null;
 // What Ctrl+Alt+W does: 'palette' opens the config-dir palette, 'swap' switches to the previous dir.
 let configDirSwitch = 'palette';
+// config.json voice.enabled; hub.voice has no default key without it.
+let voiceOn = false;
 // The app launcher's footer: the hub version from /api/config and its plugin from /api/apps/stats.
 const hubInfo = { version: null, plugin: null };
 // mode: 'project' (Ctrl+Alt+P), 'configDir' (Ctrl+Alt+W) or 'app' (Ctrl+Alt+A). One widget, three row sources.
@@ -280,6 +282,7 @@ async function init() {
   defaultConfigDir = config.defaultConfigDir ?? null;
   activeConfigDir = config.activeConfigDir ?? null;
   configDirSwitch = config.configDirSwitch ?? 'palette';
+  voiceOn = config.voice === true;
   applyTitle(config.activeConfigDir);
   themeVars = config.themeVars ?? {};
   hubThemes = config.themes ?? [];
@@ -291,6 +294,7 @@ async function init() {
   switchTab(tabs.includes(saved) ? saved : (tabs[0] ?? Object.keys(apps)[0]));
   listenMessages();
   listenKeys();
+  if (voiceOn) listenVoiceRelease();
   bindPalette();
   bindSettings();
   registerSW();
@@ -403,6 +407,268 @@ function showErrorToast(action, err) {
   showToast(document.getElementById('error-toast'));
   clearTimeout(errorToastTimer);
   if (!unauthorized) errorToastTimer = setTimeout(hideErrorToast, ERROR_TOAST_MS);
+}
+
+// Hold to talk. Frames forward keydown only, so the press moves focus to the pill on the hub page:
+// the release lands there, and focus goes back to the frame after it.
+const voice = { state: 'idle', frame: null, started: null, live: null, pillTimer: 0 };
+
+function voicePill(text, listening = false) {
+  const pill = document.getElementById('voice-pill');
+  clearTimeout(voice.pillTimer);
+  pill.textContent = text;
+  pill.classList.toggle('listening', listening);
+  pill.hidden = false;
+  return pill;
+}
+
+function hideVoicePill(afterMs = 0) {
+  clearTimeout(voice.pillTimer);
+  voice.pillTimer = setTimeout(() => {
+    document.getElementById('voice-pill').hidden = true;
+  }, afterMs);
+}
+
+// Live speech: the page records the mic and the hub relays it to the provider, which answers with
+// the text so far. False after the hub answers 501 or the mic is refused: then the provider records.
+let voiceStream = true;
+const VOICE_RATE = 16000;
+const VOICE_CHUNK = VOICE_RATE / 5;
+const VOICE_TAP = `registerProcessor('voice-tap', class extends AudioWorkletProcessor {
+  process(inputs) { const ch = inputs[0] && inputs[0][0]; if (ch) this.port.postMessage(ch.slice(0)); return true; }
+});`;
+
+async function openMic(onSamples) {
+  const media = await navigator.mediaDevices.getUserMedia({
+    audio: { channelCount: 1, echoCancellation: true, noiseSuppression: true },
+  });
+  const ctx = new AudioContext({ sampleRate: VOICE_RATE });
+  try {
+    const url = URL.createObjectURL(new Blob([VOICE_TAP], { type: 'text/javascript' }));
+    await ctx.audioWorklet.addModule(url);
+    URL.revokeObjectURL(url);
+    const tap = new AudioWorkletNode(ctx, 'voice-tap');
+    tap.port.onmessage = (e) => onSamples(e.data);
+    ctx.createMediaStreamSource(media).connect(tap).connect(ctx.destination);
+  } catch (err) {
+    for (const t of media.getTracks()) t.stop();
+    ctx.close();
+    throw err;
+  }
+  return () => {
+    for (const t of media.getTracks()) t.stop();
+    ctx.close();
+  };
+}
+
+function startLive() {
+  const live = { buf: [], len: 0, queue: Promise.resolve(), close: null, opened: false, sent: '' };
+  live.ready = Promise.allSettled([
+    sendJson('POST', '/api/voice/stream/start'),
+    openMic((samples) => {
+      live.buf.push(samples);
+      live.len += samples.length;
+      if (live.close && live.len >= VOICE_CHUNK) sendAudio(live);
+    }),
+  ]).then(([started, mic]) => {
+    if (started.status === 'fulfilled' && mic.status === 'fulfilled') {
+      live.close = mic.value;
+      return true;
+    }
+    if (mic.status === 'fulfilled') mic.value();
+    if (started.status === 'fulfilled') sendJson('POST', '/api/voice/stream/cancel').catch(() => {});
+    if (started.status === 'rejected' && started.reason.status !== 501) throw started.reason;
+    voiceStream = false;
+    return false;
+  });
+  return live;
+}
+
+// Posts run one at a time, so the provider gets the audio in order.
+function sendAudio(live) {
+  if (!live.len) return;
+  const pcm = new Float32Array(live.len);
+  let at = 0;
+  for (const b of live.buf) {
+    pcm.set(b, at);
+    at += b.length;
+  }
+  live.buf = [];
+  live.len = 0;
+  live.queue = live.queue
+    .then(() =>
+      fetch('/api/voice/stream/audio', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/octet-stream' },
+        body: pcm.buffer,
+      }),
+    )
+    .then((res) => res.json())
+    .then((r) => r.ok && showLive(live, r))
+    .catch(() => {});
+}
+
+function invokeVoice(action, params) {
+  onInvoke({ id: 'voice', action, params }, (r) => {
+    if (!r.ok) showErrorToast('Voice', new Error(`${action} failed: ${r.reason}`));
+  });
+}
+
+const canLive = () => Object.hasOwn(actions, 'session.live');
+
+// "new session" opens the dialog at once; the words after it, or any other words, show in Kanban as they come.
+function openOnce(live, newSession) {
+  if (!newSession || live.opened) return;
+  live.opened = true;
+  invokeVoice('session.new', {});
+}
+
+function showLive(live, { text, newSession }) {
+  if (!canLive() || voice.live !== live || voice.state !== 'listening') return;
+  openOnce(live, newSession);
+  if (text === live.sent) return;
+  live.sent = text;
+  invokeVoice('session.live', { text });
+}
+
+async function finishLive(live) {
+  live.close();
+  sendAudio(live);
+  await live.queue;
+  const r = await sendJson('POST', '/api/voice/stream/finish');
+  if (!canLive()) return runVoiceCommand(r);
+  openOnce(live, r.newSession);
+  if (!r.text && !live.sent && !live.opened) return runVoiceCommand(r);
+  invokeVoice('session.live', { text: r.text, final: 'true', submit: live.opened ? 'false' : r.submit });
+  if (live.opened) flashPill('New session');
+  else hideVoicePill();
+}
+
+function flashPill(text) {
+  voicePill(text);
+  hideVoicePill(1500);
+}
+
+function voiceDown() {
+  if (voice.state !== 'idle') return;
+  voice.state = 'listening';
+  const active = document.activeElement;
+  voice.frame = active?.tagName === 'IFRAME' ? active : null;
+  voicePill('Listening', true).focus();
+  voice.live = voiceStream ? startLive() : null;
+  const cli = () => {
+    voice.started = sendJson('POST', '/api/voice/start').catch((err) => err);
+  };
+  if (voice.live)
+    voice.live.ready.then(
+      (ok) => ok || cli(),
+      () => {},
+    );
+  else cli();
+}
+
+async function voiceUp() {
+  if (voice.state !== 'listening') return;
+  voice.state = 'working';
+  voice.frame?.focus();
+  voice.frame = null;
+  voicePill('…');
+  const live = voice.live;
+  try {
+    if (live && (await live.ready)) return await finishLive(live);
+    const started = await voice.started;
+    if (started instanceof Error) throw started;
+    runVoiceCommand(await sendJson('POST', '/api/voice/stop'));
+  } catch (err) {
+    hideVoicePill();
+    showErrorToast('Voice', err);
+  } finally {
+    voice.live = null;
+    voice.state = 'idle';
+  }
+}
+
+function runVoiceCommand({ text, command = {} }) {
+  if (command.kind === 'none') return flashPill('No speech');
+  if (command.kind === 'invoke') {
+    invokeVoice(command.action, command.params);
+    // A paste shows in the session, or in Kanban's copy toast, so the pill does not repeat the text.
+    return command.label ? flashPill(command.label) : hideVoicePill();
+  }
+  hideVoicePill();
+  showErrorToast("Didn't get that", new Error(`“${text}”`));
+}
+
+// `voice.dictate`, the one action the hub handles itself: an app's mic gets the provider's text with no command.
+const DICTATE = 'voice.dictate';
+
+async function dictate(op, reply) {
+  const busy = op === 'start' ? voice.state !== 'idle' : voice.state !== 'dictating';
+  if (busy || !['start', 'stop', 'cancel'].includes(op)) return reply({ ok: false, reason: 'busy' });
+  try {
+    if (op === 'start') {
+      voice.state = 'dictating';
+      voicePill('Dictating', true);
+      await sendJson('POST', '/api/voice/start');
+      return reply({ ok: true });
+    }
+    voice.state = 'idle';
+    hideVoicePill();
+    const r = await sendJson('POST', `/api/voice/${op === 'stop' ? 'dictate' : 'cancel'}`);
+    reply({ ok: true, text: r.text ?? '' });
+  } catch (err) {
+    voice.state = 'idle';
+    hideVoicePill();
+    reply({ ok: false, reason: err.message });
+  }
+}
+
+// Backspace mid-hold drops the recording and what it typed. The state stays 'cancelled' until the
+// release, so the held key's auto-repeat does not start a new hold.
+async function voiceCancel() {
+  voice.state = 'cancelled';
+  const live = voice.live;
+  voice.live = null;
+  flashPill('Cancelled');
+  try {
+    if (live && (await live.ready)) {
+      live.close();
+      await live.queue;
+      await sendJson('POST', '/api/voice/stream/cancel');
+      if (canLive() && (live.sent || live.opened)) {
+        invokeVoice('session.live', { text: '', final: 'true', cancel: live.opened ? 'close' : 'true' });
+      }
+    } else {
+      await voice.started;
+      await sendJson('POST', '/api/voice/cancel');
+    }
+  } catch {}
+}
+
+function listenVoiceRelease() {
+  document.addEventListener('keydown', (e) => {
+    if (voice.state !== 'listening' || e.key !== 'Backspace') return;
+    e.preventDefault();
+    voiceCancel();
+  });
+  document.addEventListener('keyup', (e) => {
+    if (e.key !== ' ' && e.key !== 'Control') return;
+    if (voice.state === 'cancelled') {
+      voice.frame?.focus();
+      voice.frame = null;
+      voice.state = 'idle';
+    } else voiceUp();
+  });
+  window.addEventListener('blur', () => {
+    // A frame that takes focus mid-hold (Kanban's New session dialog) would get the release.
+    const held = voice.state === 'listening' || voice.state === 'cancelled';
+    if (held && document.activeElement?.tagName === 'IFRAME') {
+      setTimeout(() => document.getElementById('voice-pill').focus());
+      return;
+    }
+    if (voice.state === 'cancelled') voice.state = 'idle';
+    voiceUp();
+  });
 }
 
 function bindErrorToast() {
@@ -558,7 +824,7 @@ function welcomeFor(data, appId) {
     forward: Object.keys(bindings()),
     keys: actionKeys(),
     themes: hubThemes,
-    actions: Object.keys(actions),
+    actions: [...Object.keys(actions), ...(voiceOn ? [DICTATE] : [])],
     origins: Object.keys(apps).map(originOf),
     settings: apps[appId]?.settings ?? {},
   };
@@ -621,6 +887,7 @@ function fillUrl(template, params) {
 function onInvoke({ id, action, params = {}, open }, send) {
   if (typeof id !== 'string') return;
   const reply = (result) => send({ type: 'hub:result', id, ...result });
+  if (action === DICTATE && voiceOn) return dictate(params.op, reply);
   const spec = typeof action === 'string' && Object.hasOwn(actions, action) ? actions[action] : null;
   if (!spec) return reply({ ok: false, reason: 'unhandled' });
   if (badParams(spec.params, params)) return reply({ ok: false, reason: 'bad-params' });
@@ -628,7 +895,9 @@ function onInvoke({ id, action, params = {}, open }, send) {
   const url = template && fillUrl(template, params);
   const paneSrc = open === 'pane' && url && srcOnOrigin(handler, apps[handler].url + url);
   if (paneSrc) return reply({ ok: true, handledBy: handler, url: paneSrc });
-  switchTab(handler);
+  // Not again for the app on screen: switchTab focuses the frame and tells the app it is active,
+  // which repaints Kanban's terminal, and voice sends several actions a second.
+  if (handler !== activeApp) switchTab(handler);
   if (mode === 'message' && liveApps.has(handler)) {
     postTo(handler, { type: 'hub:action', id, action, params });
   } else if (url && !guardedApps.has(handler)) {
@@ -768,6 +1037,7 @@ function hubActions() {
       run: (i) => switchTab(tabIds()[i]),
       count: 9,
     },
+    { id: 'hub.voice', combo: voiceOn ? 'ctrl+shift+Space' : null, run: () => voiceDown() },
   ];
 }
 

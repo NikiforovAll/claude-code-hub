@@ -77,6 +77,32 @@ describe('ext', () => {
     for (const dir of [root, hubDir, configDir]) fs.rmSync(dir, { recursive: true, force: true });
   });
 
+  describe('feature', () => {
+    const feature = (more) => runExt(['install', 'voice'], ctx({ platform: 'win32', toolChecks: { 'voice.hex': () => true }, ...more }));
+
+    it('turns voice on, keeps the other keys, and turns it off again', () => {
+      writeJson(configFile(), { apps: [{ id: 'kanban' }], voice: { autoSubmit: false } });
+      assert.equal(feature(), true);
+      assert.deepEqual(config().voice, { autoSubmit: false, enabled: true });
+      assert.equal(ext('remove', 'voice'), true);
+      assert.deepEqual(config().voice, { autoSubmit: false, enabled: false });
+      assert.deepEqual(config().apps, [{ id: 'kanban' }]);
+      assert.deepEqual(commands, []);
+    });
+
+    it('refuses when Hex is missing, the OS is not Windows or Kanban is off, and writes nothing', () => {
+      writeJson(configFile(), { apps: [{ id: 'kanban' }] });
+      assert.equal(feature({ toolChecks: { 'voice.hex': () => false } }), false);
+      assert.match(out.join('\n'), /install Hex \(https:\/\/github\.com\/anomalyco\/hex\/releases\) first/);
+      assert.equal(feature({ platform: 'linux' }), false);
+      assert.match(out.join('\n'), /runs on Windows only/);
+      writeJson(configFile(), { apps: [{ id: 'kanban', enabled: false }] });
+      assert.equal(feature(), false);
+      assert.match(out.join('\n'), /needs kanban enabled/);
+      assert.equal(config().voice, undefined);
+    });
+  });
+
   it('links a folder: installs its plugin from there and writes an entry that points at it, with no copy', () => {
     writeJson(configFile(), { configDirs: ['C:/cfg'], keys: { 'hub.palette': null } });
     assert.equal(ext('install', root), true);

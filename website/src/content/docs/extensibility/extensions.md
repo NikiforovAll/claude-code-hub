@@ -204,6 +204,38 @@ In place of a plugin, `ext install` puts the add-on on the Kanban dock of the co
 - **Update.** `claude-code-hub ext update <id>` gets the latest code of a GitHub add-on and updates its dock entry. Then restart its server: <kbd>Ctrl+R</kbd> on its row under Kanban in the app launcher.
 - **Remove.** `claude-code-hub ext remove <id>` takes it off the dock of the config dir, removes its entry and deletes the clone of a GitHub add-on. <kbd>Ctrl+D</kbd> on its row in the app launcher takes it off the dock only.
 
+## Features
+
+A feature is a part of the hub that is off by default, because it needs a tool that not everyone has. The hub ships its code, so `ext install` clones nothing: it checks the tool and turns the feature on in `config.json`. The [Extensions page](/claude-code-hub/extensions/) lists features next to apps and add-ons, with a **Feature** badge, so you can find them in one place.
+
+```bash
+claude-code-hub ext install voice
+claude-code-hub ext remove voice
+```
+
+Restart the hub after either command. A feature's folder holds a `feature.json`:
+
+```json
+{
+  "manifest": 1,
+  "kind": "feature",
+  "id": "voice",
+  "title": "Voice control",
+  "requires": { "hub": "1.27.0", "os": ["win32"], "apps": ["kanban"], "tools": [{ "name": "Hex", "check": "voice.hex", "url": "https://github.com/anomalyco/hex/releases" }] },
+  "config": { "voice": { "enabled": true } },
+  "listing": { "tagline": "Hold a key and speak" }
+}
+```
+
+| Field | Meaning |
+| --- | --- |
+| `config` | What `ext install` merges into `config.json`. `ext remove` sets `enabled` to `false` and keeps your other keys |
+| `requires.os` | The platforms the feature runs on |
+| `requires.tools` | The tools it needs. `check` names a check the hub ships, which finds the tool. `url` is where to get it: `ext install` prints it when the tool is missing, and the Extensions page links it |
+| `requires.apps`, `listing` | As in an [app manifest](/claude-code-hub/extensibility/reference/manifest/) |
+
+Only the hub's own repository has features today: [Voice control](/claude-code-hub/guides/voice/).
+
 ## Trust
 
 An extension runs as you, with no sandbox. It can read the hub token and every file you can read, and its plugin can run hooks in each Claude Code session. Add only an extension whose source you trust, the same as a Claude Code plugin.

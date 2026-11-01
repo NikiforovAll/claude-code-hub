@@ -524,6 +524,23 @@
     }
 
     .update-toast[hidden] { display: none; }
+    .voice-pill {
+      position: fixed;
+      left: 50%;
+      bottom: 16px;
+      z-index: 30;
+      transform: translateX(-50%);
+      padding: 6px 14px;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 999px;
+      box-shadow: 0 6px 20px var(--shadow);
+      color: var(--text);
+      font: 13px ui-monospace, SFMono-Regular, Menlo, monospace;
+      outline: none;
+    }
+    .voice-pill[hidden] { display: none; }
+    .voice-pill.listening::before { content: '● '; color: #e5484d; }
     .update-toast.leaving { opacity: 0; transform: translateY(8px); }
     .update-toast-body { flex: 1; min-width: 0; }
     .update-toast-title { font-weight: 600; font-size: 15px; }
@@ -648,6 +665,8 @@
     </div>
     <button class="update-toast-close" id="error-close" type="button" aria-label="Close">×</button>
   </div>
+
+  <div class="voice-pill" id="voice-pill" tabindex="-1" role="status" hidden></div>
 
   <script src="/sdk/keys.js"></script>
   <script src="/app.js"></script>

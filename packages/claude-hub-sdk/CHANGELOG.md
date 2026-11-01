@@ -2,6 +2,10 @@
 
 The SDK follows semver. A new function or message is a minor version, a change that breaks an app is a major version. The protocol version is separate ([Versioning](https://nikiforovall.blog/claude-code-hub/reference/protocol/#versioning)).
 
+## 1.9.0
+
+- `comboOf()` names the space bar `Space`, as in `ctrl+shift+Space`. Before, the name ended in a space character, which `config.json` `keys` could not hold. The hub binds `ctrl+shift+Space` for hold to talk when voice is on.
+
 ## 1.8.0
 
 - `hub.invoke(action, params, {open: 'pane'})` asks for the action's URL instead of running it. The hub sends `open: 'pane'` in `hub:invoke`, fills the action's `url` template on the handler's origin and answers `{ok: true, handledBy, url}` without a tab switch, so the caller can show the app in a pane of its own. When the action has no `url` or a template param is missing, the hub runs the action as before and the result has no `url`. Standalone and in the stub, the result carries the standalone URL and no window opens.

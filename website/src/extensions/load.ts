@@ -18,7 +18,7 @@ const SHA_RE = /^[0-9a-f]{40}$/;
 export interface Extension {
   id: string;
   name: string;
-  kind: 'app' | 'addon';
+  kind: 'app' | 'addon' | 'feature';
   official: boolean;
   order: number;
   tagline: string;
@@ -29,7 +29,7 @@ export interface Extension {
   author?: string;
   homepage?: string;
   license?: string;
-  requires: { hub?: string; node?: string; apps?: string[] };
+  requires: { hub?: string; node?: string; apps?: string[]; os?: string[]; tools?: { name: string; url?: string }[] };
   plugin?: string;
   source: string;
   sha: string;
@@ -98,14 +98,21 @@ async function loadOne(file: string, local: Map<string, string>): Promise<Extens
   const src = { owner: m[1], repo: m[2], subdir: m[3] ?? '' };
   const sha: string = pinned ? entry.sha : await head(src.owner, src.repo);
   const dir = local.get(id);
-  const raw = await readAt(src, sha, 'hub-app.json', dir);
-  const kind = raw === null ? 'addon' : 'app';
-  const text = raw ?? (await readAt(src, sha, 'addon.json', dir));
-  if (text === null) throw new Error(`${file}: no hub-app.json or addon.json at ${entry.source}@${sha}`);
+  let kind: Extension['kind'] | undefined;
+  let text: string | null = null;
+  for (const [k, name] of [['app', 'hub-app.json'], ['addon', 'addon.json'], ['feature', 'feature.json']] as const) {
+    text = await readAt(src, sha, name, dir);
+    if (text !== null) {
+      kind = k;
+      break;
+    }
+  }
+  if (text === null || !kind) throw new Error(`${file}: no hub-app.json, addon.json or feature.json at ${entry.source}@${sha}`);
   const manifest = JSON.parse(text);
   // cck owns the add-on manifest and checks it on install; the site reads only what it shows.
   // The app manifest is checked against a folder that does not exist, so containment is a check of the path text.
-  const err = kind === 'addon' ? addonError(manifest, id) : manifestError(manifest, id, path.resolve(SITE, '.extension-root'));
+  const err =
+    kind === 'addon' ? addonError(manifest, id) : kind === 'feature' ? featureError(manifest, id) : manifestError(manifest, id, path.resolve(SITE, '.extension-root'));
   if (err) throw new Error(`${file}: ${err}`);
   const listing = manifest.listing ?? {};
   if (!listing.tagline) throw new Error(`${file}: listing.tagline is missing`);
@@ -121,7 +128,7 @@ async function loadOne(file: string, local: Map<string, string>): Promise<Extens
   );
   return {
     id,
-    name: (kind === 'addon' ? manifest.title : manifest.name) ?? id,
+    name: (kind === 'app' ? manifest.name : manifest.title) ?? id,
     kind,
     official: entry.official === true,
     order: typeof entry.order === 'number' ? entry.order : Number.MAX_SAFE_INTEGER,
@@ -147,6 +154,13 @@ function addonError(m: { kind?: unknown; id?: unknown; title?: unknown; url?: un
   if (m.kind !== 'addon') return 'addon.json kind is not "addon"';
   if (m.id !== id) return `addon.json id is not ${id}`;
   if (typeof m.title !== 'string' || typeof m.url !== 'string') return 'addon.json needs title and url';
+  return null;
+}
+
+function featureError(m: { kind?: unknown; id?: unknown; title?: unknown; config?: unknown }, id: string): string | null {
+  if (m.kind !== 'feature') return 'feature.json kind is not "feature"';
+  if (m.id !== id) return `feature.json id is not ${id}`;
+  if (typeof m.title !== 'string' || !m.config || typeof m.config !== 'object') return 'feature.json needs title and config';
   return null;
 }
 

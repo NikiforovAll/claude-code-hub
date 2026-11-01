@@ -1,0 +1,101 @@
+---
+title: Control the hub by voice
+description: Hold a key, speak, and the hub starts a session or sends your words as a prompt. Experimental, Windows only, needs Hex.
+sidebar:
+  badge:
+    text: Experimental
+    variant: caution
+---
+
+import Shot from '../../../kit/Shot.astro';
+import Lightbox from '../../../kit/Lightbox.astro';
+
+Hold <kbd>Ctrl+Shift+Space</kbd>, speak, and let go. The hub turns what you said into an action: it starts a new session, or sends your words to the session on screen as a prompt. Your words show up as you speak. You do not touch the keyboard again, not even to press <kbd>Enter</kbd>.
+
+<Shot src="shots/extensions/voice-live-new-session.webp" alt="Kanban's New session dialog opened by voice while the user still speaks: the Prompt field shows &quot;Fix the flaky login test and then run the&quot; and a Listening pill sits at the bottom of the hub window" width={3840} height={2160} />
+
+Voice is off by default. You turn it on with the [Voice control extension](/claude-code-hub/extensions/voice/).
+
+## Before you start
+
+- **Windows.** The hub uses the Hex CLI, which runs on Windows only.
+- **Hex.** [Hex](https://anoma.ly/hex) does the speech to text, on your machine. Get the Windows installer from its [website](https://anoma.ly/hex) or its [releases](https://github.com/anomalyco/hex/releases). Install it and start it once, so that it downloads its speech model. Hex must be running while you use voice.
+- **The embedded terminal.** Kanban sends prompts to the session in its [embedded terminal](/claude-code-hub/guides/terminal/). A session that runs in another terminal does not get them.
+
+<Shot src="shots/extensions/voice-hex.webp" alt="The Hex website: &quot;Speak. It appears.&quot;, local voice dictation for Windows, with the Windows installer and a PowerShell install command" width={2800} height={1560} />
+
+## Turn voice on
+
+```bash
+claude-code-hub ext install voice
+```
+
+The command checks that Hex is installed and turns voice on in the hub's `config.json`. Then restart the hub.
+
+To turn voice off again:
+
+```bash
+claude-code-hub ext remove voice
+```
+
+## Talk to the hub
+
+Hold <kbd>Ctrl+Shift+Space</kbd> while you speak. A pill at the bottom of the window shows **Listening**. Let go of the keys when you are done.
+
+Your words show up while you speak, about once a second: in the session's input box, or in the Prompt field of the New session dialog. When you let go, Hex gives the final text, which replaces them, and the hub submits it.
+
+To change your mind, press <kbd>Backspace</kbd> while you still hold the keys. The hub stops listening, removes the words it typed and sends nothing. A New session dialog that your words opened closes. Then let go.
+
+The first time, the hub window asks to use your microphone. Allow it: the hub records while you hold the keys and sends the sound to Hex on your machine. If you block it, or your Hex has no live text, Hex records and your words show up only when you let go.
+
+Hex keeps <kbd>Ctrl+Space</kbd> for plain dictation into any app, so both work side by side.
+
+| Say | The hub |
+| --- | --- |
+| "New session" | Opens Kanban's New session dialog |
+| "New session, fix the flaky login test" | Opens the dialog with "fix the flaky login test" as the first prompt |
+| Anything else | Sends it to the session on screen as a prompt, and submits it |
+
+A phrase works only at the start of what you say. "I need a new session for this" is a prompt, not a command.
+
+### Where a new session starts
+
+"New session" opens Kanban's New session dialog as soon as Hex hears it, while you keep speaking. The words after it go into the Prompt field, so you see what starts before it starts. The folder is that of the session on screen, else the project that Kanban's project filter shows, else the most recent project. Press <kbd>Enter</kbd> to start it, or change a field first.
+
+### When a prompt is not sent
+
+A prompt goes to the session whose terminal is on screen. While Claude works, it queues the prompt and runs it next. When no session terminal is on screen, nothing is sent: a toast shows what you said, with a **Copy** button.
+
+Kanban does not send a prompt while Claude shows a dialog, because the Enter press would answer it. A toast tells you so.
+
+## Dictate in the New session dialog
+
+The microphone button in Kanban's New session dialog uses Hex too, when voice is on. Click it, speak, and click it again: the text goes into the Prompt field where the cursor is. Nothing is sent until you press **Start**.
+
+With voice off, or when you run Kanban alone, the button uses the browser's speech recognition.
+
+## Settings
+
+The extension writes `voice` in the hub's `config.json`. You can change it by hand, then restart the hub.
+
+```json
+{
+  "voice": { "enabled": true, "autoSubmit": true }
+}
+```
+
+| Key | Default | Meaning |
+| --- | --- | --- |
+| `enabled` | `false` | Turns voice on |
+| `autoSubmit` | `true` | Submits a prompt after it is pasted. With `false`, the prompt stays in the session's input box until you press <kbd>Enter</kbd> |
+
+To use another key, set `hub.voice` in [`keys`](/claude-code-hub/reference/shortcuts/#change-the-keys).
+
+## When it does not work
+
+- **Nothing happens when you hold the keys.** Voice is off, or the hub did not restart after you turned it on.
+- **"Voice: hex …" toast.** Hex is not installed or not running. Start Hex and try again.
+- **"No speech".** Hex heard nothing. Check the microphone that the hub window uses (the camera icon in the address bar of a browser tab, or Chrome's site settings for the app), and the one that Hex uses.
+- **The words are wrong.** Each attempt is in `<hub dir>/voice.jsonl`, one line per attempt, with what Hex heard and what the hub did with it.
+
+<Lightbox />

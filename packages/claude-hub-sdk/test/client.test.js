@@ -463,6 +463,7 @@ describe('keys', () => {
     assert.equal(comboOf(ctrlAlt('π', 'KeyP')), 'ctrl+alt+p');
     assert.equal(comboOf({ ...NO_MODS, key: '¡', code: 'Digit1', altKey: true }), 'alt+1');
     assert.equal(comboOf(ctrlAlt('ArrowLeft', 'ArrowLeft')), 'ctrl+alt+ArrowLeft');
+    assert.equal(comboOf({ ...NO_MODS, key: ' ', code: 'Space', ctrlKey: true, shiftKey: true }), 'ctrl+shift+Space');
     assert.equal(comboOf({ ...ctrlAlt('K', 'KeyK'), shiftKey: true, metaKey: true }), 'ctrl+alt+shift+meta+k');
   });
 
