@@ -433,7 +433,15 @@ function noteBrowserVoice() {
 
 // Hold to talk. Frames forward keydown only, so the press moves focus to the pill on the hub page:
 // the release lands there, and focus goes back to the frame after it.
-const voice = { state: 'idle', frame: null, started: null, live: null, pillTimer: 0 };
+const voice = {
+  state: 'idle',
+  frame: null,
+  started: null,
+  live: null,
+  cancelling: null,
+  dictating: null,
+  pillTimer: 0,
+};
 
 function voicePill(text, listening = false) {
   const pill = document.getElementById('voice-pill');
@@ -602,6 +610,9 @@ const canLive = () => Object.hasOwn(actions, 'session.live');
 function openOnce(live, newSession) {
   if (!newSession || live.opened) return;
   live.opened = true;
+  // Words typed into the terminal before "new session" was heard come back out of its input box.
+  if (live.sent) invokeVoice('session.live', { text: '', final: 'true', cancel: 'true' });
+  live.sent = '';
   invokeVoice('session.new', {});
 }
 
@@ -670,6 +681,8 @@ async function voiceUp() {
   } catch (err) {
     hideVoicePill();
     showErrorToast('Voice', err);
+    // Ends Kanban's live text, keeping the words, so the next hold does not erase from a stale start.
+    if (live?.sent && canLive()) invokeVoice('session.live', { text: live.sent, final: 'true', submit: 'false' });
   } finally {
     voice.live = null;
     voice.state = 'idle';
@@ -699,11 +712,13 @@ async function dictate(op, reply) {
     if (op === 'start') {
       voice.state = 'dictating';
       voicePill('Dictating', true);
-      await sendJson('POST', '/api/voice/start');
+      voice.dictating = sendJson('POST', '/api/voice/start');
+      await voice.dictating;
       return reply({ ok: true });
     }
     voice.state = 'idle';
     hideVoicePill();
+    await voice.dictating?.catch(() => {});
     const r = await sendJson('POST', `/api/voice/${op === 'stop' ? 'dictate' : 'cancel'}`);
     reply({ ok: true, text: r.text ?? '' });
   } catch (err) {
@@ -745,15 +760,12 @@ function listenVoiceRelease() {
   document.addEventListener('keydown', (e) => {
     if (voice.state !== 'listening' || e.key !== 'Backspace') return;
     e.preventDefault();
-    voiceCancel();
+    voice.cancelling = voiceCancel();
   });
   document.addEventListener('keyup', (e) => {
     if (!releasesVoice(e)) return;
-    if (voice.state === 'cancelled') {
-      voice.frame?.focus();
-      voice.frame = null;
-      voice.state = 'idle';
-    } else voiceUp();
+    if (voice.state === 'cancelled') endCancelledHold();
+    else voiceUp();
   });
   window.addEventListener('blur', () => {
     // A frame that takes focus mid-hold (Kanban's New session dialog) would get the release.
@@ -762,9 +774,20 @@ function listenVoiceRelease() {
       setTimeout(() => document.getElementById('voice-pill').focus());
       return;
     }
-    if (voice.state === 'cancelled') voice.state = 'idle';
+    if (voice.state === 'cancelled') return endCancelledHold();
     voiceUp();
   });
+}
+
+// A new hold waits for the cancel to finish, or its late stream/cancel would end the new stream.
+// Idle before the frame takes focus, so the blur handler does not treat the hold as still held.
+async function endCancelledHold() {
+  const frame = voice.frame;
+  voice.frame = null;
+  await voice.cancelling;
+  if (voice.state !== 'cancelled') return;
+  voice.state = 'idle';
+  frame?.focus();
 }
 
 function bindErrorToast() {
@@ -994,6 +1017,7 @@ function onInvoke({ id, action, params = {}, open }, send) {
   // Not again for the app on screen: switchTab focuses the frame and tells the app it is active,
   // which repaints Kanban's terminal, and voice sends several actions a second.
   if (handler !== activeApp) switchTab(handler);
+  else if (id !== 'voice') iframes[handler]?.focus();
   if (mode === 'message' && liveApps.has(handler)) {
     postTo(handler, { type: 'hub:action', id, action, params });
   } else if (url && !guardedApps.has(handler)) {
