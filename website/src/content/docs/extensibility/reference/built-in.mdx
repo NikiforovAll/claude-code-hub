@@ -154,7 +154,7 @@ Kanban does not start the session itself: it opens its New session dialog with t
 | | |
 | --- | --- |
 | Handler | Kanban |
-| Params | `subject`: the task subject, optional |
+| Params | `subject`: the task subject, optional; `description`: the task description, optional |
 | Mode | `message` |
 | Shows | Kanban comes on screen with a new pending task on the board of the session on screen |
 
@@ -162,7 +162,7 @@ Kanban does not start the session itself: it opens its New session dialog with t
 await hub.invoke('task.add', { subject: 'Fix the flaky login test' });
 ```
 
-With no `subject`, Kanban opens the board's Add task input. With no session on screen, Kanban shows a toast and adds nothing. The hub's voice control calls it for "Hub, add a task", with the words after it as the subject.
+With no `subject`, Kanban opens the board's Add task input. With no session on screen, Kanban shows a toast and adds nothing. The hub's voice control calls it for "Hub, add a task", with the words after it split into the subject and the description.
 
 ### `project.plugins`
 

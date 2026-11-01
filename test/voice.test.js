@@ -8,9 +8,9 @@ const { createHexStream } = require('../lib/voice/hex-stream');
 
 const ALL = { 'session.paste': {}, 'session.new': {} };
 
-function voiceWith({ actions = ALL, said = '', cfg = {} } = {}) {
+function voiceWith({ actions = ALL, said = '', cfg = {}, deps = {} } = {}) {
   const speech = () => ({ start: async () => ({ ok: true }), stop: async () => ({ ok: true, text: said }) });
-  return createVoice({ provider: 'hex', ...cfg }, () => ({ actions }), { speech });
+  return createVoice({ provider: 'hex', ...cfg }, () => ({ actions }), { speech, ...deps });
 }
 
 describe('voice', () => {
@@ -49,6 +49,50 @@ describe('voice', () => {
     const v = voiceWith();
     assert.deepEqual(v.live('Hub, ta'), { text: 'ta', newSession: false, command: 'Hub' });
     assert.deepEqual(await v.decide('Hub, play music'), { kind: 'unknown' });
+  });
+
+  it('splits a long task at the first break, keeping every word', async () => {
+    const v = voiceWith({ actions: { ...ALL, 'task.add': {} } });
+    const add = async (said) => (await v.decide(`Hub, add a task, ${said}`)).params;
+    assert.deepEqual(await add('update the docs'), { subject: 'update the docs' });
+    assert.deepEqual(await add('fix the login page, the submit button does nothing on Safari'), {
+      subject: 'fix the login page',
+      description: 'the submit button does nothing on Safari',
+    });
+    assert.deepEqual(await add('rename the voice pill to voice status because people get confused'), {
+      subject: 'rename the voice pill to voice status because people get confused',
+    });
+  });
+
+  it('asks the split model only for a long task with no break, and keeps its cut only when verbatim', async () => {
+    const asked = [];
+    const answers = { 'rename the voice pill to voice status because people get confused': 'rename the voice pill to voice status' };
+    const ask = async (text) => {
+      asked.push(text);
+      return answers[text] ?? 'Rename the pill';
+    };
+    const v = voiceWith({ actions: { ...ALL, 'task.add': {} }, cfg: { taskSplitModel: 'haiku' }, deps: { ask } });
+    const add = async (said) => (await v.decide(`Hub, add a task, ${said}`)).params;
+    assert.deepEqual(await add('rename the voice pill to voice status because people get confused'), {
+      subject: 'rename the voice pill to voice status',
+      description: 'because people get confused',
+    });
+    assert.deepEqual(await add('rename the voice pill to the new name because people get confused'), {
+      subject: 'rename the voice pill to the new name because people get confused',
+    });
+    await add('update the docs');
+    await add('fix the login page, the submit button does nothing on Safari');
+    assert.equal(asked.length, 2);
+  });
+
+  it('lists its commands for the help panel', () => {
+    assert.deepEqual(
+      voiceWith().commands.map((c) => [c.action, c.say, c.param]),
+      [
+        ['session.new', 'new session', 'prompt'],
+        ['task.add', 'add a task', 'subject'],
+      ],
+    );
   });
 
   it('takes a command with no prefix only when bare', async () => {

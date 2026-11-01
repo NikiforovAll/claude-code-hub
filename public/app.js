@@ -46,6 +46,8 @@ let configDirSwitch = 'palette';
 let voiceOn = false;
 // 'hex' or 'browser', which the hub picked for voice.provider 'auto'.
 let voiceProvider = null;
+// The grammar's commands, {action, label, param, say, help}, for the voice help panel.
+let voiceCommands = [];
 const voiceInBrowser = () => voiceProvider === 'browser';
 // The app launcher's footer: the hub version from /api/config and its plugin from /api/apps/stats.
 const hubInfo = { version: null, plugin: null };
@@ -287,6 +289,7 @@ async function init() {
   configDirSwitch = config.configDirSwitch ?? 'palette';
   voiceOn = !!config.voice;
   voiceProvider = config.voice?.provider ?? null;
+  voiceCommands = config.voice?.commands ?? [];
   applyTitle(config.activeConfigDir);
   themeVars = config.themeVars ?? {};
   hubThemes = config.themes ?? [];
@@ -443,6 +446,7 @@ const voice = {
   cancelling: null,
   dictating: null,
   pillTimer: 0,
+  helpTimer: 0,
 };
 
 function voicePill(text, listening = false) {
@@ -460,6 +464,48 @@ function hideVoicePill(afterMs = 0) {
     document.getElementById('voice-pill').hidden = true;
   }, afterMs);
 }
+
+const VOICE_HELP_LINGER_MS = 6000;
+
+function helpRow(say, hint, what, app, kind = '') {
+  const row = el('div', `voice-help-row ${kind}`.trim());
+  const line = el('div', 'say', say);
+  if (hint) line.append(' ', el('i', '', hint));
+  row.append(line, el('div', 'what', what));
+  if (app) row.append(el('div', 'app', app));
+  return row;
+}
+
+// Opens when the hold has heard "hub" and no command yet: what the user can say on this tab.
+function showVoiceHelp() {
+  const panel = document.getElementById('voice-help');
+  clearTimeout(voice.helpTimer);
+  if (!panel.hidden) return;
+  const appOf = (action) => apps[actions[action]?.app]?.name ?? '';
+  const rows = voiceCommands
+    .filter((c) => Object.hasOwn(actions, c.action))
+    .map((c) => helpRow(`Hub, ${c.say}`, `<${c.param}>`, c.help, appOf(c.action)));
+  if (Object.hasOwn(actions, 'session.paste')) {
+    const what = voice.bare
+      ? 'Not typed here: drafts go only to the session on screen'
+      : 'Typed into the session as a draft';
+    rows.push(helpRow('anything else', '', what, appOf('session.paste'), voice.bare ? 'other off' : 'other'));
+  }
+  document.getElementById('voice-help-rows').replaceChildren(...rows);
+  document.getElementById('voice-help-tip').textContent = voice.bare
+    ? '"Hub" is optional on this tab · Backspace cancels'
+    : 'Enter during the hold sends · Backspace cancels';
+  panel.hidden = false;
+}
+
+function hideVoiceHelp(afterMs = 0) {
+  clearTimeout(voice.helpTimer);
+  voice.helpTimer = setTimeout(() => {
+    document.getElementById('voice-help').hidden = true;
+  }, afterMs);
+}
+
+const voiceHelpOpen = () => !document.getElementById('voice-help').hidden;
 
 // Live speech: the page records the mic and the hub relays it to the provider, which answers with
 // the text so far. False after the hub answers 501 or the mic is refused: then the provider records.
@@ -630,6 +676,8 @@ function openOnce(live, newSession) {
 function showLive(live, { text, newSession, command }) {
   if (!canLive() || voice.live !== live || voice.state !== 'listening') return;
   openOnce(live, newSession);
+  if (command === 'Hub' && !text) showVoiceHelp();
+  else hideVoiceHelp();
   if (command) {
     clearTyped(live);
     const pill = text ? `${command}: ${text}` : command;
@@ -651,6 +699,7 @@ async function finishLive(live) {
     clearTyped(live);
     return runVoiceCommand(r);
   }
+  hideVoiceHelp();
   invokeVoice('session.live', { text: r.text, final: 'true', submit: String(voice.send && !live.opened) });
   if (live.opened) flashPill('New session');
   else hideVoicePill();
@@ -666,6 +715,7 @@ function voiceDown() {
   voice.state = 'listening';
   voice.send = false;
   voice.bare = actions['session.paste']?.app !== activeApp;
+  hideVoiceHelp();
   const active = document.activeElement;
   voice.frame = active?.tagName === 'IFRAME' ? active : null;
   voicePill('Listening', true).focus();
@@ -704,6 +754,7 @@ async function voiceUp() {
     runVoiceCommand(await sendJson('POST', heard('/api/voice/stop')));
   } catch (err) {
     hideVoicePill();
+    hideVoiceHelp();
     showErrorToast('Voice', err);
     // Ends Kanban's live text, keeping the words, so the next hold does not erase from a stale start.
     if (live?.sent && canLive()) invokeVoice('session.live', { text: live.sent, final: 'true', submit: 'false' });
@@ -714,6 +765,7 @@ async function voiceUp() {
 }
 
 function runVoiceCommand({ text, command = {} }) {
+  hideVoiceHelp();
   if (command.kind === 'none') return flashPill('No speech');
   if (command.kind === 'invoke') {
     const draft = isDraft(command);
@@ -722,6 +774,8 @@ function runVoiceCommand({ text, command = {} }) {
     return command.label ? flashPill(command.label) : hideVoicePill();
   }
   hideVoicePill();
+  // "Hub" alone asks what to say: the panel stays a while in place of the toast.
+  if (voiceHelpOpen()) return hideVoiceHelp(VOICE_HELP_LINGER_MS);
   showErrorToast("Didn't get that", new Error(`“${text}”`));
 }
 
@@ -760,6 +814,7 @@ async function voiceCancel() {
   const live = voice.live;
   voice.live = null;
   flashPill('Cancelled');
+  hideVoiceHelp();
   try {
     if (live && (await live.ready)) {
       await live.cancel();

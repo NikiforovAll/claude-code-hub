@@ -63,10 +63,12 @@ A command starts with the word "Hub". Everything else is a prompt.
 | --- | --- |
 | "Hub, new session" (also "Hub, start a session", "Hub, session") | Opens Kanban's New session dialog |
 | "Hub, new session, fix the flaky login test" | Opens the dialog with "fix the flaky login test" as the first prompt |
-| "Hub, add a task, fix the login page" (also "Hub, new task …", "Hub, task …") | Adds a pending task "fix the login page" to the board of the session on screen. With no words after it, opens the board's Add task input |
+| "Hub, add a task, fix the login page" (also "Hub, new task …", "Hub, task …") | Adds a pending task "fix the login page" to the board of the session on screen. With no words after it, opens the board's Add task input. A task longer than 8 words is split at its first comma or period: "fix the login page, the button does nothing on Safari" becomes the title "fix the login page" and the description "the button does nothing on Safari". Your words are never changed |
 | Anything else | Types it into the session on screen as a prompt. <kbd>Enter</kbd> during the hold also sends it |
 
 "Hub" must be the first word. Once the hub hears it, nothing more goes into the session: the pill shows the command as you speak. "Hub" followed by words that are not a command shows a toast.
+
+Not sure what to say? Hold the keys and say only "Hub". A panel at the bottom right lists the commands you can use on this tab. It closes when you say a command, and stays a few seconds if you let go.
 
 ### On another tab
 
@@ -102,6 +104,7 @@ The extension writes `voice` in the hub's `config.json`. You can change it by ha
 | --- | --- | --- |
 | `enabled` | `false` | Turns voice on |
 | `provider` | `auto` | What turns speech into text: `hex`, `browser`, or `auto` (Hex when it is installed, else the browser) |
+| `taskSplitModel` | none | A Claude model, such as `haiku`, that finds where a long task with no comma or period ends its title. It runs `claude -p` on your machine, so it uses your Claude plan: about $0.0002 and 3 seconds per such task |
 To use another key, set `hub.voice` in [`keys`](/claude-code-hub/reference/shortcuts/#change-the-keys).
 
 ## When it does not work

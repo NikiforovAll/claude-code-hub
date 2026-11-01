@@ -541,6 +541,52 @@
     }
     .voice-pill[hidden] { display: none; }
     .voice-pill.listening::before { content: '● '; color: #e5484d; }
+    .voice-help {
+      position: fixed;
+      right: 16px;
+      bottom: 16px;
+      z-index: 30;
+      width: min(320px, calc(100vw - 32px));
+      overflow: hidden;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      box-shadow: 0 12px 36px var(--shadow);
+      color: var(--text);
+      font: 13px/1.45 ui-monospace, SFMono-Regular, Menlo, monospace;
+      animation: voice-help-in 0.16s ease-out;
+    }
+    @keyframes voice-help-in { from { opacity: 0; transform: translateX(12px); } }
+    .voice-help[hidden] { display: none; }
+    .voice-help-title {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 10px 14px;
+      border-bottom: 1px solid var(--border);
+      font-weight: 600;
+    }
+    .voice-help-title::before { content: ''; width: 8px; height: 8px; border-radius: 50%; background: #e5484d; }
+    .voice-help-rows { display: grid; padding: 4px 0; }
+    .voice-help-row { display: grid; grid-template-columns: 1fr auto; column-gap: 10px; padding: 8px 14px; }
+    .voice-help-row + .voice-help-row { border-top: 1px dashed var(--border); }
+    .voice-help-row.off { opacity: 0.45; }
+    .voice-help-row .say { grid-column: 1; color: var(--accent); }
+    .voice-help-row.other .say { color: var(--text); }
+    .voice-help-row .say i { color: var(--text-dim); font-style: normal; }
+    .voice-help-row .what { grid-column: 1; color: var(--text-dim); font-size: 12px; }
+    .voice-help-row .app {
+      grid-column: 2;
+      grid-row: 1 / span 2;
+      align-self: center;
+      padding: 1px 6px;
+      border: 1px solid var(--border);
+      border-radius: 999px;
+      color: var(--text-dim);
+      font-size: 11px;
+    }
+    .voice-help-tip { padding: 8px 14px; background: var(--bg); border-top: 1px solid var(--border); color: var(--text-dim); font-size: 12px; }
+    @media (prefers-reduced-motion: reduce) { .voice-help { animation: none; } }
     .update-toast.leaving { opacity: 0; transform: translateY(8px); }
     .update-toast-body { flex: 1; min-width: 0; }
     .update-toast-title { font-weight: 600; font-size: 15px; }
@@ -677,6 +723,11 @@
   </div>
 
   <div class="voice-pill" id="voice-pill" tabindex="-1" role="status" hidden></div>
+  <div class="voice-help" id="voice-help" role="status" hidden>
+    <div class="voice-help-title">What you can say</div>
+    <div class="voice-help-rows" id="voice-help-rows"></div>
+    <div class="voice-help-tip" id="voice-help-tip"></div>
+  </div>
 
   <script src="/sdk/keys.js"></script>
   <script src="/app.js"></script>

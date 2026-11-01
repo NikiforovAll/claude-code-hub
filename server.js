@@ -965,7 +965,7 @@ app.get('/api/config', (_req, res) => {
     activeConfigDir: hubConfig.activeConfigDir,
     defaultConfigDir,
     configDirSwitch: configDirSwitch(hubConfig),
-    voice: voice && { provider: voice.provider, auto: voice.auto },
+    voice: voice && { provider: voice.provider, auto: voice.auto, commands: voice.commands },
     version: HUB_VERSION,
   });
 });
@@ -1333,7 +1333,12 @@ const voice = hubConfig.voice?.enabled === true ? loadVoice() : null;
 
 function loadVoice() {
   try {
-    const ctx = () => ({ apps: appsConfig(), actions: ACTIONS });
+    const active = () => hubConfig.activeConfigDir;
+    const ctx = () => ({
+      apps: appsConfig(),
+      actions: ACTIONS,
+      configDir: active() && active() !== defaultConfigDir ? active() : null,
+    });
     return require('./lib/voice').createVoice(hubConfig.voice, ctx);
   } catch (err) {
     console.log(`Voice is off: ${err.message}`);
