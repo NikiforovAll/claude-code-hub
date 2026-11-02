@@ -189,6 +189,8 @@ The shortcuts also work when focus is inside a tool. Kanban keeps <kbd>Ctrl</kbd
 --no-autostart          Windows, macOS: stop starting the tray at logon
 --tray-status           Windows, macOS: show whether autostart is on and the tray and hub are running
 --app-id <id>           Windows, macOS, with --tray or --autostart: the installed app that Open Hub starts
+-v, --version           Print the version
+-h, --help              Print the flags
 ```
 
 If a port is busy, the hub uses a free port and reports it.

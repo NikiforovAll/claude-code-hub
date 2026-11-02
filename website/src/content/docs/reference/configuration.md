@@ -31,6 +31,8 @@ The examples use the command of a [global install](/claude-code-hub/getting-star
 | `--no-autostart` | | Windows, macOS: stop starting the tray when you log on |
 | `--tray-status` | | Windows, macOS: show the config dir, autostart, and whether the tray and hub run |
 | `--app-id <id>` | | Windows, macOS, with `--tray` or `--autostart`: the [installed app](/claude-code-hub/guides/tray/#open-the-installed-app) that **Open Hub** starts |
+| `-v`, `--version` | | Print the version and exit |
+| `-h`, `--help` | | Print the flags and exit |
 
 A flag takes its value after a space or after `=`: `--port 4000` and `--port=4000` are the same.
 

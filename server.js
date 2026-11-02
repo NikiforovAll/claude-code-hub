@@ -1,5 +1,15 @@
 #!/usr/bin/env node
 
+const { HUB_VERSION, checkArgs } = require('./lib/cli');
+
+// Before the other requires: -v and -h answer at once, and a bad flag never reaches the running-hub check,
+// which prints the hub URL with its token.
+const cli = checkArgs(process.argv.slice(2));
+if (cli.exit !== undefined) {
+  (cli.exit ? console.error : console.log)(cli.out);
+  process.exit(cli.exit);
+}
+
 const { spawn } = require('child_process');
 const crypto = require('crypto');
 const express = require('express');
@@ -33,7 +43,6 @@ const {
   MAX_POOL_SIZE,
   settingValues,
 } = require('./lib/settings');
-const { version: HUB_VERSION } = require('./package.json');
 
 function getArg(name) {
   const idx = process.argv.findIndex((a) => a.startsWith(`--${name}`));
