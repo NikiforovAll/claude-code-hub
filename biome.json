@@ -28,5 +28,18 @@
   },
   "files": {
     "includes": ["public/app.js", "server.js", "packages/claude-hub-sdk/**"]
-  }
+  },
+  "overrides": [
+    {
+      "includes": ["public/app.js"],
+      "linter": {
+        "rules": {
+          "correctness": { "noUndeclaredVariables": "error" }
+        }
+      },
+      "javascript": {
+        "globals": ["ClaudeHubKeys"]
+      }
+    }
+  ]
 }

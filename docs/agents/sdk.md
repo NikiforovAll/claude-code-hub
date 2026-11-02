@@ -13,7 +13,7 @@ The hub pins exact app versions. The SDK is semver (`packages/claude-hub-sdk/pac
 
 ## Sub-app integration
 
-Each sub-app's server calls `require(process.env.HUB_SDK_SERVER).mount(app)` when that env var is set, before `express.static`, and each has a `HUB_INTEGRATION` region in its `public/app.js`.
+Each sub-app's server calls `require(process.env.HUB_SDK_SERVER).mount(app)` when that env var is set, before `express.static`, and each has a `HUB_INTEGRATION` region in its `public/app.js`. cck's side of the contract, and the rules for changing an action or topic on either side, are in `cck/docs/hub-contract.md`.
 
 The page loads `/vendor/claude-hub-sdk.js` as the first element in `<body>`. Under the hub, `mount()` serves the hub's client there. Run alone, the app serves its `public/vendor` copy of the stub, and `/hub-config` does not exist. The region calls `ClaudeHub.connect()`, which fetches `/hub-config` and forwards keys, and uses `subscribe`, `bindTheme`, `onThemes`, `onActive`, `handle`, `invoke`, `can`, `closeGuard`, `openExternal`, `terminalToken` and `keyLabel` in place of the raw messages. Each app's help dialog gives its hub rows an `action` (a hub action id, or a list for one shared row) and shows `hub.keyLabel(row.action)`, its default keys until welcome, and hides a row that has no key. `hub.inHub` is true once `/hub-config` says a hub frames the page. Each app ships a `hub-app.json`, the only copy of its manifest. Marketplace and Memory apply the `project` (absolute path) of `project.changed`; Cost applies `encoded`.
 
