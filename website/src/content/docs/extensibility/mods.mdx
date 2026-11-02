@@ -23,17 +23,9 @@ The hub ships one mod, `xmas`. It adds:
 claude-code-hub ext install xmas
 ```
 
-The mod runs code, so the command asks first:
+Restart the hub. To use the colors, pick **Christmas** in the theme picker of any tool. The snow and the lights do not need the theme.
 
-```text
-  Mod xmas changes: hub, kanban
-  It runs code in hub, kanban, with the same access as the app's own code.
-  Let xmas run code in hub, kanban? [y/N]
-```
-
-Type `y`, then restart the hub. To use the colors, pick **Christmas** in the theme picker of any tool. The snow and the lights do not need the theme.
-
-The mod ships with the hub, so `ext install` clones nothing, and the mod updates when the hub does. To take it off, run `claude-code-hub ext remove xmas` and restart the hub.
+The mod ships with the hub, so `ext install` clones nothing and does not ask, and the mod updates when the hub does. To take it off, run `claude-code-hub ext remove xmas` and restart the hub.
 
 ## Turn mods off
 
@@ -49,7 +41,16 @@ When a mod breaks a page, turn it off in one of these ways:
 
 Mod JS runs in the page of the hub or the app, with the same access as the page's own code. In Kanban's page it can read the terminal token and type into sessions. So:
 
-- `ext install` asks before it lets a mod run code, and `ext update` asks again when the code changes. With no terminal to ask on, the command stops, unless you pass `--yes`. A mod with only CSS never asks.
+- `ext install` of a mod from GitHub or a folder says where its JS runs and asks first:
+
+  ```text
+    xmas-lights from github:someone/hub-mods at 3f2a1c9
+    It runs with your rights:
+      JS in hub, kanban
+    Install it? [y/N]
+  ```
+
+  `ext update` asks again when the update moves to a new commit. With no terminal to ask on, the command stops, unless you pass `--yes`. A mod with only CSS, and a mod the hub ships, never asks.
 - A page that loads mod JS gets a content security policy of `connect-src 'self'`. It blocks `fetch`, XHR, WebSocket and beacons to other hosts. It does not block image or script loads or navigation, so it stops a careless mod, not a hostile one.
 
 Install only a mod whose source you trust.

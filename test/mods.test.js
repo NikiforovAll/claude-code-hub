@@ -4,7 +4,7 @@ const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
 const { APPS, HUB_ROOT, appRoot } = require('../lib/apps');
-const { BUNDLED, readMod, resolveMods, modAssets, hubModScript, modJsHash } = require('../lib/mods');
+const { BUNDLED, readMod, resolveMods, modAssets, hubModScript } = require('../lib/mods');
 const { coreVars } = require('../lib/themes');
 
 describe('resolveMods', () => {
@@ -54,12 +54,6 @@ describe('resolveMods', () => {
     assert.match(script, /self\.ClaudeHub = \{ mod: ClaudeHubModKit\.createMods\(self\)\.mod \};\n$/);
     const cssOnly = [{ ...mods[0], targets: { hub: { css: ['hub.css'], js: [] } } }];
     assert.equal(hubModScript(modAssets(cssOnly, 'hub')), '');
-  });
-
-  it('changes the JS hash when a script moves to another page', () => {
-    const at = (target) => modJsHash(path.join(bundled, 'probe'), { targets: { [target]: { js: ['hub.js'] } } });
-    assert.notEqual(at('hub'), at('kanban'));
-    assert.equal(at('hub'), at('hub'));
   });
 });
 

@@ -238,8 +238,44 @@ Only the hub's own repository has features today: [Voice control](/claude-code-h
 
 ## Mods
 
-A mod adds CSS and JS to the hub page and the apps, and can bring color themes. Its folder holds a `mod.json`. `ext install` takes a mod in the same forms as an app, and asks before it lets the mod run code. The hub ships one mod, `xmas`. Read [Mods](/claude-code-hub/extensibility/mods/).
+A mod adds CSS and JS to the hub page and the apps, and can bring color themes. Its folder holds a `mod.json`. `ext install` takes a mod in the same forms as an app. The hub ships one mod, `xmas`. Read [Mods](/claude-code-hub/extensibility/mods/).
 
 ## Trust
 
 An extension runs as you, with no sandbox. It can read the hub token and every file you can read, and its plugin can run hooks in each Claude Code session. Add only an extension whose source you trust, the same as a Claude Code plugin.
+
+### What asks
+
+`ext install` and `ext update` say what code runs and ask `y/N` first, one line per kind of code:
+
+```text
+  probe from github:someone/hub-probe at 3f2a1c9
+  It runs with your rights:
+    a server the hub starts
+    Claude Code plugin probe@probe-market, in your sessions
+  Install it? [y/N]
+```
+
+| Extension | What it lists |
+| --- | --- |
+| App | Its server, and its Claude Code plugin when it has one |
+| Add-on | Its server, when it has one |
+| Mod | The pages its JS runs in. A mod with only CSS does not ask |
+
+- **Install** from GitHub, the registry or a folder asks. An extension the hub ships (`xmas`) and a feature (`voice`) do not: their code is part of the hub you installed.
+- **Update** asks when it moves to a new commit, with the commit count. A "no" keeps the commit you had.
+- **No terminal.** With nothing to ask on, the command stops. `--yes` installs or updates without asking.
+
+### Pinning
+
+`ext install` records the commit it cloned. The hub does not update an extension on its own: the code changes only when you run `ext update`. A registry entry from outside the hub's repository is pinned to a commit, so the registry cannot move it either.
+
+### What the prompt protects against
+
+| Case | What happens |
+| --- | --- |
+| A program on your machine edits `config.json` | It already runs as you, so the hub adds no new risk. The prompt does not help here |
+| An agent in a session runs `ext install` after a prompt injection | The command needs your `y`. Do not let an agent pass `--yes` |
+| A source you trusted turns hostile | Nothing changes until you run `ext update`, and the update shows the commit count first |
+
+A mod's page gets a content security policy of `connect-src 'self'`. It stops a careless mod from sending data to other hosts, not a hostile one: image loads and navigation still go out.

@@ -76,24 +76,25 @@ const ld = {
         feature ? (
           <p>
             The hub ships the code of a feature, so nothing is cloned. <code>ext install</code> checks that {tools.map((t) => t.name).join(' and ') || 'the hub can run it'} {tools.length ? 'is installed' : ''} and turns {x.name.toLowerCase()} on in the hub's <code>config.json</code>.
-            Restart the hub. <code>claude-code-hub ext remove {x.id}</code> turns it off again.{' '}
+            Restart the hub.{' '}
             {x.homepage && <a href={x.homepage}>Read the guide</a>}
           </p>
         ) : mod ? (
           <p>
             <code>ext install</code> finds {x.id} in the mods the hub ships, else in this registry, and adds it to the hub's <code>config.json</code>.
-            A mod that runs code asks first: type <code>y</code> to allow it. Restart the hub. <code>claude-code-hub ext remove {x.id}</code> takes it off again, and <code>/?nomods</code> opens the hub without it once.{' '}
+            A mod from GitHub with JS says where its JS runs and asks <code>y/N</code> first; a mod the hub ships does not ask. Restart the hub. <code>/?nomods</code> opens the hub without mods once.{' '}
             <a href={url('extensibility/mods/')}>Read how mods work</a>.
           </p>
         ) : addon ? (
           <p>
             <code>ext install</code> finds {x.id} in this registry, clones it into the hub dir with git and puts it on the Kanban dock of your Claude config dir.
-            No restart is needed: every session shows it, and Kanban starts its server the first time you open it from the dock rail.{' '}
+            An add-on with a server says so and asks <code>y/N</code> first. No restart is needed: every session shows it, and Kanban starts its server the first time you open it from the dock rail.{' '}
             <a href={url('extensibility/extensions/#add-ons')}>Read how add-ons work</a>.
           </p>
         ) : (
           <p>
             <code>ext install</code> finds {x.id} in this registry and clones it into the hub dir with git{x.plugin && <> and installs the {x.plugin} plugin in your Claude config dir</>}.
+            It says what runs (the app's server{x.plugin && <> and the plugin's hooks in your sessions</>}) and asks <code>y/N</code> first.
             Restart the hub, and the app gets the next tab.
           </p>
         )
@@ -149,6 +150,23 @@ const ld = {
       </section>
     )
   }
+
+  <section class="remove" aria-labelledby="remove">
+    <h2 id="remove">Didn't like it?</h2>
+    <p>One command takes it out again.</p>
+    <pre><code>claude-code-hub ext remove {x.id}</code></pre>
+    <p>
+      {
+        feature
+          ? <>This turns {x.name.toLowerCase()} off in the hub's <code>config.json</code>. Restart the hub.</>
+          : mod
+            ? <>This takes {x.id} out of the hub's <code>config.json</code> and deletes its clone, if it has one. Restart the hub.</>
+            : addon
+              ? <>This takes {x.id} off the Kanban dock and deletes its clone. No restart is needed.</>
+              : <>This removes {x.plugin ? <>the {x.plugin} plugin, </> : ''}the app's entry and its clone. Restart the hub, and the tab is gone.</>
+      }
+    </p>
+  </section>
 </Shell>
 
 <style>
@@ -246,6 +264,15 @@ const ld = {
     margin: 0;
     min-width: 0;
     overflow-wrap: anywhere;
+  }
+  .remove {
+    margin-top: clamp(3rem, 6vw, 4.5rem);
+    max-width: 44rem;
+  }
+  .remove p {
+    margin: 0 0 1rem;
+    color: var(--c-ink2);
+    font-size: 0.9375rem;
   }
   .shots {
     margin-top: clamp(3rem, 6vw, 4.5rem);

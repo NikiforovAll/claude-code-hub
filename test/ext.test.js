@@ -27,7 +27,7 @@ describe('ext', () => {
     return results[cmd] ?? { ok: true, idempotent: false, output: '' };
   };
   const registry = () => path.join(configDir, 'registry.json');
-  const ctx = (more) => ({ hubDir, configDir: () => configDir, hubVersion: '1.11.0', nodeVersion: '22.13.0', exec, registry: registry(), ...more });
+  const ctx = (more) => ({ hubDir, configDir: () => configDir, hubVersion: '1.11.0', nodeVersion: '22.13.0', exec, registry: registry(), ask: () => 'y', ...more });
   const ext = (...argv) => runExt(argv, ctx());
   const configFile = () => path.join(hubDir, 'config.json');
   const config = () => JSON.parse(fs.readFileSync(configFile(), 'utf8'));
@@ -223,6 +223,19 @@ describe('ext', () => {
       assert.match(out.join('\n'), new RegExp(`Installed probe from github:o/r/ext at ${sha.slice(0, 7)}`));
     });
 
+    it('says what runs and asks before an app installs, and on no deletes the clone and writes nothing', () => {
+      const sha = commit('one');
+      const asked = [];
+      const no = runExt(['install', 'github:o/r/ext'], ctx({ githubBase: remote, ask: (q) => (asked.push(q), 'n') }));
+      assert.equal(no, false);
+      assert.deepEqual(asked, ['  Install it? [y/N] ']);
+      assert.ok(out.includes(`\n  probe from github:o/r/ext at ${sha.slice(0, 7)}`));
+      assert.ok(out.includes('  It runs with your rights:\n    a server the hub starts\n    Claude Code plugin probe@probe-market, in your sessions'));
+      assert.deepEqual(commands, []);
+      assert.equal(rawConfig(), null);
+      assert.deepEqual(fs.readdirSync(extensions()), []);
+    });
+
     it('pins a commit, and update keeps it there', () => {
       const first = commit('one');
       manifest({ plugin: PLUGIN, name: 'Two' });
@@ -255,12 +268,11 @@ describe('ext', () => {
       assert.deepEqual(commands, ['claude --version', ...registerCmds(extRoot()), 'claude plugin uninstall probe@probe-market', 'claude plugin install probe@probe-market']);
     });
 
-    it('asks again on update only when a mod changes its code, and keeps the old commit on no', () => {
+    it('asks again on an update that moves the code, and keeps the old commit on no', () => {
       fs.rmSync(path.join(root, 'hub-app.json'));
       const modFiles = (js) => {
         fs.writeFileSync(path.join(root, 'kanban.js'), js);
-        fs.writeFileSync(path.join(root, 'kanban.css'), `/* ${Math.random()} */`);
-        writeJson(path.join(root, 'mod.json'), { manifest: 1, kind: 'mod', id: 'probe', targets: { kanban: { surface: 1, css: ['kanban.css'], js: ['kanban.js'] } } });
+        writeJson(path.join(root, 'mod.json'), { manifest: 1, kind: 'mod', id: 'probe', targets: { kanban: { surface: 1, js: ['kanban.js'] } } });
       };
       const asked = [];
       let answer = 'y';
@@ -269,20 +281,22 @@ describe('ext', () => {
       const one = commit('one');
       assert.equal(modGh('install', 'github:o/r/ext'), true);
       assert.equal(asked.length, 1);
-      modFiles('one()');
-      const css = commit('css only');
       assert.equal(modGh('update', 'probe'), true);
-      assert.equal(asked.length, 1);
-      assert.equal(config().mods[0].sha, css);
+      assert.equal(asked.length, 1, 'no new commit, nothing to ask');
       modFiles('two()');
-      commit('new code');
+      const two = commit('two');
+      modFiles('three()');
+      commit('three');
       answer = 'n';
+      out = [];
       assert.equal(modGh('update', 'probe'), false);
-      assert.equal(asked.length, 2);
-      assert.match(out.join('\n'), /changes the code it runs in kanban[\s\S]*probe keeps the code it had/);
-      assert.equal(config().mods[0].sha, css);
+      assert.deepEqual(asked.slice(1), ['  Update it? [y/N] ']);
+      assert.ok(out.includes(`\n  probe ${one.slice(0, 7)} -> ${gitIn(repo, 'rev-parse', 'HEAD').slice(0, 7)} (2 commits)`));
+      assert.ok(out.includes('  It runs with your rights: JS in kanban'));
+      assert.match(out.join('\n'), /probe keeps the code it had/);
+      assert.equal(config().mods[0].sha, one);
       assert.equal(fs.readFileSync(path.join(extRoot(), 'kanban.js'), 'utf8'), 'one()');
-      assert.notEqual(one, css);
+      assert.notEqual(two, one);
     });
 
     it('goes back to the installed commit when the new code needs a newer hub', () => {
@@ -603,7 +617,7 @@ describe('ext', () => {
     it('installs a bundled mod by its id before the registry, lists, refuses update and removes it', () => {
       assert.equal(modExt('install', 'probe'), true);
       assert.deepEqual(config(), { mods: [{ id: 'probe', source: 'bundled' }] });
-      assert.match(out.join('\n'), /changes: hub, kanban[\s\S]*runs code in kanban/);
+      assert.deepEqual(asked, [], 'the hub ships it, so it does not ask');
       assert.equal(modExt('install', 'probe'), true);
       assert.match(out.join('\n'), /probe is already in the hub/);
       out = [];
@@ -629,20 +643,25 @@ describe('ext', () => {
       assert.deepEqual(config().mods.map((m) => m.id), ['probe']);
     });
 
-    it('asks before a mod runs code, and installs nothing on no', () => {
+    it('asks before a mod folder runs code, and installs nothing on no', () => {
+      modManifest(root);
       answer = 'n';
-      assert.equal(modExt('install', 'probe'), false);
-      assert.deepEqual(asked, ['  Let probe run code in kanban? [y/N] ']);
+      assert.equal(modExt('install', root), false);
+      assert.deepEqual(asked, ['  Install it? [y/N] ']);
+      const linked = root.replaceAll('\\', '/');
+      assert.ok(out.includes(`\n  probe from ${linked}`));
+      assert.ok(out.includes('  It runs with your rights:\n    JS in kanban'));
       assert.match(out.join('\n'), /probe is not installed/);
       assert.equal(rawConfig(), null);
     });
 
     it('refuses with no terminal to ask on, unless --yes', () => {
+      modManifest(root);
       answer = null;
-      assert.equal(modExt('install', 'probe'), false);
-      assert.match(out.join('\n'), /Pass --yes/);
+      assert.equal(modExt('install', root), false);
+      assert.match(out.join('\n'), /Pass --yes to install it/);
       asked = [];
-      assert.equal(modExt('install', 'probe', '--yes'), true);
+      assert.equal(modExt('install', root, '--yes'), true);
       assert.deepEqual(asked, []);
       assert.deepEqual(config().mods.map((m) => m.id), ['probe']);
     });
