@@ -1118,6 +1118,9 @@ function welcomeFor(data, appId) {
     actions: [...Object.keys(actions), ...(hubDictates() ? [DICTATE] : [])],
     origins: Object.keys(apps).map(originOf),
     settings: apps[appId]?.settings ?? {},
+    voice: voiceOn
+      ? voiceCommands.filter((c) => actions[c.action]?.app === appId).map(({ say, help }) => ({ say, help }))
+      : [],
   };
 }
 

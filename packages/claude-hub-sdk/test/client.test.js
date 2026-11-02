@@ -513,6 +513,16 @@ describe('keys', () => {
     assert.deepEqual(keyParts('ctrl+shift+meta+F2', true), ['⌃', '⇧', '⌘', 'F2']);
   });
 
+  it('gives voiceCommands from welcome.voice', async () => {
+    const { env, hub } = await connected();
+    assert.deepEqual(hub.voiceCommands(), [], 'before welcome');
+    env.fromHub(welcome({ voice: [{ say: 'next', help: 'Opens the next', action: 'x' }, { say: 1 }, null] }));
+    assert.deepEqual(hub.voiceCommands(), [{ say: 'next', help: 'Opens the next' }]);
+    const old = await connected();
+    old.env.fromHub(welcome({}));
+    assert.deepEqual(old.hub.voiceCommands(), [], 'a hub that sends no voice');
+  });
+
   it('gives keyLabel from welcome.keys', async () => {
     const keys = { 'hub.projectPicker': 'ctrl+alt+o', 'hub.appByNumber': 'alt+{n}', 'hub.configDirPicker': null };
     const { env, hub } = await connected();

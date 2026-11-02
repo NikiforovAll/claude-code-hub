@@ -40,6 +40,7 @@
         forwards: () => false,
         forwardCombos: () => [],
         keyLabel: () => null,
+        voiceCommands: () => [],
         closeGuard() {},
         openExternal(url) {
           win.open(url, '_blank', 'noopener');

@@ -111,7 +111,7 @@ The hub ships the SDK and hands it to each app it spawns, so the app runs the hu
 3. **Load it first.** The page loads `/vendor/claude-hub-sdk.js` as a classic script, the first element in `<body>`, with no `defer` or `async` ([Theme](#6-theme), rule 3).
 4. **Same API.** The stub and the client have the same functions. The hub's tests check this.
 
-The app's page code calls `ClaudeHub.connect()` and uses the returned object: `subscribe`, `publish`, `bindTheme`, `onThemes`, `onActive`, `onStatus`, `handle`, `invoke`, `can`, `forwards`, `forwardCombos`, `keyLabel`, `closeGuard`, `openExternal` and `terminalToken`. It works the same with the stub and the client.
+The app's page code calls `ClaudeHub.connect()` and uses the returned object: `subscribe`, `publish`, `bindTheme`, `onThemes`, `onActive`, `onStatus`, `handle`, `invoke`, `can`, `forwards`, `forwardCombos`, `keyLabel`, `voiceCommands`, `closeGuard`, `openExternal` and `terminalToken`. It works the same with the stub and the client.
 
 ### HTTP
 
@@ -158,6 +158,7 @@ Each message is `{type: 'hub:<name>', …payload}`, sent with `postMessage`.
    - `actions`: the actions that an enabled app handles ([Actions](#7-actions)).
    - `origins`: the origin of each enabled app. A link to one of them stays in the hub ([Links](#121-links)). A hub older than this field does not send it.
    - `settings`: the values of the app's own settings ([Settings](#122-settings)). `{}` for an app with none. A hub older than this field does not send it.
+   - `voice`: with voice on, `{say, help}` for each voice command whose action this app handles, for the app's help. `say` is the phrase after "hub". `[]` with voice off. A hub older than this field does not send it.
 
 ### 5.1 Nested pages
 

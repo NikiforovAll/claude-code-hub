@@ -206,6 +206,11 @@
           actions: strings(m.actions),
           keys: comboMap(m.keys),
           themes: Array.isArray(m.themes) ? m.themes : [],
+          voice: Array.isArray(m.voice)
+            ? m.voice
+                .filter((c) => typeof c?.say === 'string' && typeof c?.help === 'string')
+                .map(({ say, help }) => ({ say, help }))
+            : [],
         };
         forward = strings(m.forward);
         appOrigins = strings(m.origins);
@@ -482,6 +487,8 @@
           while (n < all[0].length - 1 && all.every((p) => p.length - 1 > n && p[n] === all[0][n])) n++;
           return [...all[0].slice(0, n), all.map((p) => p.slice(n).join('+')).join('/')];
         },
+        // The voice commands this app handles, [{say, help}], for its help. [] with voice off, before welcome, or standalone.
+        voiceCommands: () => (welcome ? welcome.voice.map((c) => ({ ...c })) : []),
         closeGuard(on) {
           post({ type: 'hub:closeGuard', on: !!on });
         },

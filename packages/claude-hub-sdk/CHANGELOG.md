@@ -2,6 +2,10 @@
 
 The SDK follows semver. A new function or message is a minor version, a change that breaks an app is a major version. The protocol version is separate ([Versioning](https://nikiforovall.blog/claude-code-hub/reference/protocol/#versioning)).
 
+## 1.11.0
+
+- `hub.voiceCommands()` gives the voice commands the app handles, as `[{say, help}]` from `welcome.voice`, for the app's help. It gives `[]` with voice off, before welcome, standalone and in the stub.
+
 ## 1.10.0
 
 - `ClaudeHub.mod` loads the hub mods for the app and gives them a way in. The hub passes `HUB_MODS` as `{assets, files}`: `mount()` puts `assets` in `self.ClaudeHubMods` ahead of the client as given, and serves only the paths in `files` under `/mods`. The hub builds the URLs, so the SDK holds no URL format. The client writes a stylesheet per CSS file and a deferred script per JS file, so mod JS runs after a deferred `app.js`. `mod.wrap(name, fn)` replaces the global function `name` with `fn(original, ...args)`; when `fn` throws before it calls `original`, `original` runs. `mod.on(event, fn)` and `mod.emit(event, detail)` carry the events an app emits after a render. `mod.list` names the loaded mods. In the stub, no mod loads, `wrap` returns `false` and `emit` reaches no one.
