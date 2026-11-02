@@ -1328,7 +1328,6 @@ app.get('/api/projects', async (_req, res) => {
 });
 
 // Voice control, off unless config.json has voice.enabled; lib/voice loads only then.
-const VOICE_LOG = path.join(HUB_DIR, 'voice.jsonl');
 const voice = hubConfig.voice?.enabled === true ? loadVoice() : null;
 
 function loadVoice() {
@@ -1353,26 +1352,16 @@ const heldOn = (req) => (typeof req.query.app === 'string' ? req.query.app : und
 app.post('/api/voice/text', express.json({ limit: '64kb' }), async (req, res) => {
   if (!voice) return res.status(404).json({ error: 'voice is off' });
   if (typeof req.body?.text !== 'string') return res.status(400).json({ error: 'text is required' });
-  const t0 = Date.now();
-  const r = await voice.text(req.body.text, req.body.final === true, heldOn(req));
-  if (req.body.final === true) logVoice(r, t0, { provider: 'browser' });
-  res.json(r);
+  res.json(await voice.text(req.body.text, req.body.final === true, heldOn(req)));
 });
 
 app.post('/api/voice/:op', async (req, res) => {
   if (!voice) return res.status(404).json({ error: 'voice is off' });
   const { op } = req.params;
   if (!['start', 'stop', 'dictate', 'cancel'].includes(op)) return res.status(404).json({ error: 'unknown op' });
-  const t0 = Date.now();
   const r = await voice[op](heldOn(req));
-  if ((op === 'stop' || op === 'dictate') && r.ok) logVoice(r, t0);
   res.status(r.ok ? 200 : 502).json(r);
 });
-
-function logVoice(r, t0, extra) {
-  const entry = { at: new Date().toISOString(), text: r.text, command: r.command, ms: Date.now() - t0, ...extra };
-  fs.appendFile(VOICE_LOG, `${JSON.stringify(entry)}\n`, () => {});
-}
 
 // Live speech: the page sends mic audio while the key is held, about 5 posts a second, and each
 // answer carries the text so far. 501 sends the page back to /api/voice/start and /stop.
@@ -1385,9 +1374,7 @@ app.post(
     if (!['start', 'audio', 'finish', 'cancel'].includes(op)) return res.status(404).json({ error: 'unknown op' });
     if (!voice.stream) return res.status(501).json({ error: 'no live speech' });
     if (op === 'audio' && !Buffer.isBuffer(req.body)) return res.status(400).json({ error: 'audio is required' });
-    const t0 = Date.now();
     const r = await voice.stream[op](req.body, heldOn(req));
-    if (op === 'finish' && r.ok) logVoice(r, t0, { live: true });
     res.status(r.ok ? 200 : r.unsupported ? 501 : 502).json(r);
   },
 );

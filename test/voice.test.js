@@ -91,6 +91,9 @@ describe('voice', () => {
         ['session.new', 'new session', 'prompt'],
         ['session.find', 'open session', 'name'],
         ['task.add', 'add a task', 'subject'],
+        ['session.approve', 'approve', undefined],
+        ['session.deny', 'deny', 'message'],
+        ['session.next', 'next', undefined],
       ],
     );
     for (const c of voiceWith().commands) assert.ok(c.help.length <= 45, `help fits one panel line: ${c.help}`);
@@ -109,6 +112,28 @@ describe('voice', () => {
     assert.equal((await v.decide('hub session')).action, 'session.new');
     assert.equal((await v.decide('hub open a new session')).kind, 'unknown');
     assert.equal((await voiceWith().decide('hub open session docs')).kind, 'unknown');
+  });
+
+  it('approves, denies with a reason, and moves to the next session that needs the user', async () => {
+    const v = voiceWith({ actions: { ...ALL, 'session.approve': {}, 'session.deny': {}, 'session.next': {} } });
+    const invoke = (action, label, params = {}) => ({ kind: 'invoke', action, params, label });
+    for (const said of ['Hub, approve.', 'hub yes', 'Hob allow', 'hub accept!']) {
+      assert.deepEqual(await v.decide(said), invoke('session.approve', 'Approve'), said);
+    }
+    assert.deepEqual(await v.decide('Hub, deny.'), invoke('session.deny', 'Deny'));
+    assert.deepEqual(
+      await v.decide('Hub, no, use the staging database instead.'),
+      invoke('session.deny', 'Deny', { message: 'use the staging database instead' }),
+    );
+    for (const said of ['Hub, next.', 'hub next waiting', 'Hub next session', 'hub, next one']) {
+      assert.deepEqual(await v.decide(said), invoke('session.next', 'Next'), said);
+    }
+    assert.deepEqual(await v.decide('Hub, yes, but not that file'), { kind: 'unknown' });
+    assert.deepEqual(await v.decide('hub next time run the tests'), { kind: 'unknown' });
+    assert.equal((await v.decide('hub now')).kind, 'unknown');
+    assert.equal((await v.decide('hub nothing')).kind, 'unknown');
+    assert.equal((await v.decide('yes')).action, 'session.paste');
+    assert.equal((await voiceWith().decide('hub approve')).kind, 'unknown');
   });
 
   it('runs only the actions of the tab the hold is on', async () => {

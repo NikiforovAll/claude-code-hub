@@ -16,7 +16,7 @@ Frames forward keydown only, so the press moves focus to `#voice-pill` on the hu
 
 ## CLI path
 
-`POST /api/voice/start` and `/stop` run the speech provider (`lib/voice/hex.js`, the Hex CLI's `dictation start|stop --print`); stop turns the text into a command: the grammar (`lib/voice/grammar.js`: a command starts with the reserved word "hub" (`PREFIX`, with the forms speech services mishear), then a row of `COMMANDS`: "new session <prompt>" → `session.new`, which opens Kanban's dialog filled in; "add a task <subject>" → `task.add` on the board on screen; "open session <name>" → `session.find`, which Kanban matches against its session list (`rankSessions`) and opens, else shows in its session picker; a row counts only when an app handles its action; "hub" with no row is `unknown`, never a paste), then the decider named in `voice.decider`, else `session.paste` (Kanban) with the text, a draft. The page adds `submit: "true"` only when the user pressed Enter during the hold (`voice.send`), else `"false"`.
+`POST /api/voice/start` and `/stop` run the speech provider (`lib/voice/hex.js`, the Hex CLI's `dictation start|stop --print`); stop turns the text into a command: the grammar (`lib/voice/grammar.js`: a command starts with the reserved word "hub" (`PREFIX`, with the forms speech services mishear), then a row of `COMMANDS`: "new session <prompt>" → `session.new`, which opens Kanban's dialog filled in; "add a task <subject>" → `task.add` on the board on screen; "open session <name>" → `session.find`, which Kanban matches against its session list (`rankSessions`) and opens, else shows in its session picker; "approve" → `session.approve` and "deny <reason>" → `session.deny` {message}, which answer the open session's ask through `respondWaiting` (a question opens its card); "next" → `session.next`, the next waiting, then unread, session after the open one; a row without `param` matches only with no words after it; a row counts only when an app handles its action; "hub" with no row is `unknown`, never a paste), then the decider named in `voice.decider`, else `session.paste` (Kanban) with the text, a draft. The page adds `submit: "true"` only when the user pressed Enter during the hold (`voice.send`), else `"false"`.
 
 ## Task title
 
@@ -36,6 +36,6 @@ Enter mid-hold sets `voice.send`, so the release sends the prompt; without it th
 
 Backspace mid-hold (`voiceCancel`) cancels the stream and sends `session.live` with empty `text` and `cancel` (`"close"` when the hold opened the dialog); the state stays `cancelled` until the release, so the key's auto-repeat does not start a new hold.
 
-## Dictate action and log
+## Dictate action
 
-With voice on through Hex, the hub also handles the action `voice.dictate` itself (`{op: start|stop|cancel}`, listed in `welcome.actions`; stop answers `{ok, text}` from `POST /api/voice/dictate`, which skips the deciders): cck's New session mic uses it in place of the browser's speech API. Each stop or dictate appends a line to `<hub-dir>/voice.jsonl`.
+With voice on through Hex, the hub also handles the action `voice.dictate` itself (`{op: start|stop|cancel}`, listed in `welcome.actions`; stop answers `{ok, text}` from `POST /api/voice/dictate`, which skips the deciders): cck's New session mic uses it in place of the browser's speech API.

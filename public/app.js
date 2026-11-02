@@ -486,7 +486,7 @@ const tabName = () => apps[activeApp]?.name ?? 'this tab';
 function showVoiceHelp() {
   const panel = document.getElementById('voice-help');
   clearTimeout(voice.helpTimer);
-  const rows = voiceRowsHere().map((c) => helpRow(c.action, `Hub, ${c.say}`, `<${c.param}>`, c.help));
+  const rows = voiceRowsHere().map((c) => helpRow(c.action, `Hub, ${c.say}`, c.param ? `<${c.param}>` : '', c.help));
   if (voice.drafts)
     rows.push(helpRow('session.paste', 'anything else', '', 'Typed into the session as a draft', 'other'));
   document.getElementById('voice-help-rows').replaceChildren(...rows);

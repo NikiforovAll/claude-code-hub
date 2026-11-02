@@ -118,6 +118,36 @@ await hub.invoke('session.find', { name: 'docs panel' });
 
 Kanban scores each session in its list by the share of the words found in its name, project folder and branch. Words of 4 letters or more match on a shared start, so "test" finds "tests". A session that matches at least 60% of the words, 25 points ahead of the next, opens at once. Otherwise Kanban opens its session picker with the words typed in and the best matches first, so <kbd>Enter</kbd> opens the top one. With no match, the picker filters and searches with the words as if you had typed them. The hub's voice control calls it for "Hub, open session …".
 
+### `session.approve`, `session.deny`
+
+| | |
+| --- | --- |
+| Handler | Kanban |
+| Params | `session.approve`: none · `session.deny`: `message`, the reason Claude gets, optional |
+| Mode | `message` |
+| Shows | The open session's permission prompt or plan closes, answered |
+
+```js
+await hub.invoke('session.deny', { message: 'use the staging database' });
+```
+
+They answer only the ask of the session open in Kanban, the same as its Allow and Deny buttons. A plan denied with no `message` gets Kanban's usual rejection text. A question ask needs its form, so Kanban opens its card instead. With nothing to answer, Kanban shows a toast. The hub's voice control calls them for "Hub, approve" and "Hub, deny …".
+
+### `session.next`
+
+| | |
+| --- | --- |
+| Handler | Kanban |
+| Params | none |
+| Mode | `message` |
+| Shows | Kanban comes on screen with the next session that needs the user |
+
+```js
+await hub.invoke('session.next');
+```
+
+The queue is the sessions that wait on the user, then the unread ones, each with the most recently active first, without dismissed sessions. The session after the open one opens, and the queue wraps round. With no other session in the queue, Kanban shows a toast. The hub's voice control calls it for "Hub, next".
+
 ### `session.paste`
 
 | | |

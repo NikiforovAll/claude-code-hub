@@ -65,6 +65,9 @@ A command starts with the word "Hub". Everything else is a prompt.
 | "Hub, new session, fix the flaky login test" | Opens the dialog with "fix the flaky login test" as the first prompt |
 | "Hub, open session docs panel" (also "Hub, switch to session …", "Hub, go to session …") | Opens the Kanban session whose name, project or branch has your words. With no clear winner, the session picker opens with your words and the best matches first: press <kbd>Enter</kbd> to open the top one, or pick another |
 | "Hub, add a task, fix the login page" (also "Hub, new task …", "Hub, task …") | Opens Kanban's Add task dialog for the session on screen. Your words go into Description as you speak. When you let go, a task of 8 words or fewer moves up into Title. A longer one stays in Description as said and gets a title: from `taskTitleModel` when it is set (see [Settings](#settings)), else the words before its first comma or period. Press <kbd>Enter</kbd> to add the task, or press <kbd>Enter</kbd> during the hold to add it when you let go |
+| "Hub, approve" (also "Hub, allow", "Hub, accept", "Hub, yes") | Allows the permission prompt or plan that the open session waits on |
+| "Hub, deny" or "Hub, deny, use the staging database" (also "Hub, reject …", "Hub, no …") | Denies it. Words after the command go to Claude as the reason. A question is not answered by voice: its card opens so you pick the answer |
+| "Hub, next" (also "Hub, next waiting", "Hub, next session") | Opens the next session that needs you: first the ones that wait on you, then the unread ones. Say it again to move on, and it starts over at the end |
 | Anything else | Types it into the session on screen as a prompt. <kbd>Enter</kbd> during the hold also sends it |
 
 "Hub" must be the first word. Once the hub hears it, nothing more goes into the session: the pill shows the command as you speak. "Hub" followed by words that are not a command shows a toast.
@@ -114,6 +117,6 @@ To use another key, set `hub.voice` in [`keys`](/claude-code-hub/reference/short
 - **"Voice: hex …" toast.** Hex is not installed or not running. Start Hex and try again.
 - **"Speech recognition: not-allowed" or "network".** The browser blocked the microphone, or cannot reach its speech service. Allow the microphone, check the network, or install Hex.
 - **"No speech".** Hex heard nothing. Check the microphone that the hub window uses (the camera icon in the address bar of a browser tab, or Chrome's site settings for the app), and the one that Hex uses.
-- **The words are wrong.** Each attempt is in `<hub dir>/voice.jsonl`, one line per attempt, with what Hex heard and what the hub did with it.
+- **The words are wrong.** Hex's history shows what it heard.
 
 <Lightbox />
