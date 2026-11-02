@@ -591,6 +591,12 @@
     .voice-help-row.other .say { color: var(--text); }
     .voice-help-row .say i { color: var(--text-dim); font-style: normal; }
     .voice-help-row .what { color: var(--text-dim); font-size: 12px; }
+    .voice-help-row .what:empty { display: none; }
+    .voice-help-row.fold { padding-block: 6px; }
+    .voice-help-row.fold .say { color: var(--text-dim); font-size: 12px; }
+    .voice-help-title::before { flex-shrink: 0; }
+    .voice-help-title > span { min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .voice-help-title.asks { color: var(--warn); }
     .voice-help-tip { padding: 8px 14px; background: var(--bg); border-top: 1px solid var(--border); color: var(--text-dim); font-size: 12px; }
     @media (prefers-reduced-motion: reduce) {
       .voice-help, .voice-help-title::before { animation: none; }

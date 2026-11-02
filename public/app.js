@@ -482,15 +482,51 @@ const handledHere = (action) => actions[action]?.app === activeApp;
 const voiceRowsHere = () => voiceCommands.filter((c) => handledHere(c.action));
 const tabName = () => apps[activeApp]?.name ?? 'this tab';
 
+// The voice.context of the app on screen: {title, rows: {action: false to hide the row, or a help text}}.
+function voiceContextHere() {
+  const last = published.get('voice.context');
+  return last?.from === activeApp && isPlainObject(last.payload?.rows) ? last.payload : null;
+}
+
+// With a title, the rows the app marks come first and the rest fold into one "Also" line.
+function voiceHelpRows(here, ctx) {
+  const marks = ctx?.rows ?? {};
+  const shown = here.filter((c) => marks[c.action] !== false);
+  const row = (c) =>
+    helpRow(
+      c.action,
+      `Hub, ${c.say}`,
+      c.param ? `<${c.param}>` : '',
+      typeof marks[c.action] === 'string' ? marks[c.action] : c.help,
+    );
+  if (typeof ctx?.title !== 'string') {
+    const draft = helpRow('session.paste', 'anything else', '', 'Typed into the session as a draft', 'other');
+    return [...shown.map(row), ...(voice.drafts ? [draft] : [])];
+  }
+  const folded = [
+    ...shown.filter((c) => !marks[c.action]),
+    ...(voice.drafts ? [{ action: 'session.paste', say: 'a draft' }] : []),
+  ];
+  const fold = helpRow(
+    folded.map((c) => c.action).join(' '),
+    `Also: ${folded.map((c) => c.say).join(', ')}`,
+    '',
+    '',
+    'other fold',
+  );
+  return [...shown.filter((c) => marks[c.action]).map(row), ...(folded.length ? [fold] : [])];
+}
+
 // Open for the whole hold: what the user can say on this tab, with the row the words match lit.
 function showVoiceHelp() {
   const panel = document.getElementById('voice-help');
   clearTimeout(voice.helpTimer);
-  const rows = voiceRowsHere().map((c) => helpRow(c.action, `Hub, ${c.say}`, c.param ? `<${c.param}>` : '', c.help));
-  if (voice.drafts)
-    rows.push(helpRow('session.paste', 'anything else', '', 'Typed into the session as a draft', 'other'));
-  document.getElementById('voice-help-rows').replaceChildren(...rows);
-  document.getElementById('voice-help-title').textContent = `What you can say on ${tabName()}`;
+  const ctx = voiceContextHere();
+  const asks = typeof ctx?.title === 'string';
+  document.getElementById('voice-help-rows').replaceChildren(...voiceHelpRows(voiceRowsHere(), ctx));
+  const title = document.getElementById('voice-help-title');
+  title.replaceChildren(el('span', '', asks ? ctx.title : `What you can say on ${tabName()}`));
+  title.classList.toggle('asks', asks);
   document.getElementById('voice-help-tip').textContent = voice.drafts
     ? 'Enter during the hold sends · Backspace cancels'
     : 'Backspace cancels';
@@ -506,7 +542,7 @@ function hideVoiceHelp(afterMs = 0) {
 
 function markVoiceHelp(action) {
   for (const row of document.getElementById('voice-help-rows').children) {
-    row.classList.toggle('on', row.dataset.action === action);
+    row.classList.toggle('on', row.dataset.action.split(' ').includes(action));
   }
 }
 

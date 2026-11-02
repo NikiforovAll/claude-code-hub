@@ -84,7 +84,7 @@ Voice works on the tab on screen and never switches tabs. Its commands all belon
 
 ### When a prompt is not sent
 
-A prompt goes to the session whose terminal is on screen. While Claude works, it queues the prompt and runs it next. When no session terminal is on screen, nothing is sent: a toast shows what you said, with a **Copy** button.
+A prompt goes to the session whose terminal is on screen. When you look at the open session's board or a pane and its terminal runs in Kanban, the prompt goes to that terminal in the background, and a toast offers **Show** to bring the terminal up. While Claude works, it queues the prompt and runs it next. When no session terminal can take it, nothing is sent: a toast shows what you said, with a **Copy** button.
 
 Kanban does not send a prompt while Claude shows a dialog, because the Enter press would answer it. A toast tells you so.
 
