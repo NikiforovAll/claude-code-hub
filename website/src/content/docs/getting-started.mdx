@@ -36,7 +36,7 @@ Claude Code Hub running at http://localhost:3540/?token=<token>
 Type "q" or "exit" to stop the server
 ```
 
-`--open` opens that URL in your default browser. The token in the URL lets the browser in. The hub then sets a cookie and removes the token from the address bar, so you need the URL only once per browser. See [Security and the hub token](/claude-code-hub/reference/security/).
+`--open` opens that URL in your default browser. The token in the URL lets the browser in. The hub then sets a cookie and removes the token from the address bar, so you need the URL only once per browser. When the output is not a terminal, such as a pipe or a log, the banner hides the token; `--show-token` prints it. See [Security and the hub token](/claude-code-hub/reference/security/).
 
 The default port is 3540. If it is busy, the hub uses a free port and prints it in the banner. The tools have their own default ports, 3541 to 3544, with the same fallback. See [CLI and configuration](/claude-code-hub/reference/configuration/).
 

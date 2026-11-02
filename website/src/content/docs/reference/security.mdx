@@ -11,6 +11,7 @@ The hub page and every `/api/*` route need a token. By default the hub listens o
 
 - The token is in `~/.claude-hub/token`. The hub makes it on the first run, with file mode 600, and keeps it across restarts.
 - The startup banner prints the URL with the token: `http://localhost:3540/?token=<token>`. `--open` opens that URL.
+- When the output is not a terminal, the banner prints `?token=<hidden>`: an agent's shell, a pipe, CI or the tray's `hub.log` keep what they read, and others can see it. `--show-token` prints the token there too. The line "Claude Code Hub already runs" follows the same rule.
 - When a request has the right token, the hub sets an `HttpOnly`, `SameSite=Strict` cookie named `hub_token` and redirects to the same URL without the token. The cookie lasts 400 days, so later visits and the installed app need no token.
 - Without the token or the cookie, the page shows a locked screen, and the API answers `401`.
 

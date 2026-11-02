@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 
-const { HUB_VERSION, checkArgs } = require('./lib/cli');
+const { HUB_VERSION, checkArgs, printedUrl } = require('./lib/cli');
 
 // Before the other requires: -v and -h answer at once, and a bad flag never reaches the running-hub check,
 // which prints the hub URL with its token.
@@ -1473,7 +1473,7 @@ if (!TRAY_FLAG) {
       listenWithFallback(app, HUB_PORT, onReady, '');
       return;
     }
-    console.log(`Claude Code Hub already runs for ${HUB_DIR} at ${accessUrl(running.port)}`);
+    printUrl(`Claude Code Hub already runs for ${HUB_DIR} at`, running.port);
     if (process.argv.includes('--open')) {
       import('open').then((m) => m.default(accessUrl(running.port))).finally(() => process.exit(0));
     } else {
@@ -1486,8 +1486,13 @@ function accessUrl(port) {
   return `http://localhost:${port}/?token=${HUB_TOKEN}`;
 }
 
+function printUrl(line, port) {
+  const show = process.argv.includes('--show-token') || require('tty').isatty(1);
+  console.log(printedUrl(line, accessUrl(port), { show, tokenFile: HUB_TOKEN_FILE }));
+}
+
 function printBanner(port) {
-  console.log(`Claude Code Hub running at ${accessUrl(port)}`);
+  printUrl('Claude Code Hub running at', port);
   const warning = net.exposureWarning();
   if (warning) console.log(warning);
   console.log('Type "q" or "exit" to stop the server');

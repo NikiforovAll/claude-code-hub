@@ -183,6 +183,7 @@ The shortcuts also work when focus is inside a tool. Kanban keeps <kbd>Ctrl</kbd
 --host <addr>           Bind address (default: 127.0.0.1)
 --allowed-hosts <list>  Extra host names to accept, comma-separated
 --open                  Open the browser on start
+--show-token            Print the URL with its token also when output is not a terminal
 --detached              Keep running when stdin closes (the macOS tray uses it)
 --tray                  Windows, macOS: run the hub from a tray icon
 --autostart             Windows, macOS: same as --tray, and start the tray at logon

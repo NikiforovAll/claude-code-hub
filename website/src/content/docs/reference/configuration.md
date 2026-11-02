@@ -25,6 +25,7 @@ The examples use the command of a [global install](/claude-code-hub/getting-star
 | `--host <addr>` | `127.0.0.1` | Bind address. See [Security](/claude-code-hub/reference/security/#reach-the-hub-from-another-machine). |
 | `--allowed-hosts <list>` | | Extra host names to accept, comma-separated |
 | `--open` | | Open the browser on start |
+| `--show-token` | | Print the hub URL with its token even when the output is not a terminal. See [Security](/claude-code-hub/reference/security/#the-hub-token) |
 | `--detached` | | Keep running when stdin closes. The macOS tray uses it. |
 | `--tray` | | Windows, macOS: run the hub from a [tray icon](/claude-code-hub/guides/tray/), then exit |
 | `--autostart` | | Windows, macOS: same as `--tray`, and start the tray when you log on |

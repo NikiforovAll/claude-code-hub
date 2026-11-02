@@ -4,7 +4,7 @@ const { spawnSync } = require('node:child_process');
 const fs = require('node:fs');
 const path = require('node:path');
 const { HUB_ROOT } = require('../lib/apps');
-const { FLAGS, HELP, checkArgs } = require('../lib/cli');
+const { FLAGS, HELP, checkArgs, printedUrl } = require('../lib/cli');
 const { version } = require('../package.json');
 
 it('answers the version and the help, wherever the flag is', () => {
@@ -39,6 +39,15 @@ it('the help, the configuration page and FLAGS list the same flags', () => {
   const table = page.slice(page.indexOf('| Flag |'), page.indexOf('\n\n', page.indexOf('| Flag |')));
   assert.deepEqual(flags(HELP), known);
   for (const f of flags(table)) assert.ok(known.has(f), `--${f} in configuration.md`);
+});
+
+it('hides the token off a terminal unless asked', () => {
+  const url = 'http://localhost:3540/?token=abc123';
+  assert.equal(printedUrl('Hub at', url, { show: true, tokenFile: 'T' }), `Hub at ${url}`);
+  const hidden = printedUrl('Hub at', url, { show: false, tokenFile: 'T' });
+  assert.ok(hidden.startsWith('Hub at http://localhost:3540/?token=<hidden>\n'));
+  assert.match(hidden, /--show-token.*read T$/);
+  assert.doesNotMatch(hidden, /abc123/);
 });
 
 it('server.js exits on -v before it loads the hub', () => {
