@@ -1,9 +1,22 @@
 ---
 title: Overview
-description: Change how a hub tool looks or works. Start with a small patch, go to a fork when the patch grows, and write a new app when nothing fits.
+description: The ways to change the hub, from a mod that changes how a tool looks to a new app. Pick the smallest one that does the job.
 ---
 
 import WaysToExtend from '../../../components/diagrams/WaysToExtend.astro';
+
+Pick the smallest way that does the job:
+
+| To | Use |
+| --- | --- |
+| Change how the hub or a tool looks, or add a small touch to it | A [mod](/claude-code-hub/extensibility/mods/): CSS, a little JS and color themes |
+| Show a page next to Kanban's terminal that follows the open session | An [add-on](/claude-code-hub/extensibility/extensions/#add-ons) on the dock rail |
+| Change what a tool does | A [patch](/claude-code-hub/extensibility/patch/), or a [fork](/claude-code-hub/extensibility/fork/) when the patch grows |
+| Add a tool that does a different job | A [new app](/claude-code-hub/extensibility/new-app/) in a tab of its own |
+
+To share any of them, make it an [extension](/claude-code-hub/extensibility/extensions/). `claude-code-hub ext install` adds it to the hub, and the [Extensions page](/claude-code-hub/extensions/) lists the ones you can install.
+
+## Change or add a tool
 
 The hub runs each tool from a folder. An entry in `config.json` can point a tool at your own folder, so you can change a tool and keep the hub as it is. There are three ways to do it, from the smallest change to the largest:
 
@@ -15,9 +28,7 @@ The hub runs each tool from a folder. An entry in `config.json` can point a tool
 
 Start with a patch. When the patch gets large or breaks on each upgrade, go to a fork. When the tool you want does a different job, write a new app.
 
-To share a new app, or to ship it with a Claude Code plugin, make it an [extension](/claude-code-hub/extensibility/extensions/). `claude-code-hub ext install github:<owner>/<repo>[/<folder>]` adds it to the hub and installs its plugin.
-
-## Point the hub at your folder
+### Point the hub at your folder
 
 Each way ends with an entry in the `apps` list of `config.json`:
 
@@ -36,7 +47,7 @@ Each way ends with an entry in the `apps` list of `config.json`:
 
 Restart the hub after you edit the file. See [The config file](/claude-code-hub/reference/configuration/#the-config-file) for the other keys.
 
-## One tool per capability
+### One tool per capability
 
 Only one tool gets the embedded terminal and the project list: the first enabled tool in tab order that declares it in `provides`. If your tool and the original both declare them, the hub logs a message at startup. Turn one off, or put the one you want first.
 

@@ -12,7 +12,7 @@ import Lightbox from '../../../kit/Lightbox.astro';
 
 Hold <kbd>Ctrl+Shift+Space</kbd>, speak, and let go. The hub turns what you said into an action: it starts a new session, or types your words into the session on screen as a prompt for you to review. Your words show up as you speak. To send the prompt at once, press <kbd>Enter</kbd> before you let go.
 
-<Shot src="shots/extensions/voice-demo.webp" alt="Animation: the user holds Ctrl+Shift+Space and says &quot;Hub, add a task, fix the login page redirect&quot;. Kanban's Add task dialog fills as they speak, and Enter adds the task to the board. Then &quot;Hub, new session, fix the flaky login test and run the suite&quot; opens the New session dialog with that prompt. A panel at the bottom right lists the commands and lights the one that matches" width={1280} height={800} />
+<Shot src="shots/extensions/voice-demo.webp" alt="Animation: the user holds Ctrl+Shift+Space and says &quot;Hub, add a task, fix the login page redirect&quot;. Kanban's Add task dialog fills as they speak, and Enter adds the task to the board. Then &quot;Hub, new session, fix the flaky login test and run the suite&quot; opens the New session dialog with that prompt. A panel at the bottom right lists the commands and lights the one that matches" width={3200} height={2000} />
 
 Voice is off by default. You turn it on with the [Voice control extension](/claude-code-hub/extensions/voice/).
 
@@ -72,7 +72,7 @@ A command starts with the word "Hub". Everything else is a prompt.
 
 "Hub" must be the first word. Once the hub hears it, nothing more goes into the session: the pill shows the command as you speak. "Hub" followed by words that are not a command shows a toast.
 
-While you hold the keys, a panel at the bottom right lists the commands you can use on this tab, and lights the one your words match. Not sure what to say? Say only "Hub" and let go: the panel stays a few seconds.
+While you hold the keys, a panel at the right side of the window lists the commands you can use on this tab, and lights the one your words match. Not sure what to say? Say only "Hub" and let go: the panel stays a few seconds.
 
 ### On another tab
 
