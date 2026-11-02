@@ -24,7 +24,7 @@ A new hub shortcut goes in `hubActions()` (`public/app.js`, `{id, combo, run, in
 
 `keys` in `config.json` (`{actionId: combo | null}`, `hub.appByNumber` as `<mods>+{n}`) overrides the defaults. `userKeys()` in `lib/keymap.js` checks it at startup and logs and drops an entry that is not valid, repeats another entry's combo or takes a combo in an app's `keys.keeps`; `/api/config` carries the rest as `keys`. In `bindings()`, a user combo takes that combo from the action that had it by default, and `null` unbinds.
 
-An app lists the combos it uses for itself in `keys.keeps` of its `hub-app.json`; the hub must not bind them. cck keeps 18, for example `Ctrl+Alt+N` New session and `Ctrl+Alt+1`…`9`; read `cck/hub-app.json` for the full list before you pick a combo.
+An app lists the combos it uses for itself in `keys.keeps` of its `hub-app.json`; the hub must not bind them. cck keeps 19, for example `Ctrl+Alt+N` New session and `Ctrl+Alt+1`…`9`; read `cck/hub-app.json` for the full list before you pick a combo.
 
 **Known gap (macOS, accepted).** On macOS `hub.appByNumber` defaults to `ctrl+alt+{n}` (Option+digit types a character there), which overlaps cck's kept `ctrl+alt+1`…`9`. `userKeys()` checks `keys.keeps` against user combos only, not the defaults, so under the hub on macOS the hub takes those keys and cck's "Go to tab N" does not fire. Leave it as is unless asked.
 
