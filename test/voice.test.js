@@ -89,7 +89,7 @@ describe('voice', () => {
       voiceWith().commands.map((c) => [c.action, c.say, c.param]),
       [
         ['session.new', 'new session', 'prompt'],
-        ['session.find', 'open session', 'name'],
+        ['session.find', 'switch to', 'name'],
         ['task.add', 'add a task', 'subject'],
         ['session.approve', 'approve', undefined],
         ['session.deny', 'deny', 'message'],
@@ -101,7 +101,13 @@ describe('voice', () => {
 
   it('opens a session by name, and keeps "session" alone a new one', async () => {
     const v = voiceWith({ actions: { ...ALL, 'session.find': {} } });
-    for (const said of ['Hub, open session docs panel.', 'hub switch to the session docs panel', 'Hub go to session, docs panel']) {
+    for (const said of [
+      'Hub, open session docs panel.',
+      'hub switch to the session docs panel',
+      'Hub go to session, docs panel',
+      'Hub, switch to docs panel.',
+      'hub switch docs panel',
+    ]) {
       assert.deepEqual(await v.decide(said), {
         kind: 'invoke',
         action: 'session.find',
@@ -109,6 +115,8 @@ describe('voice', () => {
         label: 'Open session',
       });
     }
+    assert.deepEqual((await v.decide('hub switch toast fix')).params, { name: 'toast fix' });
+    assert.equal((await v.decide('hub open docs panel')).kind, 'unknown');
     assert.equal((await v.decide('hub session')).action, 'session.new');
     assert.equal((await v.decide('hub open a new session')).kind, 'unknown');
     assert.equal((await voiceWith().decide('hub open session docs')).kind, 'unknown');
