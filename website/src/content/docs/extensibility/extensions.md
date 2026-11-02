@@ -236,6 +236,10 @@ Restart the hub after either command. A feature's folder holds a `feature.json`:
 
 Only the hub's own repository has features today: [Voice control](/claude-code-hub/guides/voice/).
 
+## Mods
+
+A mod adds CSS and JS to the hub page and the apps, and can bring color themes. Its folder holds a `mod.json`. `ext install` takes a mod in the same forms as an app, and asks before it lets the mod run code. The hub ships one mod, `xmas`. Read [Mods](/claude-code-hub/extensibility/mods/).
+
 ## Trust
 
 An extension runs as you, with no sandbox. It can read the hub token and every file you can read, and its plugin can run hooks in each Claude Code session. Add only an extension whose source you trust, the same as a Claude Code plugin.

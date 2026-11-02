@@ -49,7 +49,8 @@
       return hub;
     }
 
-    return { connect, comboOf };
+    const mod = { list: [], wrap: () => false, on: () => off, emit() {}, send: () => false };
+    return { connect, comboOf, mod };
   }
 
   if (typeof module === 'object' && module.exports) module.exports = { createClaudeHub, comboOf };

@@ -827,6 +827,203 @@ describe('nested page', () => {
   });
 });
 
+describe('mod', () => {
+  const modWin = (assets, readyState = 'loading') => {
+    const written = [];
+    const appended = [];
+    const errors = [];
+    const el = (tag) => {
+      const t = { tagName: tag.toUpperCase() };
+      Object.defineProperty(t, 'outerHTML', { get: () => `<${tag} ${JSON.stringify({ ...t, tagName: undefined })}>` });
+      return t;
+    };
+    const win = {
+      ClaudeHubMods: assets,
+      console: { error: (...a) => errors.push(a) },
+      document: {
+        readyState,
+        createElement: el,
+        write: (html) => written.push(html),
+        head: { appendChild: (t) => appended.push(t) },
+        body: { appendChild: (t) => appended.push(t) },
+      },
+    };
+    return { win, written, appended, errors };
+  };
+  const ASSETS = { mods: [{ id: 'xmas', version: 'v1' }], css: ['/mods/xmas/a.css'], js: ['/mods/xmas/b.js'] };
+
+  it('writes a stylesheet and a deferred script per file while the page loads', () => {
+    const { win, written } = modWin(ASSETS);
+    const { mod } = createClaudeHub(win);
+    assert.deepEqual(mod.list, ASSETS.mods);
+    assert.equal(written.length, 1);
+    assert.match(
+      written[0],
+      /^<link .*"rel":"stylesheet","href":"\/mods\/xmas\/a\.css".*<script .*"src":"\/mods\/xmas\/b\.js","defer":true/,
+    );
+  });
+
+  it('appends the tags in order after the page loaded, and loads nothing with no mods', () => {
+    const late = modWin(ASSETS, 'complete');
+    createClaudeHub(late.win);
+    assert.deepEqual(
+      late.appended.map((t) => [t.tagName, t.async]),
+      [
+        ['META', undefined],
+        ['LINK', undefined],
+        ['SCRIPT', false],
+      ],
+    );
+    const none = modWin(undefined);
+    assert.deepEqual(createClaudeHub(none.win).mod.list, []);
+    assert.deepEqual(none.written, []);
+    assert.deepEqual(none.appended, []);
+  });
+
+  it('limits connections to the page origin before mod JS loads, and not for CSS alone', () => {
+    const js = modWin(ASSETS);
+    createClaudeHub(js.win);
+    assert.deepEqual(
+      js.appended.map((t) => [t.tagName, t.httpEquiv, t.content]),
+      [['META', 'Content-Security-Policy', "connect-src 'self'"]],
+    );
+    const css = modWin({ ...ASSETS, js: [] });
+    createClaudeHub(css.win);
+    assert.deepEqual(css.appended, []);
+    assert.equal(css.written.length, 1);
+  });
+
+  it('loads no mod and lists none under ?nomods', () => {
+    const { win, written, appended } = modWin(ASSETS);
+    win.location = { search: '?nomods=1' };
+    assert.deepEqual(createClaudeHub(win).mod.list, []);
+    assert.deepEqual([...written, ...appended], []);
+  });
+
+  it('loads no mod in a page nested inside an app page, and loads in the app tab', () => {
+    const hubWin = {};
+    const nested = modWin(ASSETS);
+    Object.assign(nested.win, { top: hubWin, parent: {} });
+    assert.deepEqual(createClaudeHub(nested.win).mod.list, []);
+    assert.deepEqual([...nested.written, ...nested.appended], []);
+    const tab = modWin(ASSETS);
+    Object.assign(tab.win, { top: hubWin, parent: hubWin });
+    assert.deepEqual(createClaudeHub(tab.win).mod.list, ASSETS.mods);
+  });
+
+  it('warns when a second wrap takes the same function', () => {
+    const { win } = modWin(undefined);
+    const warned = [];
+    win.console.warn = (m) => warned.push(m);
+    win.render = () => 'x';
+    const { mod } = createClaudeHub(win);
+    mod.wrap('render', (next) => next());
+    assert.deepEqual(warned, []);
+    mod.wrap('render', (next) => next());
+    assert.match(warned[0], /wrap\(render\): two mods wrap it/);
+  });
+
+  it('sends a mod topic to the hub after hello, holding the latest one before it', async () => {
+    const env = fakeEnv({ readyState: 'loading' });
+    env.win.ClaudeHubMods = { mods: [{ id: 'xmas', version: 'v1' }] };
+    const hub = createClaudeHub(env.win);
+    const errors = [];
+    env.win.console = { error: (...a) => errors.push(a) };
+    assert.equal(hub.mod.send('xmas:level', 1), true);
+    assert.equal(hub.mod.send('xmas:level', 2), true);
+    assert.equal(hub.mod.send('other:level', 3), false);
+    assert.equal(hub.mod.send('level', 3), false);
+    assert.equal(errors.length, 2);
+    hub.connect();
+    env.load();
+    await settle();
+    hub.mod.send('xmas:done', true);
+    assert.deepEqual(
+      env.posts().filter((p) => p.msg.type === 'hub:mod'),
+      [
+        { msg: { type: 'hub:mod', topic: 'xmas:level', data: 2 }, origin: HUB },
+        { msg: { type: 'hub:mod', topic: 'xmas:done', data: true }, origin: HUB },
+      ],
+    );
+  });
+
+  it('marks the page light or dark from the theme, and from the cache on the next load', async () => {
+    const { env } = await connected();
+    env.win.document.documentElement = { dataset: {} };
+    env.fromHub(welcome());
+    env.fromHub(themeEvent({ theme: 'light', colorTheme: 'ember' }));
+    assert.equal(env.win.document.documentElement.dataset.hubMode, 'light');
+    const next = fakeEnv({ storage: { ...env.storage } });
+    next.win.document.documentElement = { dataset: {} };
+    createClaudeHub(next.win);
+    assert.equal(next.win.document.documentElement.dataset.hubMode, 'light');
+  });
+
+  it('wraps a global function in a chain, and runs the original when a wrapper throws first', () => {
+    const { win, errors } = modWin(undefined);
+    win.render = (n) => `card ${n}`;
+    const { mod } = createClaudeHub(win);
+    assert.equal(
+      mod.wrap('render', (next, n) => `<b>${next(n)}</b>`),
+      true,
+    );
+    assert.equal(
+      mod.wrap('render', (next) => `[${next()}]`),
+      true,
+    );
+    assert.equal(win.render(1), '[<b>card 1</b>]');
+    mod.wrap('render', () => {
+      throw new Error('boom');
+    });
+    assert.equal(win.render(2), '[<b>card 2</b>]');
+    assert.equal(
+      mod.wrap('missing', () => {}),
+      false,
+    );
+    assert.equal(errors.length, 2);
+  });
+
+  it('returns what the original returned when a wrapper throws after calling it', () => {
+    const { win, errors } = modWin(undefined);
+    win.render = (n) => `card ${n}`;
+    const { mod } = createClaudeHub(win);
+    mod.wrap('render', (next, n) => {
+      next(n);
+      throw new Error('late');
+    });
+    assert.equal(win.render(3), 'card 3');
+    assert.equal(errors.length, 1);
+  });
+
+  it('calls each listener of an event, keeps going past one that throws, and unsubscribes', () => {
+    const { win, errors } = modWin(undefined);
+    const { mod } = createClaudeHub(win);
+    const got = [];
+    mod.on('board.rendered', () => {
+      throw new Error('bad');
+    });
+    const off = mod.on('board.rendered', (d) => got.push(d));
+    mod.emit('board.rendered', 1);
+    off();
+    mod.emit('board.rendered', 2);
+    mod.emit('nothing');
+    assert.deepEqual(got, [1]);
+    assert.equal(errors.length, 2);
+  });
+
+  it('has the same mod API in the stub, where it changes nothing', () => {
+    const real = createClaudeHub(modWin(undefined).win).mod;
+    const fake = stub.createClaudeHub(modWin(undefined).win).mod;
+    assert.deepEqual(Object.keys(fake).sort(), Object.keys(real).sort());
+    for (const k of Object.keys(real)) assert.equal(typeof fake[k], typeof real[k], k);
+    assert.equal(
+      fake.wrap('x', () => {}),
+      false,
+    );
+    assert.equal(typeof fake.on('e', () => {}), 'function');
+  });
+});
+
 // An app run alone serves the stub, so it must answer like the client does with no hub.
 describe('stub', () => {
   const standalone = { 'session.cost': ({ id }) => `http://localhost:3543/?session=${id}` };

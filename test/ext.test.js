@@ -255,6 +255,36 @@ describe('ext', () => {
       assert.deepEqual(commands, ['claude --version', ...registerCmds(extRoot()), 'claude plugin uninstall probe@probe-market', 'claude plugin install probe@probe-market']);
     });
 
+    it('asks again on update only when a mod changes its code, and keeps the old commit on no', () => {
+      fs.rmSync(path.join(root, 'hub-app.json'));
+      const modFiles = (js) => {
+        fs.writeFileSync(path.join(root, 'kanban.js'), js);
+        fs.writeFileSync(path.join(root, 'kanban.css'), `/* ${Math.random()} */`);
+        writeJson(path.join(root, 'mod.json'), { manifest: 1, kind: 'mod', id: 'probe', targets: { kanban: { surface: 1, css: ['kanban.css'], js: ['kanban.js'] } } });
+      };
+      const asked = [];
+      let answer = 'y';
+      const modGh = (...argv) => runExt(argv, ctx({ githubBase: remote, ask: (q) => (asked.push(q), answer) }));
+      modFiles('one()');
+      const one = commit('one');
+      assert.equal(modGh('install', 'github:o/r/ext'), true);
+      assert.equal(asked.length, 1);
+      modFiles('one()');
+      const css = commit('css only');
+      assert.equal(modGh('update', 'probe'), true);
+      assert.equal(asked.length, 1);
+      assert.equal(config().mods[0].sha, css);
+      modFiles('two()');
+      commit('new code');
+      answer = 'n';
+      assert.equal(modGh('update', 'probe'), false);
+      assert.equal(asked.length, 2);
+      assert.match(out.join('\n'), /changes the code it runs in kanban[\s\S]*probe keeps the code it had/);
+      assert.equal(config().mods[0].sha, css);
+      assert.equal(fs.readFileSync(path.join(extRoot(), 'kanban.js'), 'utf8'), 'one()');
+      assert.notEqual(one, css);
+    });
+
     it('goes back to the installed commit when the new code needs a newer hub', () => {
       const one = commit('one');
       gh('install', 'github:o/r/ext');
@@ -539,10 +569,110 @@ describe('ext', () => {
     });
   });
 
+  describe('a mod', () => {
+    let bundled;
+    const modManifest = (dir, fields) => {
+      fs.rmSync(path.join(dir, 'hub-app.json'), { force: true });
+      fs.writeFileSync(path.join(dir, 'hub.css'), 'body{}');
+      fs.writeFileSync(path.join(dir, 'kanban.js'), '');
+      writeJson(path.join(dir, 'mod.json'), {
+        manifest: 1,
+        kind: 'mod',
+        id: 'probe',
+        targets: { hub: { surface: 1, css: ['hub.css'] }, kanban: { surface: 1, js: ['kanban.js'] } },
+        ...fields,
+      });
+    };
+    let answer;
+    let asked;
+    const ask = (q) => {
+      asked.push(q);
+      return answer;
+    };
+    const modExt = (...argv) => runExt(argv, ctx({ bundled, ask }));
+
+    beforeEach(() => {
+      answer = 'y';
+      asked = [];
+      bundled = tmp('hub-ext-bundled-');
+      fs.mkdirSync(path.join(bundled, 'probe'));
+      modManifest(path.join(bundled, 'probe'));
+    });
+    afterEach(() => fs.rmSync(bundled, { recursive: true, force: true }));
+
+    it('installs a bundled mod by its id before the registry, lists, refuses update and removes it', () => {
+      assert.equal(modExt('install', 'probe'), true);
+      assert.deepEqual(config(), { mods: [{ id: 'probe', source: 'bundled' }] });
+      assert.match(out.join('\n'), /changes: hub, kanban[\s\S]*runs code in kanban/);
+      assert.equal(modExt('install', 'probe'), true);
+      assert.match(out.join('\n'), /probe is already in the hub/);
+      out = [];
+      assert.equal(modExt('list'), true);
+      assert.deepEqual(out, ['  probe  bundled  mod']);
+      assert.equal(modExt('update', 'probe'), false);
+      assert.match(out.join('\n'), /updates when the hub does/);
+      assert.equal(modExt('remove', 'probe'), true);
+      assert.deepEqual(config().mods, []);
+      assert.ok(fs.existsSync(path.join(bundled, 'probe', 'mod.json')));
+      assert.deepEqual(commands, []);
+    });
+
+    it('links a mod folder into mods', () => {
+      modManifest(root);
+      assert.equal(modExt('install', root), true);
+      assert.deepEqual(config().mods, [{ id: 'probe', path: root.replaceAll('\\', '/'), source: 'local' }]);
+    });
+
+    it('takes JS for the hub page', () => {
+      modManifest(root, { targets: { hub: { surface: 1, css: ['hub.css'], js: ['kanban.js'] } } });
+      assert.equal(modExt('install', root), true);
+      assert.deepEqual(config().mods.map((m) => m.id), ['probe']);
+    });
+
+    it('asks before a mod runs code, and installs nothing on no', () => {
+      answer = 'n';
+      assert.equal(modExt('install', 'probe'), false);
+      assert.deepEqual(asked, ['  Let probe run code in kanban? [y/N] ']);
+      assert.match(out.join('\n'), /probe is not installed/);
+      assert.equal(rawConfig(), null);
+    });
+
+    it('refuses with no terminal to ask on, unless --yes', () => {
+      answer = null;
+      assert.equal(modExt('install', 'probe'), false);
+      assert.match(out.join('\n'), /Pass --yes/);
+      asked = [];
+      assert.equal(modExt('install', 'probe', '--yes'), true);
+      assert.deepEqual(asked, []);
+      assert.deepEqual(config().mods.map((m) => m.id), ['probe']);
+    });
+
+    it('asks nothing for a mod with CSS only', () => {
+      modManifest(root, { targets: { hub: { surface: 1, css: ['hub.css'] } } });
+      answer = 'n';
+      assert.equal(modExt('install', root), true);
+      assert.deepEqual(asked, []);
+    });
+
+    for (const [why, fields, message] of [
+      ['a file outside the folder', { targets: { kanban: { surface: 1, css: ['../x.css'] } } }, /is not a relative \.css path/],
+      ['a missing file', { targets: { kanban: { surface: 1, css: ['gone.css'] } } }, /gone\.css is not found/],
+      ['a wrong extension', { targets: { kanban: { surface: 1, css: ['kanban.js'] } } }, /is not a relative \.css path/],
+      ['a target with no surface version', { targets: { kanban: { css: ['hub.css'] } } }, /targets\.kanban\.surface must be the version/],
+    ]) {
+      it(`refuses ${why} and writes nothing`, () => {
+        modManifest(root, fields);
+        assert.equal(modExt('install', root), false);
+        assert.match(out.join('\n'), message);
+        assert.equal(rawConfig(), null);
+      });
+    }
+  });
+
   it('prints the usage for an unknown command or option', () => {
     assert.equal(ext('nope'), false);
     assert.match(out.join('\n'), /Usage: claude-code-hub ext/);
-    assert.equal(ext('install', root, '--yes'), false);
-    assert.match(out.join('\n'), /Unknown option '--yes'/);
+    assert.equal(ext('install', root, '--nope'), false);
+    assert.match(out.join('\n'), /Unknown option '--nope'/);
   });
 });

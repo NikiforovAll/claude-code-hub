@@ -37,6 +37,7 @@ const extensions = await loadExtensions();
               {x.official && <span class="badge">Official</span>}
               {x.kind === 'addon' && <span class="badge">Add-on</span>}
               {x.kind === 'feature' && <span class="badge">Feature</span>}
+              {x.kind === 'mod' && <span class="badge">Mod</span>}
             </span>
             <span class="tagline">{x.tagline}</span>
             {x.tags.length > 0 && (

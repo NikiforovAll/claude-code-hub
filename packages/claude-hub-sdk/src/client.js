@@ -14,6 +14,7 @@
 
   // keys.js comes first in the served file. Required as a module, client.js loads it itself.
   const { comboOf, keyParts, keySigs } = typeof ClaudeHubKeys === 'object' ? ClaudeHubKeys : require('./keys');
+  const { createMods } = typeof ClaudeHubModKit === 'object' ? ClaudeHubModKit : require('./mods');
 
   function isVars(v) {
     return (
@@ -41,11 +42,24 @@
         : [],
     );
 
+  // The page's light or dark, for mod CSS: [data-hub-mode="light"]. Cached so it is set before the hub answers.
+  const MODE_KEY = 'claude-hub:mode';
+
   function createClaudeHub(win) {
     const doc = win.document;
     const framed = win.top !== win;
     let appliedVars = null;
     let hub = null;
+    const mods = createMods(win);
+    const { mod } = mods;
+
+    function setMode(mode) {
+      if (mode !== 'light' && mode !== 'dark') return;
+      if (doc.documentElement) doc.documentElement.dataset.hubMode = mode;
+      try {
+        win.localStorage.setItem(MODE_KEY, mode);
+      } catch (_) {}
+    }
 
     function setVars(vars) {
       const body = doc.body;
@@ -82,6 +96,9 @@
     if (framed) {
       const cache = readCache();
       if (cache && hubOnTop(cache.origin)) setVars(cache.vars);
+      try {
+        setMode(win.localStorage.getItem(MODE_KEY));
+      } catch (_) {}
     }
 
     function connect({ standalone = {} } = {}) {
@@ -151,6 +168,7 @@
         if (isVars(p.vars)) adoptVars(p.vars, origin);
         else if (!waiting()) adoptVars(null);
         lastTheme = p;
+        setMode(p.theme);
         applyMode(p);
         emit('theme.changed', p);
       }
@@ -351,6 +369,7 @@
       Promise.all([config, loaded]).then(() => {
         if (!origin) return;
         post({ type: 'hub:hello', protocol: [1], subscribes: [...topics.keys()] });
+        mods.connectSender(post);
         setStatus('waiting');
         // A hub older than protocol v1 never answers. The app then runs as if alone, with no hub calls.
         win.setTimeout(() => {
@@ -493,7 +512,7 @@
       return hub;
     }
 
-    return { connect, comboOf };
+    return { connect, comboOf, mod };
   }
 
   if (typeof module === 'object' && module.exports) module.exports = { createClaudeHub, comboOf };

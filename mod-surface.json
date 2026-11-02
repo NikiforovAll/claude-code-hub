@@ -1,0 +1,10 @@
+{
+  "surface": 1,
+  "functions": {},
+  "events": {
+    "<mod id>:<name>": "A message from the same mod's code in an app page, sent there with mod.send(topic, data). The detail is {app, data}: the app id and the data as sent."
+  },
+  "parts": {},
+  "states": {},
+  "page": "The hub page holds one iframe per app and its own chrome. A mod may draw over it, such as a fixed canvas with pointer-events: none at a z-index from 11 to 14: over the app frames and the loading screen (10), under the hub's toasts (15 and up) and the palette (20)."
+}

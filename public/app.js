@@ -126,6 +126,9 @@ const HUB_VARS = {
 };
 // The last applied variables, so the loading screen paints in the theme before /api/config lands.
 const PALETTE_KEY = 'hub-palette';
+// /?nomods: the safe mode for a mod that breaks a page. The hub page and every app frame load no mod.
+const NO_MODS = new URLSearchParams(location.search).has('nomods');
+if (NO_MODS) document.querySelector('link[href="/mods/hub.css"]')?.remove();
 
 // Paints the hub's own surfaces (loading screen, palette) in the active theme. The hub relays
 // hub:theme to the sub-apps; this is what makes it apply to the hub's own chrome too.
@@ -133,6 +136,7 @@ function applyHubTheme() {
   const mode = themeState.theme ?? osTheme();
   const root = document.documentElement;
   root.classList.toggle('light', mode === 'light');
+  root.dataset.hubMode = mode;
   // No app has named a theme yet: paint the one every app starts with.
   const theme = activeColorTheme() ?? DEFAULT_COLOR_THEME;
   const key = `${theme}/${mode}`;
@@ -1003,7 +1007,13 @@ function loadApp(id, src, { link = false } = {}) {
 // The terminal token rides in the fragment so it never reaches a server log or a Referer.
 function appSrc(id, path = '') {
   const token = apps[id].terminalToken;
-  return apps[id].url + path + (token ? `#t=${token}` : '');
+  let src = apps[id].url + path;
+  const url = NO_MODS && URL.parse(src);
+  if (url) {
+    url.searchParams.set('nomods', '1');
+    src = url.href;
+  }
+  return src + (token ? `#t=${token}` : '');
 }
 
 // From each app's manifest. Before /api/config lands there are none, and the first line is generic.
@@ -1223,6 +1233,9 @@ function listenMessages() {
       openExternal(data);
     } else if (data.type === 'hub:theme') {
       onThemeMessage(data);
+    } else if (data.type === 'hub:mod' && typeof data.topic === 'string') {
+      // From a mod's code in the app (mod.send) to the same mod on this page, which /mods/hub.js loads.
+      window.ClaudeHub?.mod?.emit(data.topic, { app: appId, data: data.data });
     }
   });
 }

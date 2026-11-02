@@ -11,6 +11,7 @@ const { x } = Astro.props as { x: Extension };
 const { requires } = x;
 const addon = x.kind === 'addon';
 const feature = x.kind === 'feature';
+const mod = x.kind === 'mod';
 const OS = { win32: 'Windows', darwin: 'macOS', linux: 'Linux' } as Record<string, string>;
 const tools = (requires.tools ?? []).filter((t) => !t.optional);
 const optionalTools = (requires.tools ?? []).filter((t) => t.optional);
@@ -23,7 +24,7 @@ const needs = [
 ].filter(Boolean) as string[];
 const linkedTools = tools.filter((t) => t.url);
 const facts = [
-  ['Kind', addon ? 'Kanban dock add-on' : feature ? 'Hub feature' : 'Hub app'],
+  ['Kind', addon ? 'Kanban dock add-on' : feature ? 'Hub feature' : mod ? 'Mod' : 'Hub app'],
   ['Author', x.author],
   ['License', x.license],
   ['Requires', needs.join(', ')],
@@ -54,6 +55,7 @@ const ld = {
       {x.official && <span class="badge">Official</span>}
       {addon && <span class="badge">Add-on</span>}
       {feature && <span class="badge">Feature</span>}
+      {mod && <span class="badge">Mod</span>}
     </h1>
     <p class="lede">{x.tagline}</p>
     {x.description && <p class="description">{x.description}</p>}
@@ -76,6 +78,12 @@ const ld = {
             The hub ships the code of a feature, so nothing is cloned. <code>ext install</code> checks that {tools.map((t) => t.name).join(' and ') || 'the hub can run it'} {tools.length ? 'is installed' : ''} and turns {x.name.toLowerCase()} on in the hub's <code>config.json</code>.
             Restart the hub. <code>claude-code-hub ext remove {x.id}</code> turns it off again.{' '}
             {x.homepage && <a href={x.homepage}>Read the guide</a>}
+          </p>
+        ) : mod ? (
+          <p>
+            <code>ext install</code> finds {x.id} in the mods the hub ships, else in this registry, and adds it to the hub's <code>config.json</code>.
+            A mod that runs code asks first: type <code>y</code> to allow it. Restart the hub. <code>claude-code-hub ext remove {x.id}</code> takes it off again, and <code>/?nomods</code> opens the hub without it once.{' '}
+            <a href={url('extensibility/mods/')}>Read how mods work</a>.
           </p>
         ) : addon ? (
           <p>

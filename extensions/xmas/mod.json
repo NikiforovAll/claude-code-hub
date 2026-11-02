@@ -1,0 +1,57 @@
+{
+  "manifest": 1,
+  "kind": "mod",
+  "id": "xmas",
+  "title": "Christmas",
+  "themes": [
+    {
+      "id": "xmas",
+      "label": "Christmas",
+      "extends": "ember",
+      "dark": {
+        "ember": "#c8424a",
+        "emberGlow": "#d9b46a",
+        "emberDim": "rgba(200,66,74,0.22)",
+        "field": "#0f1513",
+        "surface": "#141b18",
+        "elevated": "#1a2320",
+        "hover": "#222d29",
+        "border": "#2a3631"
+      },
+      "light": {
+        "ember": "#a8323a",
+        "emberGlow": "#7d2329",
+        "emberDim": "rgba(168,50,58,0.14)",
+        "field": "#eceee9",
+        "surface": "#f2f3ef",
+        "elevated": "#fbfbf8",
+        "hover": "#d9ddd5",
+        "border": "#cdd3c9"
+      }
+    }
+  ],
+  "targets": {
+    "hub": { "surface": 1, "css": ["hub.css"], "js": ["hub.js"] },
+    "kanban": { "surface": 1, "css": ["kanban.css"], "js": ["kanban.js"] }
+  },
+  "listing": {
+    "tagline": "A quiet Christmas look for the hub and Kanban",
+    "description": "Pine and cranberry colors, light snow that falls faster while sessions work, fairy lights on the progress bar, a garland around the open session, a Santa hat on the mascot and a countdown to Christmas. It runs a little JS, so the install asks you first.",
+    "tags": ["theme", "seasonal", "mod"],
+    "screenshots": [
+      {
+        "url": "https://nikiforovall.blog/claude-code-hub/shots/extensions/xmas-demo.webp",
+        "alt": "Animation: the hub with the Christmas mod in dark mode. Snow falls over the board, a garland of red, green and gold dashes moves to each session the user opens, and the progress bar in the header twinkles as fairy lights. Then the same board in light mode",
+        "title": "Snow, lights and a garland",
+        "caption": "The garland follows the open session, and the snow falls faster while sessions work.",
+        "card": true
+      },
+      {
+        "url": "https://nikiforovall.blog/claude-code-hub/shots/extensions/xmas-hub-light.webp",
+        "alt": "The hub in light mode with the Christmas mod: a garland around the open session card, fairy lights on the header progress bar, a red and green dashed line at the top and grey snowflakes",
+        "title": "Light mode",
+        "caption": "Each part has its own light-mode colors."
+      }
+    ]
+  }
+}

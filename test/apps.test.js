@@ -368,6 +368,7 @@ describe('loadApp', () => {
     const app = loadApp(COST, { hubRoot, resolve: () => path.join(pkgRoot, 'package.json'), log });
     assert.deepEqual(app, {
       id: 'cost',
+      root: pkgRoot,
       version: null,
       plugin: undefined,
       entry: path.join(pkgRoot, 'server.js'),

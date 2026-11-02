@@ -16,7 +16,8 @@ const { createNetGuard, KEEP_ALIVE_MS } = require('./lib/net-guard');
 const { ping, stats } = require('./lib/ipc');
 const { killChild } = require('./lib/kill-child');
 const { createPortHealth } = require('./lib/port-health');
-const { readRegistry, themeConfig } = require('./lib/themes');
+const { readRegistry, themeConfig, modThemes } = require('./lib/themes');
+const { resolveMods, modAssets, appModEnv, readSurface, hubModScript } = require('./lib/mods');
 const { createUpdateCheck } = require('./lib/update-check');
 const { liveHub, removeRecord, writeRecord } = require('./lib/hub-record');
 const { HUB_PLUGIN } = require('./lib/install');
@@ -159,6 +160,9 @@ function resolveHubConfig() {
   // Hand-edited only; kept verbatim so a rewrite of the file does not drop it.
   if (saved.terminal && typeof saved.terminal === 'object') config.terminal = saved.terminal;
   if (Array.isArray(saved.apps)) config.apps = saved.apps;
+  if (Array.isArray(saved.addons)) config.addons = saved.addons;
+  if (Array.isArray(saved.mods)) config.mods = saved.mods;
+  if (typeof saved.modsEnabled === 'boolean') config.modsEnabled = saved.modsEnabled;
   if (saved.keys !== undefined) config.keys = saved.keys;
   if (saved.voice && typeof saved.voice === 'object') config.voice = saved.voice;
   copyLive(saved, config);
@@ -206,6 +210,18 @@ if (!ENABLED_APPS.length) {
   console.error(`No enabled app could load (${ids}). The reasons are logged above.`);
   process.exit(1);
 }
+const SURFACES = {
+  hub: readSurface(__dirname),
+  ...Object.fromEntries(ENABLED_APPS.map((a) => [a.id, readSurface(a.root)])),
+};
+const MODS_OFF = process.argv.includes('--no-mods') || hubConfig.modsEnabled === false;
+if (MODS_OFF && hubConfig.mods?.length) console.log('mods are off (--no-mods or modsEnabled: false): no mod loads');
+const MODS = resolveMods(hubConfig, path.dirname(HUB_CONFIG_FILE), {
+  warn: console.log,
+  surfaces: SURFACES,
+  off: MODS_OFF,
+});
+for (const m of MODS) console.log(`mod ${m.id} changes ${Object.keys(m.targets).join(', ')}`);
 const ACTIONS = actionTable(ENABLED_APPS);
 const { keys: USER_KEYS, lines: keyLines } = userKeys(hubConfig.keys, ENABLED_APPS);
 for (const line of keyLines) console.log(`${HUB_CONFIG_FILE}: ${line}`);
@@ -299,6 +315,10 @@ function childEnv(pool, name) {
     ALLOWED_HOSTS: net.ALLOWED_HOSTS,
     HUB_SDK_SERVER,
   };
+  // The app's own process serves its mod files (the SDK's mount), so they load from the app's origin.
+  const mods = appModEnv(MODS, name);
+  if (mods) env.HUB_MODS = mods;
+  else delete env.HUB_MODS;
   if (TERMINAL.enabled && name === TERMINAL_APP.id) {
     env.CCK_TERMINAL = JSON.stringify(TERMINAL);
     env.CCK_TERMINAL_TOKEN = TERMINAL_TOKEN;
@@ -919,6 +939,7 @@ app.use(express.json());
 const THEME_REGISTRY = readRegistry();
 // Read on each /api/config, so an edit applies on the next page load.
 const USER_THEMES_FILE = path.join(HUB_DIR, 'themes.json');
+const MOD_THEMES = modThemes(THEME_REGISTRY, MODS, console.log);
 
 function appsConfig() {
   return Object.fromEntries(
@@ -958,7 +979,7 @@ app.get('/api/update', async (_req, res) => {
 
 app.get('/api/config', (_req, res) => {
   res.json({
-    ...themeConfig(THEME_REGISTRY, { userFile: USER_THEMES_FILE }),
+    ...themeConfig(THEME_REGISTRY, { userFile: USER_THEMES_FILE, extra: MOD_THEMES }),
     apps: appsConfig(),
     actions: ACTIONS,
     keys: USER_KEYS,
@@ -1396,6 +1417,27 @@ app.get('/api/resolve-path', (req, res) => {
 
 const HUB_KEYS_JS = path.join(__dirname, 'packages', 'claude-hub-sdk', 'src', 'keys.js');
 app.get('/sdk/keys.js', (_req, res) => res.sendFile(HUB_KEYS_JS));
+// Public like the rest of the page's styles. Only the files a manifest lists are served.
+const HUB_MOD_ASSETS = modAssets(MODS, 'hub');
+const HUB_MOD_CSS = HUB_MOD_ASSETS.css.map((u) => `@import url("${u}");`).join('\n');
+const HUB_MOD_JS = hubModScript(HUB_MOD_ASSETS);
+app.get('/mods/hub.css', (_req, res) => res.type('css').set('Cache-Control', 'no-cache').send(HUB_MOD_CSS));
+app.get('/mods/hub.js', (_req, res) => res.type('js').set('Cache-Control', 'no-cache').send(HUB_MOD_JS));
+app.get('/mods/:id/*', (req, res, next) => {
+  const abs = HUB_MOD_ASSETS.files.get(`/${req.params.id}/${req.params[0]}`);
+  if (!abs) return next();
+  res.sendFile(abs, { maxAge: '1y', immutable: true });
+});
+// With no hub mod, or under ?nomods, the page leaves out the mod tags: no two extra requests, and
+// no render-blocking stylesheet that safe mode would paint before app.js removes it.
+const HUB_PAGE = path.join(__dirname, 'public', 'index.html');
+const HUB_HAS_MODS = HUB_MOD_ASSETS.css.length > 0 || HUB_MOD_ASSETS.js.length > 0;
+const MOD_TAGS = ['<link rel="stylesheet" href="/mods/hub.css">', '<script src="/mods/hub.js"></script>'];
+app.get(['/', '/index.html'], (req, res, next) => {
+  if (HUB_HAS_MODS && req.query.nomods === undefined) return next();
+  const html = MOD_TAGS.reduce((page, tag) => page.replace(tag, ''), fs.readFileSync(HUB_PAGE, 'utf8'));
+  res.type('html').set('Cache-Control', 'no-cache').send(html);
+});
 app.use(express.static(path.join(__dirname, 'public')));
 
 // Children get HUB_URL at spawn and trust only that origin, so the first pool waits for the port

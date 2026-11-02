@@ -1,0 +1,141 @@
+:root {
+  --xmas-red: #b5333c;
+  --xmas-pine: #3f6b55;
+  --xmas-gold: #c9a45c;
+  --xmas-trim: #f1ede4;
+}
+
+:root[data-hub-mode="light"] {
+  --xmas-trim: #d6cbb4;
+}
+
+/* A snowflake after a finished task's number, in the board's own muted ink. */
+[data-hub-part="task-card"].completed [data-hub-part="task-number"]::after {
+  content: "\2744";
+  margin-left: 6px;
+  color: var(--text-muted);
+  opacity: 0.75;
+  font-size: 11px;
+  line-height: 1;
+}
+
+[data-hub-part="task-card"].completed:hover [data-hub-part="task-number"]::after {
+  color: var(--accent-text);
+  opacity: 1;
+}
+
+/* A small gold star after the Completed title when every task is done. */
+[data-hub-part="board"].xmas-all-done [data-hub-part="done-title"]::after {
+  content: " \2605";
+  color: var(--xmas-gold);
+  letter-spacing: 0;
+}
+
+/* Fairy lights: the header bar is a wire of unlit bulbs, and the fill lights them in turn,
+   cranberry, gold, pine. The fill's width still comes from the board. */
+/* :root lifts it over the board's own two-class rule for the bar. */
+:root [data-hub-part="progress"] {
+  height: 8px;
+  border-radius: 0;
+  overflow: visible;
+  background:
+    radial-gradient(circle at 6px 4px, color-mix(in srgb, var(--text-muted) 35%, transparent) 1.6px, transparent 2.2px) 0 0 / 12px 8px repeat-x,
+    linear-gradient(var(--border), var(--border)) 0 50% / 100% 1px no-repeat;
+}
+
+[data-hub-part="progress"] [data-hub-part="progress-fill"] {
+  overflow: hidden;
+  background:
+    radial-gradient(circle at 6px 4px, #d24c55 2px, transparent 2.6px) 0 0 / 36px 8px repeat-x,
+    radial-gradient(circle at 18px 4px, #ddb865 2px, transparent 2.6px) 0 0 / 36px 8px repeat-x,
+    radial-gradient(circle at 30px 4px, #5c9a7a 2px, transparent 2.6px) 0 0 / 36px 8px repeat-x;
+  filter: drop-shadow(0 0 2px rgba(221, 184, 101, 0.55));
+}
+
+/* A few twinkles when the bar appears, not forever, so an idle board draws no frames. */
+@media (prefers-reduced-motion: no-preference) {
+  [data-hub-part="progress-fill"] {
+    animation: xmas-twinkle 5s ease-in-out 3;
+  }
+}
+
+@keyframes xmas-twinkle {
+  50% {
+    opacity: 0.78;
+  }
+}
+
+/* The open session's border is a thin garland, like the hub's top line. Diagonal stripes masked
+   to a ring put short dashes on all four sides and keep the card's rounded corners. */
+[data-hub-part="session-card"].active {
+  border-color: transparent;
+  box-shadow: 0 0 14px -8px rgba(221, 184, 101, 0.5);
+}
+
+[data-hub-part="session-card"].active::after {
+  content: "";
+  position: absolute;
+  inset: -1px;
+  padding: 1.5px;
+  border-radius: inherit;
+  pointer-events: none;
+  opacity: 0.7;
+  background: repeating-linear-gradient(
+    45deg,
+    var(--xmas-red) 0 9px,
+    transparent 9px 14px,
+    var(--xmas-pine) 14px 23px,
+    transparent 23px 28px,
+    var(--xmas-gold) 28px 37px,
+    transparent 37px 42px
+  );
+  -webkit-mask: linear-gradient(#000 0 0) content-box exclude, linear-gradient(#000 0 0);
+  mask: linear-gradient(#000 0 0) content-box exclude, linear-gradient(#000 0 0);
+}
+
+:root[data-hub-mode="light"] [data-hub-part="session-card"].active::after {
+  opacity: 0.6;
+}
+
+/* Days to Christmas, set by kanban.js. A pseudo-element, because the board rebuilds the footer's children. */
+[data-hub-part="sidebar-footer"] {
+  flex-wrap: wrap;
+  row-gap: 6px;
+}
+
+[data-hub-part="sidebar-footer"]::before {
+  content: var(--xmas-advent, none);
+  order: 1;
+  flex-basis: 100%;
+  color: var(--text-muted);
+  font-size: 10px;
+  white-space: nowrap;
+}
+
+/* The same hat on the footer's Kanbot, 1px per pixel: trim and pompom as gradient layers over
+   the red. CSS, because the board rebuilds the footer on each poll, which would drop added nodes. */
+[data-hub-part="sidebar-footer"] button:has(> [data-hub-part="kanbot"]) {
+  position: relative;
+}
+
+[data-hub-part="sidebar-footer"] button:has(> [data-hub-part="kanbot"])::before {
+  content: "";
+  position: absolute;
+  width: 10px;
+  height: 6px;
+  margin: -6px 0 0 3px;
+  pointer-events: none;
+  background:
+    linear-gradient(var(--xmas-trim) 0 0) 0 5px / 10px 1px,
+    linear-gradient(var(--xmas-trim) 0 0) 8px 0 / 2px 2px,
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 10 6' shape-rendering='crispEdges'%3E%3Cpath fill='%23b5333c' d='M1 4h8v1H1zM2 3h6v1H2zM3 2h5v1H3zM5 1h3v1H5z'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+}
+
+[data-hub-part="idle-mascot"] .xmas-hat-red {
+  fill: var(--xmas-red);
+}
+
+[data-hub-part="idle-mascot"] .xmas-hat-trim {
+  fill: var(--xmas-trim);
+}

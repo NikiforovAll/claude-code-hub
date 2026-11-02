@@ -7,6 +7,7 @@ const path = require('node:path');
 const FIXTURE = path.join(__dirname, 'fixtures', 'app.js');
 const CLIENT_SRC = path.join(__dirname, '..', 'src', 'client.js');
 const KEYS_SRC = path.join(__dirname, '..', 'src', 'keys.js');
+const MODS_SRC = path.join(__dirname, '..', 'src', 'mods.js');
 
 let child;
 afterEach(() => child?.kill());
@@ -67,7 +68,39 @@ describe('server mount', () => {
   it("serves the hub's client over the app's own file", async () => {
     const url = await start();
     const body = await (await fetch(`${url}/vendor/claude-hub-sdk.js`)).text();
-    assert.equal(body, `${fs.readFileSync(KEYS_SRC, 'utf8')}\n${fs.readFileSync(CLIENT_SRC, 'utf8')}`);
+    assert.equal(body, [KEYS_SRC, MODS_SRC, CLIENT_SRC].map((f) => fs.readFileSync(f, 'utf8')).join('\n'));
+  });
+
+  // HUB_MODS comes from the hub's own appModEnv, so a change on either side of the contract fails here.
+  it('serves the listed mod files and puts the mod list ahead of the client', async () => {
+    const { appModEnv } = require('../../../lib/mods');
+    const root = fs.mkdtempSync(path.join(require('node:os').tmpdir(), 'sdk-mod-'));
+    fs.writeFileSync(path.join(root, 'a.css'), 'body{color:red}');
+    fs.writeFileSync(path.join(root, 'b.js'), 'void 0');
+    fs.writeFileSync(path.join(root, 'secret.txt'), 'no');
+    const mods = [
+      { id: 'xmas', root, version: 'v1', targets: { kanban: { css: ['a.css'], js: ['b.js'] } } },
+      { id: 'other', root, version: 'v2', targets: { cost: { css: ['a.css'] } } },
+    ];
+    assert.equal(appModEnv(mods, 'memory'), null);
+    try {
+      const url = await start({ HUB_MODS: appModEnv(mods, 'kanban') });
+      const body = await (await fetch(`${url}/vendor/claude-hub-sdk.js`)).text();
+      const assets = {
+        mods: [{ id: 'xmas', version: 'v1' }],
+        css: ['/mods/xmas/a.css?v=v1'],
+        js: ['/mods/xmas/b.js?v=v1'],
+      };
+      assert.ok(body.startsWith(`self.ClaudeHubMods = ${JSON.stringify(assets)};\n`));
+      const css = await fetch(`${url}/mods/xmas/a.css?v=v1`);
+      assert.equal(await css.text(), 'body{color:red}');
+      assert.match(css.headers.get('cache-control'), /immutable/);
+      for (const p of ['/mods/xmas/secret.txt', '/mods/other/a.css']) {
+        assert.equal((await fetch(`${url}${p}`)).status, 404, p);
+      }
+    } finally {
+      fs.rmSync(root, { recursive: true, force: true });
+    }
   });
 
   it('serves a client that runs as one classic script', async () => {

@@ -2,6 +2,17 @@
 
 The SDK follows semver. A new function or message is a minor version, a change that breaks an app is a major version. The protocol version is separate ([Versioning](https://nikiforovall.blog/claude-code-hub/reference/protocol/#versioning)).
 
+## 1.10.0
+
+- `ClaudeHub.mod` loads the hub mods for the app and gives them a way in. The hub passes `HUB_MODS` as `{assets, files}`: `mount()` puts `assets` in `self.ClaudeHubMods` ahead of the client as given, and serves only the paths in `files` under `/mods`. The hub builds the URLs, so the SDK holds no URL format. The client writes a stylesheet per CSS file and a deferred script per JS file, so mod JS runs after a deferred `app.js`. `mod.wrap(name, fn)` replaces the global function `name` with `fn(original, ...args)`; when `fn` throws before it calls `original`, `original` runs. `mod.on(event, fn)` and `mod.emit(event, detail)` carry the events an app emits after a render. `mod.list` names the loaded mods. In the stub, no mod loads, `wrap` returns `false` and `emit` reaches no one.
+- `mod.send(topic, data)` posts `hub:mod` to the hub page, where the same mod's hub code gets it through `ClaudeHub.mod.on(topic)` as `{app, data}`. The topic is `<mod id>:<name>` with the id of an installed mod. Before the hub answers, only the latest data per topic waits. In the stub, `send` returns `false`.
+- A page with mod JS gets a `connect-src 'self'` meta CSP before the first mod script, so mod code cannot send what it reads to another host with fetch, XHR, WebSocket or a beacon. It does not stop image or script loads or navigation.
+- `?nomods` in the page URL loads no mod.
+- Mods load only in an app's own tab, or in the page opened on its own. A page nested inside an app's page, such as cck's terminal or a pane, loads none.
+- The client sets `data-hub-mode` (`light` or `dark`) on `<html>` from `theme.changed` and keeps it in `localStorage` for the next load, so CSS can follow the hub's mode without an app's own theme class.
+- `mod.wrap` warns when a second mod wraps the same function.
+- The mod runtime is `src/mods.js`, which `mount()` and `sdk:sync` put in front of `client.js`. The hub page loads the same code.
+
 ## 1.9.0
 
 - `comboOf()` names the space bar `Space`, as in `ctrl+shift+Space`. Before, the name ended in a space character, which `config.json` `keys` could not hold. The hub binds `ctrl+shift+Space` for hold to talk when voice is on.

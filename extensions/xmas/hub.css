@@ -1,0 +1,33 @@
+/* A hairline of holly, pine and gold along the top edge of the window. Drawn once, no animation. */
+body::before {
+  content: "";
+  position: fixed;
+  inset: 0 0 auto 0;
+  height: 2px;
+  z-index: 50;
+  pointer-events: none;
+  opacity: 0.7;
+  background: repeating-linear-gradient(
+    90deg,
+    #b5333c 0 18px,
+    transparent 18px 26px,
+    #3f6b55 26px 44px,
+    transparent 44px 52px,
+    #c9a45c 52px 58px,
+    transparent 58px 66px
+  );
+}
+
+:root[data-hub-mode="light"] body::before {
+  opacity: 0.55;
+}
+
+/* Above the app frames, below the hub's toasts and dialogs. */
+.xmas-snow {
+  position: fixed;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  z-index: 12;
+  pointer-events: none;
+}

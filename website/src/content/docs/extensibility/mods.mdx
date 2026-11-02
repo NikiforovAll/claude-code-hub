@@ -1,0 +1,114 @@
+---
+title: Mods
+description: Change how the hub and its tools look with CSS and a little JS, without a fork. The Christmas mod ships with the hub.
+---
+
+import Shot from '../../../kit/Shot.astro';
+
+A mod adds CSS and JS to the hub page and to the apps in its tabs. It can also bring color themes. Use a mod to change how a tool looks or to add a small touch to it. To change what a tool does, [patch](/claude-code-hub/extensibility/patch/) or [fork](/claude-code-hub/extensibility/fork/) it.
+
+## The Christmas mod
+
+The hub ships one mod, `xmas`. It adds:
+
+- A **Christmas** color theme in pine and cranberry, for dark and light mode.
+- Light snow over every tab. The snow falls faster while sessions work.
+- Fairy lights on Kanban's progress bar, and a garland around the open session.
+- A Santa hat on the mascot, and a countdown to Christmas under the session list.
+
+<Shot src="shots/extensions/xmas-demo.webp" alt="Animation: the hub with the Christmas mod in dark mode. Snow falls over the board, a garland of red, green and gold dashes moves to each session the user opens, and the progress bar in the header twinkles as fairy lights. Then the same board in light mode" width={2880} height={1620} />
+### Install it
+
+```bash
+claude-code-hub ext install xmas
+```
+
+The mod runs code, so the command asks first:
+
+```text
+  Mod xmas changes: hub, kanban
+  It runs code in hub, kanban, with the same access as the app's own code.
+  Let xmas run code in hub, kanban? [y/N]
+```
+
+Type `y`, then restart the hub. To use the colors, pick **Christmas** in the theme picker of any tool. The snow and the lights do not need the theme.
+
+The mod ships with the hub, so `ext install` clones nothing, and the mod updates when the hub does. To take it off, run `claude-code-hub ext remove xmas` and restart the hub.
+
+## Turn mods off
+
+When a mod breaks a page, turn it off in one of these ways:
+
+| Way | Scope |
+| --- | --- |
+| Open the hub at `/?nomods` | This page load. The hub page and every app frame load no mod |
+| `"enabled": false` on the mod's entry in `mods` of `config.json` | That mod, from the next start |
+| `"modsEnabled": false` in `config.json`, or `--no-mods` | Every mod, from the next start |
+
+## Trust
+
+Mod JS runs in the page of the hub or the app, with the same access as the page's own code. In Kanban's page it can read the terminal token and type into sessions. So:
+
+- `ext install` asks before it lets a mod run code, and `ext update` asks again when the code changes. With no terminal to ask on, the command stops, unless you pass `--yes`. A mod with only CSS never asks.
+- A page that loads mod JS gets a content security policy of `connect-src 'self'`. It blocks `fetch`, XHR, WebSocket and beacons to other hosts. It does not block image or script loads or navigation, so it stops a careless mod, not a hostile one.
+
+Install only a mod whose source you trust.
+
+## Write a mod
+
+A mod is a folder with a `mod.json`:
+
+```json
+{
+  "manifest": 1,
+  "kind": "mod",
+  "id": "xmas",
+  "title": "Christmas",
+  "themes": [{ "id": "xmas", "label": "Christmas", "extends": "ember", "dark": { "ember": "#c8424a" }, "light": { "ember": "#a8323a" } }],
+  "targets": {
+    "hub": { "surface": 1, "css": ["hub.css"], "js": ["hub.js"] },
+    "kanban": { "surface": 1, "css": ["kanban.css"], "js": ["kanban.js"] }
+  },
+  "listing": { "tagline": "A quiet Christmas look for the hub and Kanban" }
+}
+```
+
+| Field | Meaning |
+| --- | --- |
+| `targets` | The pages to change: `hub` for the hub page, or an app id. An app target loads in the app's tab, not in pages nested inside it, such as Kanban's terminal or a pane. `css` and `js` list files in the mod folder |
+| `targets.<id>.surface` | The version of that page's mod surface that the files are written for. The hub skips a target whose surface does not match, and logs it |
+| `themes` | New color themes, in the same form as a [custom color theme](/claude-code-hub/guides/themes/). A mod adds themes only: the hub skips one whose id a built-in or another mod's theme already has, and logs it |
+| `listing` | As in an [app manifest](/claude-code-hub/extensibility/reference/manifest/) |
+
+Install a mod you are writing from its folder: `claude-code-hub ext install <dir>`. Restart the hub after a change.
+
+### The mod surface
+
+Each page lists what a mod can use in its `mod-surface.json`: the hub's is at the root of the hub, and each app's is at the root of the app. A mod that uses only these names keeps working when the page changes:
+
+- **Parts.** Elements marked with `data-hub-part`, for example Kanban's `sessions`, `session-card` and `progress-fill`. Select them in CSS and JS.
+- **States.** Classes that a part can have, for example `active` on a `session-card`.
+- **Functions.** Render functions that a mod can wrap, for example Kanban's `renderSessions`.
+- **Events.** Events that the page emits after a render, for example `board.rendered`.
+- **Theme vars.** The hub's CSS variables, such as `--c-ember`. A mod's own variables and classes start with its id, for example `--xmas-gold` and `.xmas-snow`.
+
+`data-hub-mode` on `<html>` is `dark` or `light`, so a mod can follow the page's mode.
+
+In JS, `window.ClaudeHub.mod` has the calls:
+
+| Call | Action |
+| --- | --- |
+| `mod.on(event, fn)` | Run `fn` after the page emits `event`. Returns a function that stops it |
+| `mod.wrap(name, fn)` | Wrap a listed function: `fn(original, ...args)`. When `fn` throws, the page gets what the original returns |
+| `mod.send(topic, data)` | From an app page, send `data` to the same mod's code on the hub page. The topic starts with the mod's id |
+| `mod.list` | The mods that loaded on this page |
+
+The Christmas mod uses `send`: Kanban's page sends how many sessions work, and the hub page makes the snow fall faster.
+
+### Keep it fast
+
+A mod runs in every page load and, through `on` and `wrap`, after renders. So:
+
+- Do no work in a render that you do not wrap. A wrap must give the same output for the same input.
+- Run animation on the compositor, or at 30 fps at most. Stop it while the page is hidden, and do not start it when the OS asks for less motion (`prefers-reduced-motion`).
+- Call `mod.send` only when the value changes.

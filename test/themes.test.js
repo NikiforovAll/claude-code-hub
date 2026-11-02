@@ -3,7 +3,7 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
-const { readRegistry, themeConfig, ROLES } = require('../lib/themes');
+const { readRegistry, themeConfig, modThemes, ROLES } = require('../lib/themes');
 
 const CORE = [
   '--accent',
@@ -165,5 +165,33 @@ describe('themeConfig with user themes', () => {
       assert.equal(themes.length, registry.length);
       assert.equal(warnings.length, 1);
     }
+  });
+});
+
+describe('mod themes', () => {
+  const registry = readRegistry();
+  const xmas = { id: 'xmas', label: 'Christmas', extends: 'ember', dark: { ember: '#c8424a' } };
+
+  it('adds a theme and never replaces a built-in or another mod theme', () => {
+    const logs = [];
+    const mods = [
+      { id: 'a', themes: [xmas, { id: 'ember', dark: { ember: '#000000' } }] },
+      { id: 'b', themes: [{ ...xmas, label: 'Other' }] },
+    ];
+    assert.deepEqual(modThemes(registry, mods, (l) => logs.push(l)), [xmas]);
+    assert.deepEqual(logs, [
+      '[mods] a: skipped its theme "ember": another theme has this id',
+      '[mods] b: skipped its theme "xmas": another theme has this id',
+    ]);
+  });
+
+  it("keeps the user's own change to a built-in, and names the mod when the file takes a mod theme's id", () => {
+    const file = path.join(fs.mkdtempSync(path.join(os.tmpdir(), 'user-themes-')), 'themes.json');
+    fs.writeFileSync(file, JSON.stringify([{ id: 'ember', dark: { ember: '#3b82f6' } }, { id: 'xmas', extends: 'ember' }]));
+    const warnings = [];
+    const { themes, themeVars } = themeConfig(registry, { userFile: file, extra: [xmas], warn: (w) => warnings.push(w) });
+    assert.equal(themeVars.ember.dark['--accent'], '#3b82f6');
+    assert.equal(themes.find((t) => t.id === 'xmas').label, 'Christmas');
+    assert.deepEqual(warnings, ['[themes] skipped "xmas": an installed mod has a theme with this id']);
   });
 });

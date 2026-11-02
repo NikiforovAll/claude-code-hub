@@ -40,17 +40,40 @@ function answerHub() {
   process.channel.unref();
 }
 
-// What an app page loads as /vendor/claude-hub-sdk.js: keys.js, then client.js or stub.js.
+// What an app page loads as /vendor/claude-hub-sdk.js: keys.js, then client.js with mods.js ahead of it, or stub.js.
 function bundle(file) {
   const read = (f) => fs.readFileSync(path.join(__dirname, f), 'utf8');
-  return `${read('keys.js')}\n${read(file)}`;
+  const parts = file === 'client.js' ? ['keys.js', 'mods.js', file] : ['keys.js', file];
+  return parts.map(read).join('\n');
+}
+
+// HUB_MODS, fixed for the process's life: {assets, files}. `assets` is the page's mod list as the
+// client reads it; `files` maps each /mods path to the file on disk, and only those are served.
+// The hub builds both (lib/mods.js appModEnv), so the URL format is not repeated here.
+function readMods() {
+  try {
+    const { assets, files } = JSON.parse(process.env.HUB_MODS || '{}');
+    if (assets && typeof assets === 'object' && files && typeof files === 'object')
+      return { assets, files: new Map(Object.entries(files)) };
+  } catch {}
+  return { assets: null, files: new Map() };
 }
 
 // Mount before express.static: the hub's client must win over the app's stub in public/vendor.
 function mount(app) {
   answerHub();
-  const client = bundle('client.js');
+  const { assets, files } = readMods();
+  const prefix = assets ? `self.ClaudeHubMods = ${JSON.stringify(assets)};\n` : '';
+  const client = prefix + bundle('client.js');
   app.get('/vendor/claude-hub-sdk.js', (_req, res) => res.type('js').send(client));
+  if (files.size) {
+    // app.use, not a route pattern, so it works on each app's Express version.
+    app.use('/mods', (req, res, next) => {
+      const abs = files.get(req.path);
+      if (!abs || (req.method !== 'GET' && req.method !== 'HEAD')) return next();
+      res.sendFile(abs, { maxAge: '1y', immutable: true });
+    });
+  }
   app.get('/hub-config', (_req, res) => {
     res.json({ enabled: !!process.env.CLAUDE_HUB, url: process.env.HUB_URL || null });
   });

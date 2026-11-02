@@ -544,9 +544,11 @@
     .voice-help {
       position: fixed;
       right: 16px;
-      bottom: 16px;
+      top: 50%;
+      translate: 0 -50%;
       z-index: 30;
       width: min(360px, calc(100vw - 32px));
+      max-height: calc(100vh - 32px);
       overflow: hidden;
       background: var(--surface);
       border: 1px solid var(--border);
@@ -636,6 +638,7 @@
     .update-toast-close:hover { color: var(--text); }
     .error-toast { z-index: 25; border-left-color: #e5484d; }
   </style>
+  <link rel="stylesheet" href="/mods/hub.css">
 </head>
 <body>
   <div class="iframe-container" id="iframe-container">
@@ -746,5 +749,6 @@
 
   <script src="/sdk/keys.js"></script>
   <script src="/app.js"></script>
+  <script src="/mods/hub.js"></script>
 </body>
 </html>

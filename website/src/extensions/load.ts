@@ -18,7 +18,7 @@ const SHA_RE = /^[0-9a-f]{40}$/;
 export interface Extension {
   id: string;
   name: string;
-  kind: 'app' | 'addon' | 'feature';
+  kind: 'app' | 'addon' | 'feature' | 'mod';
   official: boolean;
   order: number;
   tagline: string;
@@ -100,19 +100,25 @@ async function loadOne(file: string, local: Map<string, string>): Promise<Extens
   const dir = local.get(id);
   let kind: Extension['kind'] | undefined;
   let text: string | null = null;
-  for (const [k, name] of [['app', 'hub-app.json'], ['addon', 'addon.json'], ['feature', 'feature.json']] as const) {
+  for (const [k, name] of [['app', 'hub-app.json'], ['addon', 'addon.json'], ['feature', 'feature.json'], ['mod', 'mod.json']] as const) {
     text = await readAt(src, sha, name, dir);
     if (text !== null) {
       kind = k;
       break;
     }
   }
-  if (text === null || !kind) throw new Error(`${file}: no hub-app.json, addon.json or feature.json at ${entry.source}@${sha}`);
+  if (text === null || !kind) throw new Error(`${file}: no hub-app.json, addon.json, feature.json or mod.json at ${entry.source}@${sha}`);
   const manifest = JSON.parse(text);
   // cck owns the add-on manifest and checks it on install; the site reads only what it shows.
   // The app manifest is checked against a folder that does not exist, so containment is a check of the path text.
   const err =
-    kind === 'addon' ? addonError(manifest, id) : kind === 'feature' ? featureError(manifest, id) : manifestError(manifest, id, path.resolve(SITE, '.extension-root'));
+    kind === 'addon'
+      ? addonError(manifest, id)
+      : kind === 'feature'
+        ? featureError(manifest, id)
+        : kind === 'mod'
+          ? modError(manifest, id)
+          : manifestError(manifest, id, path.resolve(SITE, '.extension-root'));
   if (err) throw new Error(`${file}: ${err}`);
   const listing = manifest.listing ?? {};
   if (!listing.tagline) throw new Error(`${file}: listing.tagline is missing`);
@@ -161,6 +167,14 @@ function featureError(m: { kind?: unknown; id?: unknown; title?: unknown; config
   if (m.kind !== 'feature') return 'feature.json kind is not "feature"';
   if (m.id !== id) return `feature.json id is not ${id}`;
   if (typeof m.title !== 'string' || !m.config || typeof m.config !== 'object') return 'feature.json needs title and config';
+  return null;
+}
+
+// The hub's readMod checks the files on install; the site reads only what it shows.
+function modError(m: { kind?: unknown; id?: unknown; title?: unknown; targets?: unknown }, id: string): string | null {
+  if (m.kind !== 'mod') return 'mod.json kind is not "mod"';
+  if (m.id !== id) return `mod.json id is not ${id}`;
+  if (typeof m.title !== 'string' || !m.targets || typeof m.targets !== 'object') return 'mod.json needs title and targets';
   return null;
 }
 

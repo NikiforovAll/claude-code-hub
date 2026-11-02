@@ -179,6 +179,7 @@ The shortcuts also work when focus is inside a tool. Kanban keeps <kbd>Ctrl</kbd
 --memory-port <n>       Memory Diagnoser port (default: 3544)
 --pool-size <n>         Config-dir sets kept running after a switch (default: 3)
 --disable-terminal      Turn off the embedded terminal in Kanban
+--no-mods               Load no mod (or "modsEnabled": false in config.json)
 --host <addr>           Bind address (default: 127.0.0.1)
 --allowed-hosts <list>  Extra host names to accept, comma-separated
 --open                  Open the browser on start
