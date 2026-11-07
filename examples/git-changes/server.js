@@ -58,11 +58,14 @@ function parseStatus(out) {
     } else if (e[0] === '?') groups.untracked.push({ path: e.slice(2), code: '?' });
     else if (e[0] === 'u') groups.conflict.push({ path: pathField(e, 10), code: 'U' });
     else if (e[0] === '1' || e[0] === '2') {
-      const xy = e.slice(2, 4);
-      const file = pathField(e, e[0] === '1' ? 8 : 9);
+      const f = e.split(' ');
+      const xy = f[1];
+      const file = f.slice(e[0] === '1' ? 8 : 9).join(' ');
       const from = e[0] === '2' ? t[++i] : null;
-      if (xy[0] !== '.') groups.staged.push({ path: file, from, code: xy[0] });
-      if (xy[1] !== '.') groups.unstaged.push({ path: file, code: xy[1] });
+      // Field 3 is S<c><m><u> for a submodule: new commit, modified tracked files, untracked files.
+      const sub = f[2][0] === 'S' ? { commit: f[2][1] === 'C', modified: f[2][2] === 'M', untracked: f[2][3] === 'U', pinned: f[6] } : null;
+      if (xy[0] !== '.') groups.staged.push({ path: file, from, code: xy[0], sub });
+      if (xy[1] !== '.') groups.unstaged.push({ path: file, code: xy[1], sub });
     }
   }
   return { branch, groups };
@@ -89,30 +92,85 @@ function parseWorktrees(out) {
     .filter((wt) => wt.path);
 }
 
-async function status(root) {
-  const [st, unstagedNum, stagedNum, log, unpushed, wts] = await Promise.all([
+async function changes(root) {
+  const [st, unstagedNum, stagedNum] = await Promise.all([
     git(root, ['status', '--porcelain=v2', '-z', '--branch', '--untracked-files=all']),
     git(root, ['diff', '--numstat', '-z']),
     git(root, ['diff', '--cached', '--numstat', '-z']),
-    git(root, ['log', '-10', '--format=%H%x1f%h%x1f%s%x1f%an%x1f%at%x1e']).catch(() => ''),
-    git(root, ['rev-list', '--max-count=10', 'HEAD', '--not', '--remotes']).catch(() => ''),
-    git(root, ['worktree', 'list', '--porcelain']).catch(() => ''),
   ]);
-  const local = new Set(unpushed.split(/\s+/).filter(Boolean));
   const { branch, groups } = parseStatus(st);
   const sn = parseNumstat(stagedNum);
   const un = parseNumstat(unstagedNum);
   for (const f of groups.staged) Object.assign(f, sn.get(f.path));
   for (const f of groups.unstaged) Object.assign(f, un.get(f.path));
-  const commits = log
+  return { branch, groups };
+}
+
+const MAX_SUB_COMMITS = 20;
+const NO_COMMIT = /^0+$/;
+const EMPTY_GROUPS = () => ({ conflict: [], staged: [], unstaged: [], untracked: [] });
+const changed = (groups) => [...groups.staged, ...groups.unstaged];
+const parseLog = (out) =>
+  out
     .split('\x1e')
     .map((r) => r.trim())
     .filter(Boolean)
-    .map((r) => {
-      const [full, hash, subject, author, at] = r.split('\x1f');
-      return { hash, subject, author, at: Number(at), pushed: !local.has(full) };
-    });
+    .map((r) => r.split('\x1f'));
+
+// The submodule's own changes, and the commits between the pinned commit and its HEAD. The parent's
+// status flags say which of them can be non-empty, so a clean side costs no git call.
+async function submodule(root, rel, flags) {
+  const dir = path.join(root, rel);
+  const pinned = NO_COMMIT.test(flags.pinned) ? null : flags.pinned;
+  const range = flags.commit && pinned;
+  const dirty = flags.modified || flags.untracked;
+  const [own, log, back, shortHead] = await Promise.all([
+    dirty ? changes(dir).catch(() => null) : null,
+    range ? git(dir, ['log', `-${MAX_SUB_COMMITS}`, '--format=%h%x1f%s%x1e', `${pinned}..HEAD`]).catch(() => '') : '',
+    range ? git(dir, ['rev-list', '--count', `HEAD..${pinned}`]).catch(() => '0') : '0',
+    dirty ? null : git(dir, ['rev-parse', '--short=7', 'HEAD']).then((s) => s.trim(), () => null),
+  ]);
+  const head = own?.branch.head || shortHead;
+  const groups = own?.groups || EMPTY_GROUPS();
+  let add = 0, del = 0;
+  for (const f of changed(groups)) {
+    add += f.add || 0;
+    del += f.del || 0;
+  }
+  return {
+    root: dir, branch: own?.branch.name || null, pinned: pinned?.slice(0, 7) || null, head,
+    commit: flags.commit, ahead: parseLog(log).map(([hash, subject]) => ({ hash, subject })), behind: Number(back) || 0, groups, add, del,
+  };
+}
+
+async function withSubmodules(root, { branch, groups }) {
+  const subs = new Map();
+  for (const f of changed(groups)) if (f.sub && !subs.has(f.path)) subs.set(f.path, f.sub);
+  if (!subs.size) return { branch, groups };
+  const infos = new Map(await Promise.all([...subs].map(async ([rel, flags]) => [rel, await submodule(root, rel, flags)])));
+  const inWorktree = new Set(groups.unstaged.map((f) => f.path));
+  for (const kind of ['staged', 'unstaged']) for (const f of groups[kind]) {
+    if (!f.sub) continue;
+    const info = infos.get(f.path);
+    // The worktree row carries the nested totals; a staged pointer row would count them twice.
+    const counted = kind === 'unstaged' || !inWorktree.has(f.path);
+    Object.assign(f, { sub: info, add: counted ? info.add : 0, del: counted ? info.del : 0 });
+  }
+  return { branch, groups };
+}
+
+async function status(root) {
+  const [{ branch, groups }, log, unpushed, wts] = await Promise.all([
+    changes(root).then((c) => withSubmodules(root, c)),
+    git(root, ['log', '-10', '--format=%H%x1f%h%x1f%s%x1f%an%x1f%at%x1e']).catch(() => ''),
+    git(root, ['rev-list', '--max-count=10', 'HEAD', '--not', '--remotes']).catch(() => ''),
+    git(root, ['worktree', 'list', '--porcelain']).catch(() => ''),
+  ]);
+  const local = new Set(unpushed.split(/\s+/).filter(Boolean));
+  const commits = parseLog(log).map(([full, hash, subject, author, at]) => ({ hash, subject, author, at: Number(at), pushed: !local.has(full) }));
   const worktrees = parseWorktrees(wts);
+  // In a submodule, git lists the main worktree by its git dir under the parent's .git/modules/.
+  if (worktrees[0] && /[\\/]\.git[\\/]modules[\\/]/.test(worktrees[0].path)) worktrees[0].path = root;
   const main = worktrees[0]?.path;
   for (const wt of worktrees) Object.assign(wt, { rel: main && inside(main, wt.path), current: wt.path === root });
   return { root, branch, groups, commits, worktrees };
@@ -168,6 +226,19 @@ async function openWatch(root) {
     for (const c of w.clients) c.write(frame(json));
   };
   ignoredDirs(root).then((d) => (w.dirs = d), () => {});
+  // check-ignore fails on a path inside a submodule, so those paths go to the submodule's own ignore list.
+  w.subs = new Map();
+  const loadSubs = async () => {
+    const out = await git(root, ['config', '-f', '.gitmodules', '--get-regexp', '^submodule\\..*\\.path$'], [0, 1]).catch(() => '');
+    const subs = new Map();
+    for (const line of out.split(/\r?\n/).filter(Boolean)) {
+      const rel = line.slice(line.indexOf(' ') + 1);
+      subs.set(`${rel}/`, { dirs: new Set() });
+      ignoredDirs(path.join(root, rel)).then((d) => (subs.get(`${rel}/`).dirs = d), () => {});
+    }
+    w.subs = subs;
+  };
+  loadSubs();
   // Changes git ignores never reach status; a batch of only those costs one check-ignore.
   const anyTracked = async (batch) => {
     const paths = [...batch];
@@ -196,6 +267,10 @@ async function openWatch(root) {
     w.pending = new Set();
     w.relevant = false;
     try {
+      if (w.subsStale) {
+        w.subsStale = false;
+        await loadSubs();
+      }
       if (w.reset) {
         w.reset = false;
         w.tracked.clear();
@@ -232,10 +307,10 @@ async function openWatch(root) {
     if (w.running) w.dirty = true;
     else w.run();
   };
-  // Objects and other worktrees' admin files never change this checkout's status.
+  // Objects (also a submodule's, under modules/) and other worktrees' admin files never change this checkout's status.
   const onGit = (rel) => {
     if (rel === 'info/exclude') w.reset = true;
-    if (!/^(objects\/|worktrees\/[^/]+\/.)/.test(rel)) mark();
+    if (!/^((modules\/.+\/)?objects\/|worktrees\/[^/]+\/.)/.test(rel)) mark();
   };
   const onRoot = (_ev, name) => {
     if (!name) return mark();
@@ -248,6 +323,16 @@ async function openWatch(root) {
       return;
     }
     if (p === '.git' || p.startsWith('.git/')) return onGit(p.slice(5));
+    if (p === '.gitmodules') {
+      w.subsStale = true;
+      return mark();
+    }
+    const sp = underDir(w.subs, p);
+    if (sp) {
+      const rel = p.slice(sp.length);
+      if (rel === '.git' || underDir(w.subs.get(sp).dirs, rel)) return;
+      return mark();
+    }
     if (p.endsWith('.gitignore')) w.reset = true;
     if (w.reset || w.tracked.has(p)) return mark();
     if (w.ignored.has(p) || underDir(w.dirs, p)) return;

@@ -35,6 +35,7 @@
 }
 * { box-sizing: border-box; }
 [hidden] { display: none !important; }
+:root { color-scheme: var(--color-scheme, light dark); }
 html, body { margin: 0; }
 body {
   background: var(--color-bg);
@@ -124,8 +125,26 @@ section { margin-top: 10px; }
 .k-M { --c: var(--color-warning); }
 .k-A, .k-\? { --c: var(--color-success); }
 .k-D { --c: var(--color-danger); }
-.k-R, .k-C, .k-T { --c: var(--color-info); }
+.k-R, .k-C, .k-T, .k-S { --c: var(--color-info); }
 .k-U { --c: var(--color-danger); --mix: 22%; }
+.name .meta { margin-left: 8px; font: 11px var(--font-mono); color: var(--color-text-muted); }
+
+.sub { margin: 0 8px 8px; border: 1px solid var(--color-border); border-radius: 6px; background: var(--color-bg); padding: 4px 0 8px; }
+.chips { display: flex; gap: 6px; flex-wrap: wrap; padding: 6px 10px 2px; }
+.chip { font: 11px/1 var(--font-mono); padding: 4px 7px; border-radius: 999px; border: 1px solid var(--color-border); color: var(--color-text-muted); }
+.chip.w { --c: var(--color-warning); }
+.chip.i { --c: var(--color-info); }
+.chip.d { --c: var(--color-danger); }
+.chip:is(.w, .i, .d) { color: var(--c); border-color: color-mix(in srgb, var(--c) 45%, transparent); }
+.ptr { padding: 6px 10px 0; font: 12px/1.5 var(--font-mono); color: var(--color-text-muted); }
+.ptr code { color: var(--color-text); }
+.sub-commits { list-style: none; margin: 4px 0 0; padding: 0 10px 0 12px; font-size: 12px; }
+.sub-commits li { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; padding: 1px 0; }
+.sub-commits code { font: 11px var(--font-mono); color: var(--color-accent); margin-right: 6px; }
+.sub .files { padding: 4px 4px 0; }
+.sub .file.open { background: var(--color-bg-subtle); }
+.sub-open { margin: 8px 10px 0; font-size: 12px; color: var(--color-accent); border: 1px solid color-mix(in srgb, var(--color-accent) 40%, transparent); border-radius: 6px; padding: 4px 9px; }
+.sub-open:hover { background: color-mix(in srgb, var(--color-accent) 10%, transparent); }
 .name { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; direction: rtl; text-align: left; }
 .name bdi { direction: ltr; }
 .name .dir { color: var(--color-text-muted); }
@@ -141,6 +160,12 @@ section { margin-top: 10px; }
 .diff { margin: 0 8px 8px; border-radius: 6px; overflow: auto; border: 1px solid var(--color-border); background: var(--color-bg); max-height: 70vh; }
 .diff table { border-collapse: collapse; width: 100%; font: 12px/1.55 var(--font-mono); tab-size: 4; }
 .diff td { padding: 0 8px; vertical-align: top; white-space: pre; }
+.wrap .diff td:not(.ln, .sg) { white-space: pre-wrap; overflow-wrap: anywhere; }
+.wrap-btn {
+  font-size: 11px; line-height: 1; text-transform: uppercase; letter-spacing: .06em; color: var(--color-text-muted);
+  padding: 4px 8px; border-radius: 999px; border: 1px solid var(--color-border);
+}
+.wrap .wrap-btn { color: var(--color-accent); border-color: color-mix(in srgb, var(--color-accent) 40%, transparent); }
 .diff td.ln {
   width: 1%; min-width: 34px; text-align: right; user-select: none;
   color: var(--color-text-muted); opacity: .7; padding: 0 6px;
@@ -223,6 +248,7 @@ section { margin-top: 10px; }
     <span class="pill" id="branch" hidden></span>
     <span class="sync" id="sync"></span>
     <span class="live" id="live"><i></i>Live</span>
+    <button class="wrap-btn" id="wrap" title="Wrap long diff lines">Wrap</button>
   </div>
   <div class="summary" id="summary" hidden>
     <span class="count"><b id="nfiles">0</b><span id="nlabel">files</span></span>
@@ -240,6 +266,14 @@ try { view = sessionStorage.getItem(VIEW_KEY) || cwd; } catch {}
 let es = null;
 let sessionRoot = null;
 const $ = (id) => document.getElementById(id);
+const WRAP_KEY = 'git-changes:wrap';
+let wrap = true;
+try { wrap = localStorage.getItem(WRAP_KEY) !== '0'; } catch {}
+document.body.classList.toggle('wrap', wrap);
+$('wrap').addEventListener('click', () => {
+  wrap = document.body.classList.toggle('wrap');
+  try { localStorage.setItem(WRAP_KEY, wrap ? '1' : '0'); } catch {}
+});
 const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]);
 const ICON = {
   chev: '<svg class="chev" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M4 6l4 4 4-4"/></svg>',
@@ -305,10 +339,58 @@ function nameHtml(f) {
   const dir = i >= 0 ? f.path.slice(0, i + 1) : '';
   const base = f.path.slice(i + 1);
   const from = f.from ? `<span class="from">${esc(f.from)} → </span>` : '';
-  return `<span class="name" title="${esc(f.path)}"><bdi>${from}<span class="dir">${esc(dir)}</span><span class="base">${esc(base)}</span></bdi></span>`;
+  const meta = f.sub?.root ? `<span class="meta">submodule${f.sub.branch ? ` · ${esc(f.sub.branch)}` : ''}</span>` : '';
+  return `<span class="name" title="${esc(f.path)}"><bdi>${from}<span class="dir">${esc(dir)}</span><span class="base">${esc(base)}</span>${meta}</bdi></span>`;
+}
+
+// Where each row's diff comes from: a file inside a submodule diffs in the submodule's own repo.
+const diffSource = new Map();
+// server.js lists at most this many of a submodule's new commits.
+const MAX_SUB_COMMITS = 20;
+const commitsLabel = (n) => `${n >= MAX_SUB_COMMITS ? `${MAX_SUB_COMMITS}+` : n} commit${n === 1 ? '' : 's'}`;
+
+function fileRow(kind, f, key) {
+  const isSub = !!f.sub?.root;
+  const isOpen = open.has(key);
+  const code = isSub ? 'S' : f.code;
+  const body = !isOpen ? '' : isSub ? subHtml(f, kind) : `<div class="diff">${diffBody(key)}</div>`;
+  return `<li class="file${isOpen ? ' open' : ''}" data-key="${esc(key)}">
+    <button class="row" data-key="${esc(key)}" title="${esc(kind)}">${ICON.chev}<span class="badge k-${esc(code)}">${code === '?' ? 'U' : esc(code)}</span>${nameHtml(f)}${statHtml(f, kind)}</button>
+    ${body}
+  </li>`;
+}
+
+function subHtml(f, kind) {
+  const s = f.sub;
+  if (kind === 'staged' && state.groups.unstaged.some((u) => u.path === f.path)) {
+    return `<div class="sub"><div class="ptr">Pointer change staged. Open the row under Changes for the submodule's files.</div></div>`;
+  }
+  const g = s.groups;
+  const modified = new Set([...g.staged, ...g.unstaged].map((x) => x.path)).size;
+  const chips = [
+    g.conflict.length && `<span class="chip d">${g.conflict.length} conflicts</span>`,
+    `<span class="chip${modified ? ' w' : ''}">${modified} modified</span>`,
+    `<span class="chip">${g.untracked.length} untracked</span>`,
+    s.ahead.length && `<span class="chip i">${commitsLabel(s.ahead.length)} new</span>`,
+    s.behind && `<span class="chip w">${s.behind} behind pinned</span>`,
+  ].filter(Boolean).join('');
+  const ptr = s.commit && s.pinned
+    ? `<div class="ptr">pinned <code>${esc(s.pinned)}</code> → HEAD <code>${esc(s.head || '?')}</code></div>`
+    : '';
+  const commits = s.ahead.length
+    ? `<ol class="sub-commits">${s.ahead.map((c) => `<li title="${esc(c.subject)}"><code>${esc(c.hash)}</code>${esc(c.subject)}</li>`).join('')}</ol>`
+    : '';
+  const rows = [];
+  for (const [k] of GROUPS) for (const n of g[k]) rows.push(fileRow(k, n, keyOf(k, `${f.path}/${n.path}`)));
+  const files = rows.length ? `<ul class="files">${rows.join('')}</ul>` : '';
+  return `<div class="sub"><div class="chips">${chips}</div>${ptr}${commits}${files}<button class="sub-open" data-view="${esc(s.root)}">Open ${esc(f.path)} as its own view →</button></div>`;
 }
 
 function statHtml(f, kind) {
+  if (f.sub?.root && !f.add && !f.del) {
+    const n = f.sub.ahead.length;
+    return `<span class="stat muted">${n ? commitsLabel(n) : f.sub.behind ? `${f.sub.behind} behind` : 'pointer'}</span>`;
+  }
   if (f.binary) return '<span class="stat muted">binary</span>';
   if (kind === 'untracked') return '<span class="stat muted">new</span>';
   if (kind === 'conflict') return '<span class="stat del">conflict</span>';
@@ -409,14 +491,7 @@ function render() {
     if (!files.length) continue;
     html += `<section class="${closedGroups.has(kind) ? 'closed' : ''}">
       <button class="group-head" data-toggle-group="${kind}">${ICON.chev}<span class="dot" style="background:${color}"></span>${label}<span class="n">${files.length}</span></button>
-      <ul class="files">${files.map((f) => {
-        const key = keyOf(kind, f.path);
-        const isOpen = open.has(key);
-        return `<li class="file${isOpen ? ' open' : ''}" data-key="${esc(key)}">
-          <button class="row" data-kind="${kind}" data-path="${esc(f.path)}">${ICON.chev}<span class="badge k-${esc(f.code)}">${f.code === '?' ? 'U' : esc(f.code)}</span>${nameHtml(f)}${statHtml(f, kind)}</button>
-          ${isOpen ? `<div class="diff">${diffBody(key)}</div>` : ''}
-        </li>`;
-      }).join('')}</ul></section>`;
+      <ul class="files">${files.map((f) => fileRow(kind, f, keyOf(kind, f.path))).join('')}</ul></section>`;
   }
   if (commits.length) {
     const local = commits.filter((c) => !c.pushed).length;
@@ -425,7 +500,7 @@ function render() {
       `<li class="${c.pushed ? '' : 'local'}" title="${c.pushed ? 'Pushed' : 'Not pushed'}"><div class="subj">${esc(c.subject)}</div><div class="meta"><code>${esc(c.hash)}</code> · ${esc(c.author)} · ${ago(c.at)}</div></li>`).join('')}</ol></div>`;
   }
   html += treesHtml();
-  const scroll = [...main.querySelectorAll('li.open')].map((li) => [li.dataset.key, li.querySelector('.diff').scrollTop]);
+  const scroll = [...main.querySelectorAll('li.open > .diff')].map((d) => [d.parentElement.dataset.key, d.scrollTop]);
   main.innerHTML = html;
   for (const [key, top] of scroll) {
     const box = top && diffBox(key);
@@ -494,10 +569,11 @@ function showDiff(key) {
 async function loadDiff(key) {
   if (loading.has(key)) return loading.set(key, true);
   loading.set(key, false);
-  const [kind, path] = splitKey(key);
+  const src = diffSource.get(key);
+  if (!src) return loading.delete(key);
   let text = '';
   try {
-    const j = await (await fetch(api('/api/diff', { root: state.root, kind, path }))).json();
+    const j = await (await fetch(api('/api/diff', src))).json();
     text = j.text ?? '';
   } catch {}
   const again = loading.get(key);
@@ -545,15 +621,13 @@ document.addEventListener('click', (e) => {
     full.add(more.dataset.full);
     return showDiff(more.dataset.full);
   }
-  const row = e.target.closest('.row');
+  const row = e.target.closest('.row[data-key]');
   if (!row) return;
-  const key = keyOf(row.dataset.kind, row.dataset.path);
+  const key = row.dataset.key;
   if (open.has(key)) open.delete(key);
-  else {
-    open.add(key);
-    loadDiff(key);
-  }
+  else open.add(key);
   render();
+  if (open.has(key)) loadDiff(key);
 });
 $('filter').addEventListener('input', () => state && render());
 
@@ -561,21 +635,30 @@ function apply(next) {
   state = next;
   if (!state.error && view === cwd) sessionRoot = state.root;
   $('live').classList.toggle('on', !state.error);
+  diffSource.clear();
   if (!state.error) {
+    // A file whose change moved between groups keeps its row open under the new group.
     const byPath = new Map();
-    for (const [kind] of GROUPS) for (const f of state.groups[kind]) {
-      if (!byPath.has(f.path)) byPath.set(f.path, new Set());
-      byPath.get(f.path).add(keyOf(kind, f.path));
-    }
+    const index = (groups, prefix, root) => {
+      for (const [kind] of GROUPS) for (const f of groups[kind]) {
+        const p = prefix + f.path;
+        const key = keyOf(kind, p);
+        if (!byPath.has(p)) byPath.set(p, new Set());
+        byPath.get(p).add(key);
+        if (f.sub?.root) index(f.sub.groups, `${p}/`, f.sub.root);
+        else diffSource.set(key, { root, path: f.path, kind });
+      }
+    };
+    index(state.groups, '', state.root);
     for (const key of [...open]) {
       const keys = byPath.get(splitKey(key)[1]);
       if (keys?.has(key)) continue;
       open.delete(key);
       if (keys) open.add(keys.values().next().value);
     }
-    for (const key of open) loadDiff(key);
   }
   render();
+  if (!state.error) for (const key of open) loadDiff(key);
 }
 
 function connect() {
