@@ -1091,10 +1091,21 @@ const SHORTCUTS = [
   [['?'], 'Show this help'],
 ];
 
+const HUB_SHORTCUTS = [
+  [['hub.prevApp', 'hub.nextApp'], 'Previous / next hub app'],
+  ['hub.appByNumber', 'Jump to hub app by number'],
+  ['hub.projectPicker', 'Project picker'],
+  ['hub.configDirPicker', 'Config dir picker'],
+  ['hub.appLauncher', 'App launcher'],
+];
+
+const hubRows = () =>
+  HUB_SHORTCUTS.map(([action, label]) => [hub.keyLabel(action), `Hub: ${label}`]).filter(([keys]) => keys?.length);
+
 function showHelp() {
-  $('helpShortcuts').innerHTML = SHORTCUTS.map(
-    ([keys, label]) => `<dt>${keys.map((k) => `<kbd>${esc(k)}</kbd>`).join('')}</dt><dd>${esc(label)}</dd>`,
-  ).join('');
+  $('helpShortcuts').innerHTML = [...SHORTCUTS, ...hubRows()]
+    .map(([keys, label]) => `<dt>${keys.map((k) => `<kbd>${esc(k)}</kbd>`).join('')}</dt><dd>${esc(label)}</dd>`)
+    .join('');
   helpModal.showModal();
 }
 
