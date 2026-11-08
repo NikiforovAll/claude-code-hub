@@ -1,4 +1,5 @@
 {
   "source": "github:NikiforovAll/claude-code-hub/examples/inspector",
-  "official": true
+  "official": true,
+  "order": 3
 }
