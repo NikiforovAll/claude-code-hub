@@ -22,6 +22,16 @@ The hub has no visible controls. These keys drive it. They work while focus is i
 
 The number keys follow the tab order. The table shows the default order. The `apps` list in the [config file](/claude-code-hub/reference/configuration/#the-config-file) changes it, and a tool that is off has no number.
 
+## Other keyboard layouts
+
+A hub key names the character on the key, as on a US keyboard. The hub finds it the same way on every layout:
+
+- On a Latin layout, such as French, German or Dvorak, it matches the key that types that character. On French AZERTY, <kbd>Ctrl+,</kbd> is the key labelled `,`, and <kbd>Ctrl+Alt+A</kbd> is the key labelled `A`.
+- On a layout with no Latin letters, such as Ukrainian, Russian or Greek, it matches the key in the same place on a US keyboard. So <kbd>Ctrl+Alt+P</kbd> works while you type in Cyrillic, and <kbd>Ctrl+,</kbd> is the key that types `б`.
+- The digit row always counts as digits, so <kbd>Alt+1</kbd> is the key labelled `1` on any layout, AZERTY's `&` key too.
+
+The shortcuts window in the hub settings shows, next to such a key, the character your layout types on it.
+
 On a layout with <kbd>AltGr</kbd>, such as Polish or German, Windows sends <kbd>AltGr</kbd> as <kbd>Ctrl+Alt</kbd>. When the press types a character, for example <kbd>AltGr+A</kbd> types `ą` on a Polish layout, the hub leaves it to the tool, so you can type it. A hub key whose letter types a character on your layout does not work there. To use another key, see [Change the keys](#change-the-keys).
 
 ## macOS
@@ -39,7 +49,15 @@ On macOS, the hub keys use <kbd>Control</kbd> (⌃), not <kbd>Command</kbd>. All
 
 ## Change the keys
 
-Add a `keys` block to the [config file](/claude-code-hub/reference/configuration/#the-config-file), then restart the hub. Each entry sets the key of one hub action:
+Open the hub settings (<kbd>Ctrl+,</kbd>) and select **Customize…** on the **Keyboard** page. For each hub action:
+
+- **Change** waits for a key. Press the new key with at least one modifier, or <kbd>Esc</kbd> to cancel. For **App by number**, press the modifiers with any digit.
+- **Reset** gives the action its default key.
+- **Off** removes the action's key.
+
+A change applies at once, in the hub and in every tool, with no restart. When the key is in use by another hub action, that action's key turns off. A key a tool keeps is refused. The window lists those keys under the tool's name.
+
+The window saves the keys in a `keys` block in the [config file](/claude-code-hub/reference/configuration/#the-config-file). You can also edit the block by hand, then restart the hub. Each entry sets the key of one hub action:
 
 ```json
 {
@@ -60,8 +78,9 @@ Add a `keys` block to the [config file](/claude-code-hub/reference/configuration
 | `hub.prevApp` | `ctrl+alt+ArrowLeft` | `ctrl+alt+ArrowLeft` |
 | `hub.nextApp` | `ctrl+alt+ArrowRight` | `ctrl+alt+ArrowRight` |
 | `hub.appByNumber` | `alt+{n}` | `ctrl+alt+{n}` |
+| `hub.voice` | `ctrl+shift+Space` (with [voice](/claude-code-hub/guides/voice/) on) | `ctrl+shift+Space` |
 
-- A key is one or more of `ctrl`, `alt`, `shift` and `meta`, then a letter, a digit from 1 to 9, `,`, or a key name such as `ArrowUp` or `F2`, joined by `+`. On macOS, `alt` is <kbd>Option</kbd> and `meta` is <kbd>Command</kbd>. Case does not matter, except in a key name.
+- A key is one or more of `ctrl`, `alt`, `shift` and `meta`, then a letter, a digit, one of `` , . ; ' ` / \ = - [ ] ``, or a key name such as `ArrowUp` or `F2`, joined by `+`. On macOS, `alt` is <kbd>Option</kbd> and `meta` is <kbd>Command</kbd>. Case does not matter, except in a key name.
 - `hub.appByNumber` ends in `+{n}`. The hub puts the tool number, 1 to 9, in place of `{n}`.
 - `null` turns the action's key off.
 - When you give an action the default key of another action, that other action has no key until you give it one.

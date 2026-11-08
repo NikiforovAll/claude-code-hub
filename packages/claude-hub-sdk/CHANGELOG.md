@@ -2,6 +2,13 @@
 
 The SDK follows semver. A new function or message is a minor version, a change that breaks an app is a major version. The protocol version is separate ([Versioning](https://nikiforovall.blog/claude-code-hub/reference/protocol/#versioning)).
 
+## 1.12.0
+
+- `comboOf()` names a punctuation key by its US character when `e.key` is not ASCII, so `Ctrl+,` on a Cyrillic or Greek layout is `ctrl+,`. A Latin layout keeps its own punctuation. `Digit0` falls back to `0` as `Digit1`…`9` do.
+- A letter key falls back to its physical letter only when `e.key` is not ASCII. Before, AZERTY's `Ctrl+,` (the `KeyM` key) was `ctrl+m`; now it is `ctrl+,`.
+- `ClaudeHubKeys.codeOf(key)` gives the US physical key (`e.code`) of a combo's key, or `null` for a named key.
+- `hub:keys` (hub → app) carries new `forward` and `keys` after the user changes the hub's keys. The client applies them, and `hub.onKeys(fn)` calls `fn` so a page can read `forwardCombos()` or `keyLabel()` again. In the stub, `onKeys` does nothing.
+
 ## 1.11.0
 
 - `hub.voiceCommands()` gives the voice commands the app handles, as `[{say, help}]` from `welcome.voice`, for the app's help. It gives `[]` with voice off, before welcome, standalone and in the stub.

@@ -45,13 +45,17 @@ function scratchHubDir(appPorts) {
   // e2e1 ships a plugin at 1.0.0 and the config dir has 0.9.0, so its row shows the ⚠.
   const e2e1 = path.join(dir, 'e2e1');
   fs.writeFileSync(path.join(e2e1, 'package.json'), JSON.stringify({ version: '2.0.0' }));
-  const plugin = { id: 'e2e@e2e', path: 'plugin', install: 'e2e --install' };
+  const plugin = { marketplace: 'plugin', name: 'e2e', install: 'e2e --install' };
   fs.writeFileSync(
     path.join(e2e1, 'hub-app.json'),
     JSON.stringify({ manifest: 1, id: 'e2e1', name: 'e2e1', run: { entry: 'server.js' }, plugin }),
   );
   fs.mkdirSync(path.join(e2e1, 'plugin', '.claude-plugin'), { recursive: true });
   fs.writeFileSync(path.join(e2e1, 'plugin', '.claude-plugin', 'plugin.json'), JSON.stringify({ version: '1.0.0' }));
+  fs.writeFileSync(
+    path.join(e2e1, 'plugin', '.claude-plugin', 'marketplace.json'),
+    JSON.stringify({ name: 'e2e', plugins: [{ name: 'e2e', source: './' }] }),
+  );
   fs.mkdirSync(path.join(dir, 'claude', 'plugins'), { recursive: true });
   fs.writeFileSync(
     path.join(dir, 'claude', 'plugins', 'installed_plugins.json'),
@@ -243,15 +247,14 @@ describe('app launcher', () => {
     assert.equal(await row.locator('.ver').textContent(), '2.0.0');
     const badge = row.locator('.plugin-warn');
     assert.equal(await badge.textContent(), '⚠ plugin 0.9.0');
-    assert.match(await badge.getAttribute('title'), /e2e@e2e 0\.9\.0 is installed, this version ships 1\.0\.0\.\nClick to copy: e2e --install --dir /);
+    assert.match(await badge.getAttribute('title'), /e2e@e2e 0\.9\.0 is installed, this version ships 1\.0\.0\.\nClick to update the plugins\./);
     assert.equal(await page.locator('#palette-list .palette-row', { hasText: 'e2e2' }).locator('.ver, .plugin-warn').count(), 0);
   });
 
-  it('copies the install command on a click and keeps the palette open', async () => {
-    await context.grantPermissions(['clipboard-read', 'clipboard-write']);
+  it('opens the update window on a click and closes the palette', async () => {
     await page.locator('#palette-list .palette-row', { hasText: 'e2e1' }).locator('.plugin-warn').click();
-    await waitFor(async () => (await page.locator('#palette-hint').textContent()).startsWith('Copied e2e --install --dir '), 'the copy');
-    assert.equal((await hubState()).palette, 'app');
-    assert.match(await page.evaluate(() => navigator.clipboard.readText()), /^e2e --install --dir "/);
+    await waitFor(() => page.locator('#setup:not([hidden])').count(), 'the update window');
+    assert.equal(await page.locator('#setup-title').textContent(), 'Updates');
+    assert.equal(await page.locator('#palette').isHidden(), true);
   });
 });

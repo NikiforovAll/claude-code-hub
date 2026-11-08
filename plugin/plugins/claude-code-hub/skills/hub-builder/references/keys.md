@@ -2,11 +2,13 @@
 
 The hub's own keys (switch tools, open the palettes) live in the `keys` block of `<hub-dir>/config.json` (`--hub-dir`, else `CLAUDE_HUB_DIR`, else `~/.claude-hub`). Each tool's own keys are outside it. Page: `reference/shortcuts/#change-the-keys`.
 
+The user can change them without you: hub settings (`Ctrl+,`), **Keyboard** page, **Customize…**. The window applies a change at once, with no restart. Point the user there first. Edit the file only when the user asks you to.
+
 ## Steps
 
 1. Map each key the user asks for to an action in [Actions](#actions), and check its combo against [Rules](#rules). When a combo breaks a rule, tell the user why and offer one that passes.
 2. Read `config.json` and merge the entries into its `keys` block. Every other field stays byte for byte: the hub owns `configDirs`, `activeConfigDir` and `apps`.
-3. Restart the hub: it reads `keys` once, at startup. When the tray runs it, the user picks Quit in the tray menu and starts the hub again.
+3. Restart the hub: it reads the file's `keys` once, at startup. When the tray runs it, the user picks Quit in the tray menu and starts the hub again.
 4. Read the startup output, or `<hub-dir>/hub.log` when the tray started the hub. The hub logs each entry it drops as `<config.json path>: keys "<action>": … It keeps its default`. The reason is one of: not a combo, not a combo that ends in `+{n}`, `<combo> is kept by <app>`, `<combo> is already set for "<action>"`. An id that is not an action logs `keys "<id>" is not a hub action, ignored`.
 5. Read `GET http://localhost:<port>/api/config?token=<token>` (the token is in `<hub-dir>/token`).
 
@@ -42,7 +44,7 @@ Ctrl+Alt+O opens the project palette, Ctrl+Alt+H and Ctrl+Alt+L move between too
 
 ## Rules
 
-- **Form.** One or more of `ctrl`, `alt`, `shift`, `meta`, then one key, joined by `+`. The key is a letter, a digit 1 to 9, `,`, or a `KeyboardEvent.key` name (`ArrowUp`, `F2`, `PageDown`). On macOS `alt` is Option and `meta` is Command. Modifiers and letters take any case and order (`"Alt+Ctrl+O"` reads as `ctrl+alt+o`); a key name keeps its case (`PageDown`).
+- **Form.** One or more of `ctrl`, `alt`, `shift`, `meta`, then one key, joined by `+`. The key is a letter, a digit, one of `` , . ; ' ` / \ = - [ ] ``, or a `KeyboardEvent.key` name (`ArrowUp`, `F2`, `PageDown`). On macOS `alt` is Option and `meta` is Command. Modifiers and letters take any case and order (`"Alt+Ctrl+O"` reads as `ctrl+alt+o`); a key name keeps its case (`PageDown`).
 - **`{n}`.** `hub.appByNumber` ends in `+{n}`, and the hub binds it for 1 to 9. It is the only action with `{n}`.
 - **`null`** leaves the action with no key.
 - **Taking a default.** A combo that is another action's default moves to the new action, and the other action has no key until it gets one: `"hub.nextApp": "ctrl+alt+a"` leaves the app launcher with no key. Say so to the user.

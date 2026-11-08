@@ -39,6 +39,7 @@
         can: (action) => !!standaloneFn(action),
         forwards: () => false,
         forwardCombos: () => [],
+        onKeys: () => off,
         keyLabel: () => null,
         voiceCommands: () => [],
         closeGuard() {},

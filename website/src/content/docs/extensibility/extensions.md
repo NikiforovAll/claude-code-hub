@@ -104,7 +104,7 @@ The hub runs an extension once, for every config dir. Claude Code loads a plugin
 claude-code-hub ext install swarm --dir ~/.claude-work
 ```
 
-With an id the hub runs, `ext install` installs only the plugin. This also works for a built-in tool, for example `ext install kanban`. When the plugin of the active config dir is missing, off or not the version the app ships, the app launcher shows a ⚠ on the app's row. A click copies this command.
+With an id the hub runs, `ext install` installs only the plugin. This also works for a built-in tool, for example `ext install kanban`. When the plugin of the active config dir is missing, off or not the version the app ships, the app launcher shows a ⚠ on the app's row. A click opens the update window, which runs this command for you in each config dir.
 
 `ext install` is safe to run again. It updates a plugin that is already installed.
 

@@ -33,6 +33,7 @@ const { liveHub, removeRecord, writeRecord } = require('./lib/hub-record');
 const { HUB_PLUGIN } = require('./lib/install');
 const { pluginChecker } = require('./lib/plugin-status');
 const { readConfig, serializeConfig, writeConfigFile } = require('./lib/hub-config');
+const { ONBOARDING, findConfigDirs, pluginsToInstall, setupStatus } = require('./lib/onboarding');
 const {
   appSettings,
   appsShape,
@@ -174,6 +175,7 @@ function resolveHubConfig() {
   if (typeof saved.modsEnabled === 'boolean') config.modsEnabled = saved.modsEnabled;
   if (saved.keys !== undefined) config.keys = saved.keys;
   if (saved.voice && typeof saved.voice === 'object') config.voice = saved.voice;
+  if (ONBOARDING.includes(saved.onboarding)) config.onboarding = saved.onboarding;
   copyLive(saved, config);
   const savedPrevious = typeof saved.previousConfigDir === 'string' ? canonical(saved.previousConfigDir) : null;
   if (dirs.includes(savedPrevious) && savedPrevious !== active) config.previousConfigDir = savedPrevious;
@@ -232,7 +234,7 @@ const MODS = resolveMods(hubConfig, path.dirname(HUB_CONFIG_FILE), {
 });
 for (const m of MODS) console.log(`mod ${m.id} changes ${Object.keys(m.targets).join(', ')}`);
 const ACTIONS = actionTable(ENABLED_APPS);
-const { keys: USER_KEYS, lines: keyLines } = userKeys(hubConfig.keys, ENABLED_APPS);
+let { keys: userKeyMap, lines: keyLines } = userKeys(hubConfig.keys, ENABLED_APPS);
 for (const line of keyLines) console.log(`${HUB_CONFIG_FILE}: ${line}`);
 // The first enabled app in tab order that declares the capability in its manifest.
 const provider = (cap) => ENABLED_APPS.find((a) => a.provides[cap]);
@@ -991,12 +993,13 @@ app.get('/api/config', (_req, res) => {
     ...themeConfig(THEME_REGISTRY, { userFile: USER_THEMES_FILE, extra: MOD_THEMES }),
     apps: appsConfig(),
     actions: ACTIONS,
-    keys: USER_KEYS,
+    keys: userKeyMap,
     activeConfigDir: hubConfig.activeConfigDir,
     defaultConfigDir,
     configDirSwitch: configDirSwitch(hubConfig),
     voice: voice && { provider: voice.provider, auto: voice.auto, commands: voice.commands },
     version: HUB_VERSION,
+    onboarding: hubConfig.onboarding ?? null,
   });
 });
 
@@ -1129,6 +1132,9 @@ function settingsView(saved) {
       ...(SETTING_SCHEMAS[a.id] && { settings: settingsOf(a.id) }),
     })),
     restartNeeded: appsShape(apps) !== RUNNING_APPS,
+    keys: userKeyMap,
+    keyWarnings: keyLines,
+    keeps: ENABLED_APPS.filter((a) => a.keeps.length).map((a) => ({ id: a.id, name: appName(a), combos: a.keeps })),
   };
 }
 
@@ -1156,15 +1162,125 @@ app.post('/api/settings', (req, res) => {
   }
   const saved = readSettingsConfig(res);
   if (!saved) return;
-  const r = applySettings(saved, req.body, CONFIG_BASE, SETTING_SCHEMAS);
+  const r = applySettings(saved, req.body, CONFIG_BASE, SETTING_SCHEMAS, ENABLED_APPS);
   if (r.error) {
     res.status(400).json({ error: r.error });
     return;
   }
   writeHubConfig(r.config);
   copyLive(r.config, hubConfig);
+  if (req.body.keys !== undefined) ({ keys: userKeyMap, lines: keyLines } = userKeys(r.config.keys, ENABLED_APPS));
   loadAppValues(r.config);
   res.json(settingsView(r.config));
+});
+
+// The setup checklist runs the same commands a user would type, in a child hub process: --install and
+// ext install call the claude CLI with execSync, and the tray flags start the tray and exit.
+const SETUP_PLUGINS = [
+  { ...HUB_PLUGIN, name: 'Hub skill', args: ['--install'] },
+  ...ENABLED_APPS.filter((a) => a.plugin).map((a) => ({ ...a.plugin, name: a.name, args: ['ext', 'install', a.id] })),
+];
+const SETUP_TIMEOUT_MS = 120_000;
+let setupBusy = false;
+
+function runHub(args) {
+  return new Promise((resolve) => {
+    const child = spawn(process.execPath, [__filename, ...args, '--hub-dir', HUB_DIR], {
+      env: process.env,
+      stdio: ['ignore', 'pipe', 'pipe'],
+      windowsHide: true,
+      timeout: SETUP_TIMEOUT_MS,
+    });
+    let output = '';
+    const add = (d) => (output += d);
+    child.stdout.on('data', add);
+    child.stderr.on('data', add);
+    child.on('error', (e) => resolve({ ok: false, output: e.message }));
+    child.on('close', (code) => resolve({ ok: code === 0, output: output.trim() }));
+  });
+}
+
+async function currentSetup() {
+  const { trayState } = require('./lib/tray');
+  return setupStatus({
+    tray: await trayState({ hubDir: HUB_DIR }),
+    configDirs: hubConfig.configDirs,
+    activeConfigDir: hubConfig.activeConfigDir,
+    candidates: findConfigDirs({ home: os.homedir(), known: hubConfig.configDirs, hubDir: HUB_DIR }),
+    plugins: SETUP_PLUGINS,
+  });
+}
+
+async function setupJob(res, job) {
+  if (setupBusy) {
+    res.status(409).json({ error: 'Another setup step is running' });
+    return;
+  }
+  setupBusy = true;
+  try {
+    const r = await job();
+    res.status(r.ok ? 200 : 500).json({ ...r, setup: await currentSetup() });
+  } finally {
+    setupBusy = false;
+  }
+}
+
+app.get('/api/setup', async (_req, res) => {
+  res.setHeader('Cache-Control', 'no-store');
+  res.json(await currentSetup());
+});
+
+app.post('/api/setup', (req, res) => {
+  const value = req.body?.onboarding;
+  if (!ONBOARDING.includes(value)) {
+    res.status(400).json({ error: `onboarding must be one of ${ONBOARDING.join(', ')}` });
+    return;
+  }
+  const saved = readSettingsConfig(res);
+  if (!saved) return;
+  hubConfig.onboarding = value;
+  writeHubConfig({ ...saved, onboarding: value });
+  res.json({ onboarding: value });
+});
+
+app.post('/api/setup/tray', (_req, res) => {
+  const appId = getArg('app-id');
+  setupJob(res, () => runHub(['--autostart', '--port', String(hubPort), ...(appId ? ['--app-id', appId] : [])]));
+});
+
+async function installPlugins(dir) {
+  const outputs = [];
+  let pending = pluginsToInstall(dir, SETUP_PLUGINS);
+  while (pending.length) {
+    const next = pending[0];
+    const r = await runHub([...next.args, '--dir', dir]);
+    outputs.push(r.output);
+    pending = pluginsToInstall(dir, SETUP_PLUGINS);
+    if (!r.ok || pending[0]?.id === next.id) return { dir, ok: false, output: outputs.join('\n') };
+  }
+  return { dir, ok: true, output: outputs.join('\n') };
+}
+
+app.post('/api/setup/plugins', (req, res) => {
+  const all = req.body?.all === true;
+  const dir = req.body?.dir;
+  if (!all && !hubConfig.configDirs.includes(dir)) {
+    res.status(404).json({ error: 'Unknown config dir; add it first' });
+    return;
+  }
+  setupJob(res, async () => {
+    const dirs = all ? hubConfig.configDirs.filter((d) => pluginsToInstall(d, SETUP_PLUGINS).length) : [dir];
+    const results = [];
+    for (const d of dirs) results.push(await installPlugins(d));
+    return {
+      ok: results.every((r) => r.ok),
+      output: results
+        .filter((r) => r.output)
+        .map((r) => `${r.dir}\n${r.output}`)
+        .join('\n\n'),
+      results: results.map(({ dir, ok }) => ({ dir, ok })),
+    };
+  });
 });
 
 // The stalls hit a few percent of requests, so each round sends several probes per app.

@@ -10,10 +10,13 @@ describe('normalizeCombo', () => {
     assert.equal(normalizeCombo('alt + ctrl + O'), 'ctrl+alt+o');
     assert.equal(normalizeCombo('Shift+Ctrl+ArrowUp'), 'ctrl+shift+ArrowUp');
     assert.equal(normalizeCombo('Meta+Alt+{n}'), 'alt+meta+{n}');
+    for (const key of ['0', ',', '.', '/', ';', "'", '`', '[', ']', '\\', '-', '=']) {
+      assert.equal(normalizeCombo(`Ctrl+${key}`), `ctrl+${key}`);
+    }
   });
 
   it('refuses text that is not a combo', () => {
-    for (const bad of ['', 'o', 'ctrl+', 'ctrl+ctrl+o', 'hyper+o', 'ctrl+alt+0', 'ctrl+alt+arrowleft', 'ctrl+{n}x', 3, null]) {
+    for (const bad of ['', 'o', 'ctrl+', 'ctrl+ctrl+o', 'hyper+o', 'ctrl+б', 'ctrl+alt+arrowleft', 'ctrl+{n}x', 3, null]) {
       assert.equal(normalizeCombo(bad), null, String(bad));
     }
   });

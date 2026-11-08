@@ -167,6 +167,19 @@ describe('handshake', () => {
     assert.deepEqual(late, [{ zenCentered: true }]);
   });
 
+  it('takes new keys from hub:keys after welcome', async () => {
+    const { env, hub } = await connected();
+    let calls = 0;
+    hub.onKeys(() => calls++);
+    env.fromHub({ type: 'hub:keys', forward: ['ctrl+.'], keys: { 'hub.settings': 'ctrl+.' } });
+    assert.deepEqual(hub.forwardCombos(), []);
+    env.fromHub(welcome());
+    env.fromHub({ type: 'hub:keys', forward: ['ctrl+.'], keys: { 'hub.settings': 'ctrl+.' } });
+    assert.deepEqual(hub.forwardCombos(), ['ctrl+.']);
+    assert.equal(hub.keyLabel('hub.settings').join('+'), 'Ctrl+.');
+    assert.equal(calls, 1);
+  });
+
   it('gives empty settings for a welcome with none', async () => {
     const { env, hub } = await connected();
     env.fromHub(welcome());
@@ -472,6 +485,36 @@ describe('keys', () => {
     assert.equal(comboOf(altGr('ą', 'KeyA')), 'ctrl+alt+ą');
     assert.equal(comboOf(altGr('w', 'KeyW')), 'ctrl+alt+w');
     assert.equal(comboOf(ctrlAlt('ф', 'KeyA')), 'ctrl+alt+a');
+  });
+
+  it('names a key on a non-Latin layout by its US place, and a Latin one by its character', () => {
+    const ctrl = (key, code) => ({ ...NO_MODS, key, code, ctrlKey: true });
+    assert.equal(comboOf(ctrl('б', 'Comma')), 'ctrl+,');
+    assert.equal(comboOf(ctrl('ж', 'Semicolon')), 'ctrl+;');
+    assert.equal(comboOf(ctrl(',', 'KeyM')), 'ctrl+,');
+    assert.equal(comboOf(ctrl(';', 'Comma')), 'ctrl+;');
+    assert.equal(comboOf(ctrl('&', 'Digit1')), 'ctrl+1');
+    assert.equal(comboOf(ctrl('à', 'Digit0')), 'ctrl+0');
+  });
+
+  it('works from its source text alone, as cck runs it in a sandboxed frame', () => {
+    const copy = new Function(`return ${comboOf}`)();
+    assert.equal(copy({ ...NO_MODS, key: 'б', code: 'Comma', ctrlKey: true }), 'ctrl+,');
+  });
+
+  it('gives the US physical key of a combo key', () => {
+    const { codeOf } = require('../src/keys');
+    for (const [key, code] of [
+      ['p', 'KeyP'],
+      ['0', 'Digit0'],
+      [',', 'Comma'],
+      ['\\', 'Backslash'],
+      ['ArrowLeft', null],
+    ]) {
+      assert.equal(codeOf(key), code);
+      if (code && !/^(Key|Digit)/.test(code))
+        assert.equal(comboOf({ ...NO_MODS, key: 'ж', code, ctrlKey: true }), `ctrl+${key}`);
+    }
   });
 
   it('gives the same comboOf from the client, the stub and the global', () => {

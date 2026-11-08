@@ -30,6 +30,15 @@ describe('settings', () => {
     assert.match(applySettings({}, { poolSize: 99 }).error, /poolSize/);
   });
 
+  it('saves the keys, drops an empty map and refuses a bad entry', () => {
+    const kanban = { id: 'kanban', keeps: ['ctrl+alt+n'] };
+    const { config } = applySettings({ x: 1 }, { keys: { 'hub.settings': 'Ctrl+.', 'hub.voice': null } }, undefined, {}, [kanban]);
+    assert.deepEqual(config, { x: 1, keys: { 'hub.settings': 'ctrl+.', 'hub.voice': null } });
+    assert.deepEqual(applySettings({ keys: { 'hub.settings': 'ctrl+.' } }, { keys: {} }).config, {});
+    assert.match(applySettings({}, { keys: { 'hub.settings': 'ctrl+alt+n' } }, undefined, {}, [kanban]).error, /kept by kanban/);
+    assert.match(applySettings({}, { keys: { 'hub.nope': 'ctrl+.' } }).error, /not a hub action/);
+  });
+
   it('keeps the tab order when it adds an app entry', () => {
     const { config } = applySettings({}, { app: { id: 'cost', state: 'hidden' } });
     assert.deepEqual(ids(config.apps), ['kanban', 'marketplace', 'cost', 'memory']);

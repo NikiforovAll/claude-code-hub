@@ -51,7 +51,7 @@ claude-code-hub ext install <app id> [--dir <config dir>]
 | --- | --- | --- |
 | `--install` | | Install or update the hub plugin and the plugins of the enabled built-in apps (today Kanban's) in one config dir, then exit |
 | `--uninstall` | | Remove the hub plugin from one config dir, then exit. App plugins stay |
-| `ext install <app id>` | | Install or update the plugin of one app, built-in or extension, then exit. The app launcher's ⚠ copies this command |
+| `ext install <app id>` | | Install or update the plugin of one app, built-in or extension, then exit. The app launcher's ⚠ opens the update window, which runs it |
 | `--dir <path>` | `CLAUDE_CONFIG_DIR`, else `~/.claude` | The config dir to install into or remove from |
 
 The hub does not update plugins by itself. After a hub update, run `claude-code-hub --install` again in each config dir to update the hub plugin and Kanban's plugin. The app launcher shows a ⚠ on a plugin that is older than the one its app ships.
@@ -95,9 +95,11 @@ The hub creates the folder, the config file and a new token on the first run. Se
 
 On start, the hub asks npm for the latest `claude-code-hub` version and keeps the answer for 12 hours. If a newer stable version exists, the hub page shows a notice in the bottom-right corner when it loads. The notice hides after 10 seconds, or when you click ×, and shows again on the next start. Click **Skip this version** to hide it until a later version ships. The hub skips the check when it runs from a git checkout.
 
+Click **Review update…** in the notice, or open the hub settings and choose **Updates**, to see the update window. It shows the command that updates the hub, with a Copy button. Stop the hub, run the command, then start the hub again. The window also shows the plugins in each config dir. Click **Update** for one dir, or **Update all dirs**. Then restart the open Claude Code sessions in those dirs. After a hub update, the window opens once on the first load if a plugin is out of date.
+
 ## Hub settings
 
-Press <kbd>Ctrl+,</kbd> to open the hub settings, and <kbd>Esc</kbd> or <kbd>Ctrl+,</kbd> to close them. Press <kbd>Tab</kbd> to move between the controls and <kbd>←</kbd> <kbd>→</kbd> to change a choice, or click it. The hub saves each change in the [config file](#the-config-file) at once.
+Press <kbd>Ctrl+,</kbd> to open the hub settings, and <kbd>Esc</kbd> or <kbd>Ctrl+,</kbd> to close them. The list on the left has a page for **General**, **Apps** and **Keyboard**, then one page for each tool that has settings, such as **Kanban**. Press <kbd>↑</kbd> <kbd>↓</kbd> in the list to change the page, <kbd>Tab</kbd> to move between the controls and <kbd>←</kbd> <kbd>→</kbd> to change a choice, or click it. The hub saves each change in the [config file](#the-config-file) at once.
 
 | Setting | Values | Takes effect |
 | --- | --- | --- |
@@ -135,6 +137,7 @@ The hub keeps its settings in `config.json` in the hub folder, `~/.claude-hub` b
 - `terminal` is for you to edit. `"enabled": false` turns off the embedded terminal. The hub gives the whole block to Kanban as its terminal config, so you can also set keys like `shell`, `fontFamily`, `maxSessions` (most terminals open at the same time, 30 by default) and `restore` (on by default: resume the terminals that were open when the hub last stopped; `false` turns it off) here. See [Terminal config](https://nikiforovall.blog/claude-code-kanban/reference/configuration/#terminal-config) in the Kanban docs. The hub keeps this block when it writes the file.
 - `apps` is for you to edit. It sets which tools run and the tab order. The ids are `kanban`, `marketplace`, `cost` and `memory`. The tools you list come first, in list order, and the tools you do not list follow in the default order. A tool with `"enabled": false` does not start, gets no tab and no port, and links from other tools to it do nothing. With Kanban off, the embedded terminal is off and the project palette has no project list. <kbd>Alt</kbd>+<kbd>1</kbd> to <kbd>Alt</kbd>+<kbd>4</kbd> follow the tab order. `port` sets the tool's port, a whole number from 1 to 65535 (see [Ports](#ports)). The hub logs and ignores a value that is not valid, such as `"4543"` in quotes. `"hidden": true` keeps a tool running and in the app launcher, but gives it no <kbd>Alt</kbd>+number key and no place in the <kbd>Ctrl+Alt+Left</kbd>/<kbd>Right</kbd> cycle. `"deferredStart": true` does not start the tool with the hub; start it from the app launcher with <kbd>Ctrl+S</kbd>. See [Apps entry](/claude-code-hub/extensibility/reference/apps-entry/). The hub keeps this list when it writes the file, and does not start when every tool is off.
 - `keys` is for you to edit. It changes the hub's keys. See [Change the keys](/claude-code-hub/reference/shortcuts/#change-the-keys). The hub keeps this block when it writes the file.
+- `onboarding` is `"done"` or `"skipped"`. The setup checklist writes it when you finish or skip it. Until then, the hub page opens the checklist on each load if a step is not done. Delete the key to see the checklist again, or open it from the [hub settings](#hub-settings).
 - `mods` is the list of installed mods. `ext install` and `ext remove` write it. A mod with `"enabled": false` does not load. `"modsEnabled": false` turns off every mod, as `--no-mods` does. Use it when a mod breaks a page. To check without a restart, open the hub at `/?nomods`: that page loads no mod.
 
 Restart the hub after you edit the file by hand.

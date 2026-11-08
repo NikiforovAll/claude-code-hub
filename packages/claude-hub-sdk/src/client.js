@@ -111,6 +111,7 @@
       const tokenWaiters = new Set();
       const themesFns = new Set();
       const settingsFns = new Set();
+      const keysFns = new Set();
       const queued = [];
       // Topic → payload: the latest publish before welcome.
       const outbox = new Map();
@@ -252,6 +253,12 @@
             return;
           case 'hub:settings':
             if (welcome) setSettings(m.settings);
+            return;
+          case 'hub:keys':
+            if (!welcome) return;
+            welcome.keys = comboMap(m.keys);
+            forward = strings(m.forward);
+            for (const fn of keysFns) fn();
             return;
         }
       }
@@ -472,6 +479,12 @@
         forwards,
         // The combos forwards() matches, for a frame that tests keys with ClaudeHub.comboOf on its own.
         forwardCombos: () => (forward ? [...forward] : []),
+        // Calls fn after the user changes the hub's keys, so a page that copied forwardCombos() or
+        // shows keyLabel() can read them again.
+        onKeys(fn) {
+          keysFns.add(fn);
+          return () => keysFns.delete(fn);
+        },
         // The keys of a hub action for a help row, in this system's names. A list of actions shares one
         // row: ['Ctrl', 'Alt', '←/→']. [] when no key runs them; null before welcome, standalone, or
         // for an action the hub did not list.

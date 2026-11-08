@@ -3,7 +3,7 @@ let apps = {};
 let keymap = null;
 // config.json `keys`, {actionId: combo | null}, from /api/config.
 let userKeys = {};
-const { comboOf, keyParts } = ClaudeHubKeys;
+const { comboOf, codeOf, keyParts } = ClaudeHubKeys;
 let activeApp = null;
 // The app launcher's cursor starts here, so Ctrl+Alt+A then Enter goes back to the last tab.
 let previousApp = null;
@@ -305,13 +305,20 @@ async function init() {
   switchTab(tabs.includes(saved) ? saved : (tabs[0] ?? Object.keys(apps)[0]));
   listenMessages();
   listenKeys();
+  window.addEventListener('keydown', onShortcutKey, true);
+  const keysOverlay = document.getElementById('shortcuts');
+  keysOverlay.addEventListener('mousedown', (e) => {
+    if (e.target === keysOverlay) closeShortcuts();
+  });
   if (voiceOn) listenVoiceRelease();
   if (config.voice?.auto && voiceInBrowser()) noteBrowserVoice();
   bindPalette();
   bindSettings();
+  bindSetup();
   registerSW();
   bindErrorToast();
   showUpdateToast();
+  if (!config.onboarding) maybeShowSetup();
   reloadOnHubRestart();
 }
 
@@ -342,6 +349,7 @@ async function showUpdateToast() {
   } catch {
     return;
   }
+  openUpdateAfterUpgrade(info);
   const latest = info.update?.latest;
   let dismissed = null;
   try {
@@ -351,6 +359,7 @@ async function showUpdateToast() {
   const toast = document.getElementById('update-toast');
   document.getElementById('update-latest').textContent = latest;
   document.getElementById('update-current').textContent = info.version;
+  document.getElementById('update-command').textContent = HUB_UPDATE_COMMAND;
   document.getElementById('update-notes').href = info.update.url;
   let timer = 0;
   const hide = () => {
@@ -361,6 +370,10 @@ async function showUpdateToast() {
   toast.addEventListener('mouseenter', () => clearTimeout(timer));
   toast.addEventListener('mouseleave', arm);
   document.getElementById('update-close').addEventListener('click', hide);
+  document.getElementById('update-review').addEventListener('click', () => {
+    hide();
+    openUpdate();
+  });
   document.getElementById('update-skip').addEventListener('click', () => {
     try {
       localStorage.setItem(UPDATE_DISMISSED_KEY, latest);
@@ -369,6 +382,28 @@ async function showUpdateToast() {
   });
   showToast(toast);
   arm();
+}
+
+// A new hub version ships new plugins, so the first load after an upgrade offers to update them.
+const LAST_VERSION_KEY = 'hub-last-version';
+
+async function openUpdateAfterUpgrade(info) {
+  let last = null;
+  try {
+    last = localStorage.getItem(LAST_VERSION_KEY);
+    localStorage.setItem(LAST_VERSION_KEY, info.version);
+  } catch {
+    return;
+  }
+  if (!last || last === info.version) return;
+  let data;
+  try {
+    data = await sendJson('GET', '/api/setup');
+  } catch {
+    return;
+  }
+  if (data.pluginsDone || openOverlay) return;
+  openSetup(data, 'update', info);
 }
 
 function showToast(toast) {
@@ -857,10 +892,21 @@ function runVoiceCommand({ text, command = {} }) {
   showErrorToast("Didn't get that", new Error(`“${text}”`));
 }
 
-// `voice.dictate`, the one action the hub handles itself: an app's mic gets the provider's text with no command.
+// `voice.dictate`, an action the hub handles itself: an app's mic gets the provider's text with no command.
 const DICTATE = 'voice.dictate';
+const HUB_UPDATES = 'hub.updates';
 // With the browser provider an app's mic runs its own browser speech, so the hub does not offer it.
 const hubDictates = () => voiceOn && !voiceInBrowser();
+const HUB_OWNED = {
+  [DICTATE]: { available: hubDictates, run: (params, reply) => dictate(params.op, reply) },
+  [HUB_UPDATES]: {
+    available: () => true,
+    run: (_params, reply) => {
+      openUpdate();
+      reply({ ok: true, handledBy: 'hub' });
+    },
+  },
+};
 
 async function dictate(op, reply) {
   const busy = op === 'start' ? voice.state !== 'idle' : voice.state !== 'dictating';
@@ -1112,10 +1158,9 @@ function welcomeFor(data, appId) {
   return {
     type: 'hub:welcome',
     protocol: Math.max(...common),
-    forward: Object.keys(bindings()),
-    keys: actionKeys(),
+    ...keyFields(),
     themes: hubThemes,
-    actions: [...Object.keys(actions), ...(hubDictates() ? [DICTATE] : [])],
+    actions: [...Object.keys(actions), ...Object.keys(HUB_OWNED).filter((id) => HUB_OWNED[id].available())],
     origins: Object.keys(apps).map(originOf),
     settings: apps[appId]?.settings ?? {},
     voice: voiceOn
@@ -1132,6 +1177,19 @@ function sendSettings(appId, list) {
   const message = { type: 'hub:settings', settings };
   if (liveApps.has(appId)) postTo(appId, message);
   for (const [win, nested] of nestedApps) if (nested.appId === appId) postNested(win, message);
+}
+
+function keyFields() {
+  return { forward: Object.keys(bindings()), keys: actionKeys() };
+}
+
+// The user's keys after a save in the shortcuts modal, applied without a restart.
+function setUserKeys(keys) {
+  userKeys = keys ?? {};
+  keymap = null;
+  const message = { type: 'hub:keys', ...keyFields() };
+  for (const appId of liveApps.keys()) postTo(appId, message);
+  for (const win of nestedApps.keys()) postNested(win, message);
 }
 
 const helloTopics = (data) => new Set(Array.isArray(data.subscribes) ? data.subscribes : []);
@@ -1181,7 +1239,8 @@ function fillUrl(template, params) {
 function onInvoke({ id, action, params = {}, open }, send) {
   if (typeof id !== 'string') return;
   const reply = (result) => send({ type: 'hub:result', id, ...result });
-  if (action === DICTATE && hubDictates()) return dictate(params.op, reply);
+  const owned = Object.hasOwn(HUB_OWNED, action) ? HUB_OWNED[action] : null;
+  if (owned?.available()) return owned.run(params, reply);
   const spec = typeof action === 'string' && Object.hasOwn(actions, action) ? actions[action] : null;
   if (!spec) return reply({ ok: false, reason: 'unhandled' });
   if (badParams(spec.params, params)) return reply({ ok: false, reason: 'bad-params' });
@@ -1748,14 +1807,13 @@ function setPaletteHint(message) {
   drawPaletteHint();
 }
 
-// The plugin in the active config dir: its version, or a ⚠ that copies the install command.
+// The plugin in the active config dir: its version, or a ⚠ that opens the update window.
 function pluginNode(p) {
   const problem = {
     missing: { label: 'plugin not installed', cause: `${p.id} is not installed in this config dir.` },
     disabled: {
       label: `plugin ${p.installed} is off`,
       cause: `${p.id} ${p.installed} is disabled. Enable it with /plugin in Claude Code.`,
-      noCopy: true,
     },
     mismatch: {
       label: `plugin ${p.installed}`,
@@ -1767,11 +1825,11 @@ function pluginNode(p) {
   badge.type = 'button';
   badge.title = problem.cause;
   badge.setAttribute('aria-label', problem.cause);
-  if (problem.noCopy) return badge;
-  badge.title += `\nClick to copy: ${p.installCommand}\nThen restart open sessions.`;
+  if (p.state === 'disabled') return badge;
+  badge.title += '\nClick to update the plugins.';
   badge.addEventListener('click', (e) => {
     e.stopPropagation();
-    copyToHint(p.installCommand);
+    openUpdate();
   });
   return badge;
 }
@@ -1952,7 +2010,7 @@ const PALETTE_MODES = {
 };
 
 // The hub settings modal (Ctrl+,). Each change is saved at once; data is the last /api/settings answer.
-const settingsModal = { open: false, data: null, error: null, busy: false };
+const settingsModal = { open: false, data: null, error: null, busy: false, section: 'general' };
 
 const SWITCH_CHOICES = [
   ['palette', 'Open the list', 'Opens the config-dir list. Pick a dir, or type a path to add one.'],
@@ -2091,6 +2149,25 @@ function renderSettings() {
   manage.addEventListener('click', () => openPalette('configDir'));
   dirs.append(settingRow('Config dirs', manage));
 
+  const hubSec = el('section', 'set-sec');
+  hubSec.append(el('h4', '', 'Hub'));
+  const setup = el('button', '', 'Open…');
+  setup.type = 'button';
+  setup.dataset.focus = 'setup';
+  setup.addEventListener('click', () => openSetup());
+  hubSec.append(
+    settingRow(
+      'Setup checklist',
+      setup,
+      'Install the app, start with the system, add config dirs and install plugins.',
+    ),
+  );
+  const updates = el('button', '', 'Check…');
+  updates.type = 'button';
+  updates.dataset.focus = 'updates';
+  updates.addEventListener('click', () => openUpdate());
+  hubSec.append(settingRow('Updates', updates, 'The hub version, and the plugins in every config dir.'));
+
   const appsSec = el('section', 'set-sec');
   appsSec.append(el('h4', '', 'Apps'));
   const table = el('table', 'set-apps');
@@ -2131,24 +2208,66 @@ function renderSettings() {
       '“Launcher only” keeps the app running but gives it no tab or number key; open it from the app launcher. “On demand” starts it the first time you open it.',
     ),
   );
-  body.replaceChildren(dirs, appsSec, ...s.apps.filter((a) => a.settings?.length).map(appSettingsSection));
+  const keysSec = el('section', 'set-sec');
+  keysSec.append(el('h4', '', 'Keyboard shortcuts'));
+  const customize = el('button', '', 'Customize…');
+  customize.type = 'button';
+  customize.dataset.focus = 'shortcuts';
+  customize.addEventListener('click', openShortcuts);
+  const custom = Object.keys(s.keys ?? {}).length;
+  keysSec.append(
+    settingRow('Hub keys', customize, custom ? `${custom} changed from the defaults.` : 'All keys are the defaults.'),
+  );
+  const pages = [
+    ['general', 'General', [dirs, hubSec]],
+    ['apps', 'Apps', [appsSec]],
+    ['keys', 'Keyboard', [keysSec]],
+    ...s.apps.filter((a) => a.settings?.length).map((a) => [`app:${a.id}`, a.name, [appSettingsSection(a)]]),
+  ];
+  const current = pages.find(([id]) => id === settingsModal.section) ?? pages[0];
+  settingsModal.section = current[0];
+  const nav = el('nav', 'set-nav');
+  nav.setAttribute('role', 'tablist');
+  nav.setAttribute('aria-orientation', 'vertical');
+  for (const page of pages) {
+    const tab = el('button', '', page[1]);
+    tab.type = 'button';
+    tab.setAttribute('role', 'tab');
+    tab.setAttribute('aria-selected', String(page === current));
+    tab.tabIndex = page === current ? 0 : -1;
+    tab.dataset.focus = 'page';
+    tab.addEventListener('click', () => {
+      settingsModal.section = page[0];
+      renderSettings();
+    });
+    nav.append(tab);
+  }
+  const pane = el('div', 'set-pane');
+  pane.setAttribute('role', 'tabpanel');
+  pane.append(...current[2]);
+  body.replaceChildren(nav, pane);
 
   let status = el('span', '', 'Saved as you change it');
   if (settingsModal.error) status = el('span', 'set-error', settingsModal.error);
   else if (s.restartNeeded) status = el('span', 'set-restart', 'Restart the hub to apply app changes');
   const keys = el('span', 'set-keys');
-  keys.append(kbd('Tab'), ' move · ', kbd('←'), kbd('→'), ' change');
+  keys.append(kbd('↑'), kbd('↓'), ' page · ', kbd('Tab'), ' move · ', kbd('←'), kbd('→'), ' change');
   foot.replaceChildren(status, keys);
 
   // A save redraws the modal, so put focus back on the control that had it.
   if (focusKey) {
-    const target = body.querySelector(`[data-focus="${CSS.escape(focusKey)}"]`);
+    const target =
+      focusKey === 'page'
+        ? nav.querySelector('[aria-selected="true"]')
+        : body.querySelector(`[data-focus="${CSS.escape(focusKey)}"]`);
     // A radio group gets its checked button; a button that became disabled hands focus to its neighbour.
     const focusable = target?.matches('button:not(:disabled)')
       ? target
       : (target?.querySelector('[aria-checked="true"]:not(:disabled)') ??
         target?.parentElement.querySelector('button:not(:disabled)'));
     (focusable ?? document.querySelector('#settings .settings-box')).focus();
+  } else if (document.activeElement?.matches('#settings .settings-box')) {
+    nav.querySelector('[aria-selected="true"]').focus();
   }
 }
 
@@ -2172,8 +2291,543 @@ function appSettingsSection(a) {
   return sec;
 }
 
+const ACTION_NAMES = {
+  'hub.projectPicker': 'Project picker',
+  'hub.configDirPicker': 'Config-dir picker',
+  'hub.appLauncher': 'App launcher',
+  'hub.settings': 'Settings',
+  'hub.prevApp': 'Previous app',
+  'hub.nextApp': 'Next app',
+  'hub.appByNumber': 'App by number',
+  'hub.voice': 'Hold to talk',
+};
+
+const MODIFIER_KEYS = new Set(['Control', 'Alt', 'Shift', 'Meta', 'AltGraph', 'CapsLock', 'Dead', 'Process']);
+
+const shortcuts = { open: false, recording: null, error: null, busy: false, layout: null };
+
+const expandCombo = (c) => (c.includes('{n}') ? Array.from({ length: 9 }, (_, i) => c.replace('{n}', i + 1)) : [c]);
+
+async function openShortcuts() {
+  Object.assign(shortcuts, { open: true, recording: null, error: null });
+  showOverlay('shortcuts', closeShortcuts);
+  renderShortcuts();
+  document.querySelector('#shortcuts .settings-box').focus();
+  try {
+    const [data, layout] = await Promise.all([
+      settingsModal.data ?? sendJson('GET', '/api/settings'),
+      navigator.keyboard?.getLayoutMap?.(),
+    ]);
+    settingsModal.data = data;
+    shortcuts.layout = layout ?? null;
+  } catch (err) {
+    shortcuts.error ??= err.message;
+  }
+  if (shortcuts.open) renderShortcuts();
+}
+
+function closeShortcuts() {
+  Object.assign(shortcuts, { open: false, recording: null });
+  hideOverlay('shortcuts');
+}
+
+// Capture phase, so a recorded press never reaches the hub's own bindings or the overlay's Escape.
+function onShortcutKey(e) {
+  if (!shortcuts.open || shortcuts.busy) return;
+  if (e.key === 'Escape') {
+    e.preventDefault();
+    e.stopPropagation();
+    if (shortcuts.recording) {
+      shortcuts.recording = null;
+      renderShortcuts();
+    } else {
+      closeShortcuts();
+      settingsModal.section = 'keys';
+      openSettings();
+    }
+    return;
+  }
+  if (!shortcuts.recording) return;
+  e.preventDefault();
+  e.stopPropagation();
+  if (e.repeat || MODIFIER_KEYS.has(e.key) || e.isComposing) return;
+  recordKey(shortcuts.recording, comboOf(e));
+}
+
+function recordKey(id, combo) {
+  const parts = combo.split('+');
+  const fail = (msg) => {
+    shortcuts.error = msg;
+    renderShortcuts();
+  };
+  if (parts.length < 2 || parts.at(-1) === '') return fail('Hold Ctrl, Alt, Shift or ⌘ with the key.');
+  let value = combo;
+  if (id === 'hub.appByNumber') {
+    if (!/\+[1-9]$/.test(combo)) return fail('Press the modifiers with a digit, for example Alt+1.');
+    value = combo.replace(/[1-9]$/, '{n}');
+  }
+  const taken = expandCombo(value);
+  const keeper = settingsModal.data?.keeps?.find((k) => k.combos.some((c) => taken.includes(c)));
+  if (keeper) return fail(`${comboLabel(combo)} is used by ${keeper.name}. Pick another key.`);
+  saveKey(id, value);
+}
+
+// value: a combo, null for no key, undefined for the default. Another action that has the combo
+// loses it, written as null, so the change shows in its row.
+async function saveKey(id, value) {
+  const next = { ...userKeys };
+  const action = hubActions().find((a) => a.id === id);
+  if (value === undefined || value === action.combo) delete next[id];
+  else next[id] = value;
+  const mine = new Set(expandCombo(value ?? action.combo));
+  for (const other of hubActions()) {
+    const combo = comboFor(other);
+    if (other.id !== id && combo && expandCombo(combo).some((c) => mine.has(c))) next[other.id] = null;
+  }
+  shortcuts.busy = true;
+  try {
+    settingsModal.data = await sendJson('POST', '/api/settings', { keys: next });
+    setUserKeys(settingsModal.data.keys);
+    shortcuts.error = null;
+  } catch (err) {
+    shortcuts.error = err.message;
+  } finally {
+    shortcuts.busy = false;
+    shortcuts.recording = null;
+  }
+  if (shortcuts.open) renderShortcuts();
+}
+
+// The combo as the hub names it, plus the character the user's layout prints on that key when it is
+// not Latin: the hub matches such a key by its US position.
+function comboNode(combo) {
+  const node = el('span', 'key-combo');
+  node.append(kbd(comboLabel(combo)));
+  const code = codeOf(combo.split('+').at(-1));
+  const local = code && shortcuts.layout?.get(code);
+  if (local && /[^\x20-\x7e]/.test(local)) node.append(el('span', 'key-local', local));
+  return node;
+}
+
+function keyButton(text, focus, disabled, onClick) {
+  const b = el('button', '', text);
+  b.type = 'button';
+  b.dataset.focus = focus;
+  b.disabled = disabled || shortcuts.busy;
+  b.addEventListener('click', onClick);
+  return b;
+}
+
+function renderShortcuts() {
+  const body = document.getElementById('shortcuts-body');
+  const foot = document.getElementById('shortcuts-foot');
+  const s = settingsModal.data;
+  const focusKey = document.activeElement?.closest?.('[data-focus]')?.dataset.focus;
+
+  const table = el('table', 'set-apps keys-table');
+  const head = el('tr', '');
+  head.append(el('th', '', 'Action'), el('th', '', 'Key'), el('th', '', ''));
+  table.append(head);
+  for (const a of hubActions()) {
+    const combo = comboFor(a);
+    const custom = Object.hasOwn(userKeys, a.id);
+    const tr = el('tr', shortcuts.recording === a.id ? 'recording' : '');
+    const name = el('td', '', ACTION_NAMES[a.id] ?? a.id);
+    if (a.off) name.append(el('span', 'key-tag', 'voice off'));
+    if (custom) name.append(el('span', 'key-tag', 'changed'));
+    const key = el('td', '');
+    if (shortcuts.recording === a.id) key.append(el('span', 'key-prompt', 'Press keys…'));
+    else if (combo) key.append(comboNode(combo));
+    else key.append(el('span', 'set-help', 'No key'));
+    const btns = el('td', 'key-btns');
+    btns.append(
+      keyButton('Change', `rec:${a.id}`, false, () => {
+        shortcuts.recording = a.id;
+        shortcuts.error = null;
+        renderShortcuts();
+      }),
+      keyButton('Reset', `reset:${a.id}`, !custom, () => saveKey(a.id, undefined)),
+      keyButton('Off', `off:${a.id}`, !combo, () => saveKey(a.id, null)),
+    );
+    tr.append(name, key, btns);
+    table.append(tr);
+  }
+  const hubSec = el('section', 'set-sec');
+  hubSec.append(el('h4', '', 'Hub'), table);
+  for (const line of s?.keyWarnings ?? []) hubSec.append(el('span', 'set-help set-error', line));
+  hubSec.append(
+    el(
+      'span',
+      'set-help',
+      'Keys match the character on the key. On a layout with no Latin letters, they match the key in the same place on a US keyboard.',
+    ),
+  );
+
+  const sections = [hubSec];
+  for (const app of s?.keeps ?? []) {
+    const sec = el('section', 'set-sec');
+    sec.append(el('h4', '', `${app.name} keeps`));
+    const list = el('div', 'key-keeps');
+    for (const c of app.combos) list.append(comboNode(c));
+    sec.append(list);
+    sections.push(sec);
+  }
+  body.replaceChildren(...sections);
+
+  const status = shortcuts.error
+    ? el('span', 'set-error', shortcuts.error)
+    : el('span', '', shortcuts.recording ? 'Press the new key, Esc cancels' : 'Saved as you change it');
+  const hints = el('span', 'set-keys');
+  hints.append(kbd('Tab'), ' move · ', kbd('Esc'), ' back');
+  foot.replaceChildren(status, hints);
+
+  if (focusKey) {
+    const target = body.querySelector(`[data-focus="${CSS.escape(focusKey)}"]:not(:disabled)`);
+    (target ?? document.querySelector('#shortcuts .settings-box')).focus();
+  }
+}
+
 function kbd(text) {
   return el('kbd', '', text);
+}
+
+// Chrome and Edge fire this once per load, only while the page can be installed and is not yet.
+let installPrompt = null;
+window.addEventListener('beforeinstallprompt', (e) => {
+  e.preventDefault();
+  installPrompt = e;
+  if (setupModal.open) renderSetup();
+});
+
+const setupModal = {
+  open: false,
+  mode: 'setup',
+  data: null,
+  update: null,
+  updatedDirs: new Set(),
+  error: null,
+  busy: null,
+  output: null,
+};
+const isInstalledApp = () => matchMedia('(display-mode: standalone)').matches || navigator.standalone === true;
+const IS_SAFARI = /^((?!chrome|android|edg).)*safari/i.test(navigator.userAgent);
+
+// Every step is read from the machine each time, so a step done by hand shows as done. Only
+// finishing or skipping is saved.
+function setupSteps(s) {
+  if (setupModal.mode === 'update')
+    return [
+      { id: 'hub', done: !setupModal.update?.update },
+      { id: 'plugins', done: s.pluginsDone },
+    ];
+  const steps = [{ id: 'app', done: isInstalledApp() }];
+  if (s.tray.supported) steps.push({ id: 'tray', done: s.tray.autostart });
+  steps.push({ id: 'dirs', done: s.candidates.length === 0 }, { id: 'plugins', done: s.pluginsDone });
+  return steps;
+}
+
+async function maybeShowSetup() {
+  let data;
+  try {
+    data = await sendJson('GET', '/api/setup');
+  } catch {
+    return;
+  }
+  if (setupSteps(data).every((st) => st.done)) {
+    sendJson('POST', '/api/setup', { onboarding: 'done' }).catch(() => {});
+    return;
+  }
+  if (openOverlay) return;
+  openSetup(data);
+}
+
+async function openSetup(data = null, mode = 'setup', update = null) {
+  setupModal.open = true;
+  setupModal.mode = mode;
+  setupModal.error = null;
+  setupModal.output = null;
+  setupModal.updatedDirs.clear();
+  setupModal.data = data;
+  setupModal.update = update;
+  showOverlay('setup', closeSetup);
+  renderSetup();
+  document.querySelector('#setup .setup-box').focus();
+  const needUpdate = mode === 'update' && !update;
+  if (data && !needUpdate) return;
+  try {
+    const [setup, info] = await Promise.all([
+      data ?? sendJson('GET', '/api/setup'),
+      needUpdate ? sendJson('GET', '/api/update') : update,
+    ]);
+    setupModal.update = info;
+    setupModal.data = setup;
+  } catch (err) {
+    setupModal.error = err.message;
+  }
+  if (setupModal.open) renderSetup();
+}
+
+function openUpdate() {
+  return openSetup(null, 'update');
+}
+
+function closeSetup() {
+  setupModal.open = false;
+  hideOverlay('setup');
+}
+
+async function endSetup(value) {
+  try {
+    await sendJson('POST', '/api/setup', { onboarding: value });
+  } catch {}
+  closeSetup();
+}
+
+async function setupAction(key, fn) {
+  if (setupModal.busy) return;
+  setupModal.busy = key;
+  setupModal.error = null;
+  setupModal.output = null;
+  renderSetup();
+  try {
+    const r = await fn();
+    if (r?.setup) setupModal.data = r.setup;
+    noteUpdatedDirs(r?.results);
+  } catch (err) {
+    setupModal.error = err.message;
+    setupModal.output = err.data?.output ? { step: key.split(':')[0], text: err.data.output } : null;
+    if (err.data?.setup) setupModal.data = err.data.setup;
+    noteUpdatedDirs(err.data?.results);
+  } finally {
+    setupModal.busy = null;
+  }
+  if (setupModal.open) renderSetup();
+}
+
+function noteUpdatedDirs(results) {
+  for (const r of results ?? []) if (r.ok) setupModal.updatedDirs.add(r.dir);
+}
+
+function setupButton(text, key, fn, primary = false) {
+  const b = el('button', primary ? 'primary' : '', setupModal.busy === key ? 'Working…' : text);
+  b.type = 'button';
+  b.disabled = !!setupModal.busy;
+  b.dataset.focus = key;
+  b.addEventListener('click', () => setupAction(key, fn));
+  return b;
+}
+
+function installStep(step) {
+  const action =
+    installPrompt && !step.done
+      ? setupButton(
+          'Install',
+          'app',
+          async () => {
+            const prompt = installPrompt;
+            installPrompt = null;
+            await prompt.prompt();
+            await prompt.userChoice;
+          },
+          true,
+        )
+      : null;
+  let desc = 'The hub runs in its own window, with no browser tabs or address bar.';
+  if (step.done) desc = 'The hub runs as an installed app.';
+  else if (!installPrompt)
+    desc += IS_SAFARI
+      ? ' In Safari, choose File → Add to Dock.'
+      : ' Use the install icon in the address bar, or the browser menu → Install. Already installed? Open it from the Start menu or Applications.';
+  return { title: 'Install as an app', desc, action };
+}
+
+function trayStep(step, s) {
+  const where = IS_MAC ? 'menu bar' : 'notification area';
+  const desc = step.done
+    ? `Starts when you sign in. Tray icon: ${s.tray.running ? 'running' : 'not running'}.`
+    : `Adds an icon to the ${where} and starts the hub when you sign in.`;
+  const action = step.done ? null : setupButton('Turn on', 'tray', () => sendJson('POST', '/api/setup/tray'), true);
+  return { title: 'Autostart', tag: IS_MAC ? 'experimental' : null, desc, action };
+}
+
+function dirsStep(step, s) {
+  const list = el('div', 'setup-list');
+  for (const d of s.dirs) {
+    const item = el('div', 'setup-item');
+    item.append(el('code', '', d.path), el('span', 'setup-ok', d.active ? 'active' : 'added'));
+    list.append(item);
+  }
+  for (const path of s.candidates) {
+    const item = el('div', 'setup-item');
+    const add = setupButton('Add', `dir:${path}`, async () => {
+      await sendJson('POST', '/api/config-dirs', { path });
+      return { setup: await sendJson('GET', '/api/setup') };
+    });
+    item.append(el('code', '', path), add);
+    list.append(item);
+  }
+  const desc = step.done
+    ? 'The hub lists every Claude config dir it found. Switch dirs with the config-dir key.'
+    : 'Found more Claude config dirs. Each dir you add gets its own Kanban, Cost and Memory.';
+  return { title: 'Choose Claude config dirs', desc, extra: list };
+}
+
+const HUB_UPDATE_COMMAND = 'npm i -g claude-code-hub@latest';
+
+function hubStep(step) {
+  const u = setupModal.update;
+  if (step.done)
+    return { title: 'Update the hub', desc: `Version ${u?.version ?? '?'}. No newer version found on npm.` };
+  const item = el('div', 'setup-item');
+  const copy = el('button', 'primary', 'Copy');
+  copy.type = 'button';
+  copy.dataset.focus = 'copy';
+  copy.addEventListener('click', async () => {
+    try {
+      await navigator.clipboard.writeText(HUB_UPDATE_COMMAND);
+      copy.textContent = 'Copied';
+    } catch {
+      copy.textContent = 'Copy failed';
+    }
+  });
+  const notes = el('a', '', 'Release notes');
+  notes.href = u.update.url;
+  notes.target = '_blank';
+  notes.rel = 'noopener';
+  item.append(el('code', '', HUB_UPDATE_COMMAND), copy, notes);
+  const list = el('div', 'setup-list');
+  list.append(item);
+  return {
+    title: 'Update the hub',
+    tag: `${u.version} → ${u.update.latest}`,
+    desc: 'Stop the hub, run this command, then start the hub again. It also updates Kanban, Cost, Marketplace and Memory.',
+    extra: list,
+  };
+}
+
+function pluginNote(p) {
+  if (p.state === 'mismatch') return `${p.name}: ${p.installed} → ${p.bundled}`;
+  return `${p.name}: ${p.state === 'missing' ? 'not installed' : 'turned off'}`;
+}
+
+function pluginsStep(step, s) {
+  const update = setupModal.mode === 'update';
+  const list = el('div', 'setup-list');
+  for (const d of s.dirs) {
+    const item = el('div', 'setup-item');
+    const right = d.pending
+      ? setupButton(update ? 'Update' : 'Install', `plugins:${d.path}`, () =>
+          sendJson('POST', '/api/setup/plugins', { dir: d.path }),
+        )
+      : el('span', 'setup-ok good', update ? '✓ up to date' : '✓ installed');
+    item.append(el('code', '', d.path), right);
+    const notes = d.plugins.filter((p) => p.state !== 'ok').map(pluginNote);
+    if (notes.length) item.append(el('span', 'set-help', notes.join(' · ')));
+    list.append(item);
+  }
+  if (setupModal.updatedDirs.size)
+    list.append(
+      el(
+        'div',
+        'setup-notice',
+        `Restart open Claude sessions in these dirs to load the new plugins: ${[...setupModal.updatedDirs].join(', ')}`,
+      ),
+    );
+  const action =
+    s.dirs.filter((d) => d.pending).length > 1
+      ? setupButton(
+          update ? 'Update all dirs' : 'Install in all dirs',
+          'plugins:all',
+          () => sendJson('POST', '/api/setup/plugins', { all: true }),
+          true,
+        )
+      : null;
+  return {
+    title: update ? 'Update plugins' : 'Install plugins',
+    desc: update
+      ? 'The hub plugin and the app plugins in every config dir. A dir that fails does not stop the others.'
+      : 'Kanban shows live agent activity only in a dir with its plugin. Open sessions keep the old plugin until they restart.',
+    action,
+    extra: list,
+  };
+}
+
+const SETUP_STEP_VIEWS = { app: installStep, tray: trayStep, dirs: dirsStep, plugins: pluginsStep, hub: hubStep };
+
+const SETUP_MODES = {
+  setup: {
+    title: 'Welcome to Claude Code Hub',
+    sub: 'A few quick steps make the hub feel like a desktop app.',
+    status: 'Skip any step. Open this again from Hub settings.',
+    end: (allDone) => [allDone ? 'Finish' : 'Skip setup', () => endSetup(allDone ? 'done' : 'skipped')],
+  },
+  update: {
+    title: 'Updates',
+    sub: 'Nothing changes until you click. Restart the hub by hand.',
+    status: 'Open this again from Hub settings → Updates.',
+    end: () => ['Close', closeSetup],
+  },
+};
+
+function renderSetup() {
+  const body = document.getElementById('setup-body');
+  const foot = document.getElementById('setup-foot');
+  const s = setupModal.data;
+  const focusKey = document.activeElement?.closest?.('[data-focus]')?.dataset.focus;
+  const mode = SETUP_MODES[setupModal.mode];
+  document.getElementById('setup-title').textContent = mode.title;
+  document.getElementById('setup-sub').textContent = mode.sub;
+  if (!s) {
+    body.replaceChildren(el('div', 'set-help', setupModal.error ?? 'Loading…'));
+    foot.replaceChildren();
+    return;
+  }
+  const steps = setupSteps(s);
+  const doneCount = steps.filter((st) => st.done).length;
+  const current = steps.find((st) => !st.done);
+  const meter = el('div', 'setup-meter');
+  const lead = el('span', 'setup-lead');
+  lead.append(el('b', '', `${doneCount} of ${steps.length}`), ' done');
+  const bar = el('div', 'setup-progress');
+  const fill = el('i', '');
+  fill.style.width = `${(doneCount / steps.length) * 100}%`;
+  bar.append(fill);
+  meter.append(lead, bar);
+  const list = el('ol', 'setup-steps');
+  steps.forEach((st, i) => {
+    const view = SETUP_STEP_VIEWS[st.id](st, s);
+    const li = el('li', `setup-step${st.done ? ' done' : ''}${st === current ? ' current' : ''}`);
+    const title = el('span', 'setup-title', view.title);
+    if (view.tag) title.append(el('span', 'setup-tag', view.tag));
+    li.append(el('span', 'setup-mark', st.done ? '✓' : String(i + 1)), title, view.action ?? el('span', ''));
+    li.append(el('span', 'setup-desc', view.desc));
+    if (view.extra) li.append(view.extra);
+    if (setupModal.output?.step === st.id) li.append(el('pre', 'setup-out', setupModal.output.text));
+    list.append(li);
+  });
+  body.replaceChildren(meter, list);
+
+  const status = setupModal.error ? el('span', 'set-error', setupModal.error) : el('span', 'set-keys', mode.status);
+  const allDone = doneCount === steps.length;
+  const [endText, onEnd] = mode.end(allDone);
+  const end = el('button', allDone ? 'primary' : '', endText);
+  end.type = 'button';
+  end.dataset.focus = 'end';
+  end.addEventListener('click', () => onEnd());
+  foot.replaceChildren(status, end);
+
+  if (focusKey) {
+    const target = document.querySelector(`#setup [data-focus="${CSS.escape(focusKey)}"]:not(:disabled)`);
+    (target ?? document.querySelector('#setup .setup-box')).focus();
+  }
+}
+
+function bindSetup() {
+  const overlay = document.getElementById('setup');
+  overlay.addEventListener('mousedown', (e) => {
+    if (e.target === overlay) closeSetup();
+  });
+  matchMedia('(display-mode: standalone)').addEventListener('change', () => setupModal.open && renderSetup());
 }
 
 function bindSettings() {
@@ -2182,13 +2836,12 @@ function bindSettings() {
     if (e.target === overlay) closeSettings();
   });
   overlay.addEventListener('keydown', (e) => {
-    if (e.key !== 'ArrowLeft' && e.key !== 'ArrowRight') return;
-    const group = e.target.closest('[role="radiogroup"]');
-    if (!group) return;
+    const step = { ArrowLeft: -1, ArrowRight: 1, ArrowUp: -1, ArrowDown: 1 }[e.key];
+    const group = step && e.target.closest('[role="radiogroup"], [role="tablist"]');
+    if (!group || (group.getAttribute('role') === 'tablist') !== (e.key === 'ArrowUp' || e.key === 'ArrowDown')) return;
     e.preventDefault();
-    const radios = [...group.querySelectorAll('[role="radio"]:not(:disabled)')];
-    const i = radios.indexOf(e.target);
-    radios[i + (e.key === 'ArrowRight' ? 1 : -1)]?.click();
+    const items = [...group.querySelectorAll('[role="radio"]:not(:disabled), [role="tab"]')];
+    items[items.indexOf(e.target) + step]?.click();
   });
 }
 
