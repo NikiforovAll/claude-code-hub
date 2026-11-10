@@ -397,6 +397,7 @@ async function restartApp(pool, app) {
   const { id } = app;
   pool.restarts[id] = [];
   pool.stopped.delete(id);
+  pool.deferred.delete(id);
   await killApp(pool, id);
   if (pool.retired) return false;
   const child = spawnOne(pool, app);
@@ -406,7 +407,19 @@ async function restartApp(pool, app) {
 
 async function stopApp(pool, { id }) {
   pool.stopped.add(id);
+  pool.deferred.delete(id);
   await killApp(pool, id);
+}
+
+// A deferredStart app that nothing has started yet starts on its first page load: its tab, a pane,
+// an action. One the user stopped stays stopped.
+function startOnDemand(name) {
+  const pool = activePool();
+  if (!pool?.deferred.delete(name)) return;
+  console.log(`[${name}] starting on first open`);
+  pool.stopped.delete(name);
+  const target = ENABLED_APPS.find((a) => a.id === name);
+  spawnOne(pool, target);
 }
 
 // Out of pool.children before the kill, so the exit handler does not restart it.
@@ -448,7 +461,7 @@ async function ensurePool(dir) {
   pool = pools.get(dir);
   if (pool) return pool.ready;
   const stopped = new Set(ENABLED_APPS.filter((a) => a.deferredStart).map((a) => a.id));
-  pool = { dir, children: new Map(), ports: {}, restarts: {}, stopped, retired: false };
+  pool = { dir, children: new Map(), ports: {}, restarts: {}, stopped, deferred: new Set(stopped), retired: false };
   pools.set(dir, pool);
   spawnChildren(pool);
   const ready = [...pool.children.values()].map((c) => c.ready);
@@ -819,6 +832,7 @@ function proxyHandler(name) {
     if (body === undefined) return;
     // One deadline for the whole request, not one per attempt: a retry must not re-spend the wait.
     const budget = { deadline: Date.now() + (isNavigation(req) ? NAV_PORT_WAIT_MS : API_PORT_WAIT_MS) };
+    if (isNavigation(req)) startOnDemand(name);
     // One listener for the request, however many attempts it takes.
     let current = null;
     res.once('close', () => current?.destroy());
@@ -963,6 +977,7 @@ function appsConfig() {
         publishes: a.publishes,
       };
       if (a.hidden) entry.hidden = true;
+      if (a.deferredStart) entry.deferredStart = true;
       if (a.settings.length) entry.settings = appValues.get(a.id);
       if (TERMINAL_TOKEN && a.id === TERMINAL_APP.id) entry.terminalToken = TERMINAL_TOKEN;
       return [a.id, entry];
