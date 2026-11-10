@@ -2,6 +2,10 @@
 
 The SDK follows semver. A new function or message is a minor version, a change that breaks an app is a major version. The protocol version is separate ([Versioning](https://nikiforovall.blog/claude-code-hub/reference/protocol/#versioning)).
 
+## 1.13.0
+
+- `connect({ plainHostKeys: ['\\'] })` asks the app page around a nested page for the named keys without Ctrl, Alt or Meta too: `hub:hostReady` carries `plainKeys`, the list of `e.key` values. Kanban then adds its claims for those keys, such as `\` (sidebar), to what it sends that frame. A page names only keys it leaves free.
+
 ## 1.12.0
 
 - `comboOf()` names a punctuation key by its US character when `e.key` is not ASCII, so `Ctrl+,` on a Cyrillic or Greek layout is `ctrl+,`. A Latin layout keeps its own punctuation. `Digit0` falls back to `0` as `Digit1`…`9` do.

@@ -859,6 +859,19 @@ describe('nested page', () => {
     assert.equal(env.sent().filter((m) => m.type === 'hub:keydown').length, 1);
   });
 
+  it('asks the host for the plain keys the app names', async () => {
+    const { env } = await connected({ plainHostKeys: ['\\'] }, { nested: true, ancestors: [CCK, HUB] });
+    env.fromHub(welcome());
+    env.fromHub({ type: 'hub:hostKeys', keys: [{ key: '\\', code: '' }] }, { source: env.middle, origin: CCK });
+    assert.deepEqual(env.middle.sent, [{ msg: { type: 'hub:hostReady', plainKeys: ['\\'] }, origin: CCK }]);
+    env.middle.sent.length = 0;
+    assert.equal(env.key({ key: '\\', code: 'Backslash' }).prevented, true);
+    assert.deepEqual(
+      env.middle.sent.map((s) => [s.msg.type, s.msg.key]),
+      [['hub:hostKey', '\\']],
+    );
+  });
+
   it('ignores host keys in a tab', async () => {
     const { env } = await connected();
     env.fromHub(welcome());

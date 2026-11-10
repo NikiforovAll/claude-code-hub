@@ -101,7 +101,7 @@
       } catch (_) {}
     }
 
-    function connect({ standalone = {} } = {}) {
+    function connect({ standalone = {}, plainHostKeys = [] } = {}) {
       if (hub) return hub;
       const topics = new Map();
       const activeFns = new Set();
@@ -275,7 +275,11 @@
         const m = e.data;
         if (!framed || e.source !== win.parent || win.parent === win.top) return;
         if (m?.type !== 'hub:hostKeys' || !Array.isArray(m.keys)) return;
-        if (!hostKeys) win.parent.postMessage({ type: 'hub:hostReady' }, e.origin);
+        if (!hostKeys)
+          win.parent.postMessage(
+            { type: 'hub:hostReady', ...(plainHostKeys.length && { plainKeys: plainHostKeys }) },
+            e.origin,
+          );
         hostOrigin = e.origin;
         hostKeys = new Set(m.keys.map((k) => keySigs(k)[0]));
       }

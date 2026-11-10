@@ -187,10 +187,10 @@ While a nested page has focus, its key presses never reach the app page around i
 | Direction | Message | Payload |
 |---|---|---|
 | Host → page | `hub:hostKeys` | `{keys}`, the claims. The host sends it when the frame loads and again when its claims change. Each message replaces the last |
-| Page → host | `hub:hostReady` | `{}`, once per document, on the first `hub:hostKeys`. The host can then hide a hint that its keys are off |
+| Page → host | `hub:hostReady` | `{plainKeys?}`, once per document, on the first `hub:hostKeys`. The host can then hide a hint that its keys are off. `plainKeys`, a list of `e.key` values, asks for the host's claims on those keys without Ctrl, Alt or Meta too |
 | Page → host | `hub:hostKey` | `{key, code, ctrl, alt, shift, meta}`, a claimed press. The host replays it as its own press |
 
-A claim names a press by its physical key, `{ctrlKey?, altKey?, shiftKey?, metaKey?, key: 'Unidentified', code}`, or by its character, `{…, key, code: ''}`. A press matches when its code or its lowercased key, with the same modifiers, equals the claim's. A press under AltGraph matches by character only. The page sends a press to the hub first when its combo is in `welcome.forward`. It keeps a press in a text field and a press it already handled (`defaultPrevented`), and calls `preventDefault()` on a press it sends. Kanban claims only presses with Ctrl, Alt or Meta, so the page keeps its own letter keys and Escape.
+A claim names a press by its physical key, `{ctrlKey?, altKey?, shiftKey?, metaKey?, key: 'Unidentified', code}`, or by its character, `{…, key, code: ''}`. A press matches when its code or its lowercased key, with the same modifiers, equals the claim's. A press under AltGraph matches by character only. The page sends a press to the hub first when its combo is in `welcome.forward`. It keeps a press in a text field and a press it already handled (`defaultPrevented`), and calls `preventDefault()` on a press it sends. Kanban claims only presses with Ctrl, Alt or Meta, so the page keeps its own letter keys and Escape. A page that sent `plainKeys: ['\\']` also gets Kanban's claims on `\` (sidebar), and names only keys it leaves free.
 
 ## 6. Theme
 
