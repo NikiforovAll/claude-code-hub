@@ -1014,7 +1014,7 @@ app.get('/api/config', (_req, res) => {
     configDirSwitch: configDirSwitch(hubConfig),
     voice: voice && { provider: voice.provider, auto: voice.auto, commands: voice.commands },
     version: HUB_VERSION,
-    onboarding: hubConfig.onboarding ?? null,
+    onboarding: process.env.CLAUDE_HUB_NO_ONBOARDING ? 'skipped' : (hubConfig.onboarding ?? null),
   });
 });
 

@@ -90,6 +90,7 @@ The hub creates the folder, the config file and a new token on the first run. Se
 | `CLAUDE_CONFIG_DIR` | The default config dir. Else `~/.claude`. |
 | `CLAUDE_HUB_DIR` | The hub folder, if `--hub-dir` is not set. Else `~/.claude-hub`. |
 | `CLAUDE_HUB_NO_UPDATE_CHECK` | Set to any value to turn off the check for a new hub version on npm. |
+| `CLAUDE_HUB_NO_ONBOARDING` | Set to any value to skip the welcome dialog, as `onboarding: "skipped"` in `config.json` does. Nothing is saved. |
 
 ### Update check
 
