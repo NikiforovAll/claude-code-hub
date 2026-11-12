@@ -249,6 +249,7 @@ function onPublish(appId, { topic, payload }) {
       ? { ...payload, encoded: encodeProjectPath(payload.project), projectName: basename(payload.project) }
       : payload;
   published.set(topic, { from: appId, payload: event });
+  if (topic === 'attention.changed') onAttention(appId, event);
   for (const id of Object.keys(iframes)) {
     if (id === appId) continue;
     if (id === activeApp) sendTopic(id, topic, event);
@@ -317,6 +318,7 @@ async function init() {
   bindSetup();
   registerSW();
   bindErrorToast();
+  bindAttentionToast();
   showUpdateToast();
   if (!config.onboarding) maybeShowSetup();
   reloadOnHubRestart();
@@ -1010,8 +1012,108 @@ function bindErrorToast() {
 // The hub has no visible chrome, so the window/tab title is the only place the active config dir
 // shows. Only a non-default dir is named, and by basename alone — the PWA window prepends the
 // manifest name, so a product name here would read as "Claude Code Hub - .claude-eom · Hub".
-function applyTitle(dir) {
-  document.title = dir && dir !== defaultConfigDir ? basename(dir) : 'Claude Code Hub';
+function applyTitle(dir = titleDir) {
+  titleDir = dir;
+  const name = dir && dir !== defaultConfigDir ? basename(dir) : 'Claude Code Hub';
+  const n = attentionCount();
+  document.title = n ? `(${n}) ${name}` : name;
+}
+
+// attention.changed lists the sessions whose terminal reports blocked. With no tab strip, the
+// count goes in the window title and the installed app's taskbar badge. A session that newly
+// blocks while its app is off screen gets a toast, at most once per ATTENTION_GAP_MS each,
+// and none from the first payload, so a reload does not toast what was already waiting. The
+// toast goes when its app comes on screen or the session stops waiting.
+const ATTENTION_KINDS = { permission: 'Permission', question: 'Question', auth: 'Sign-in' };
+const ATTENTION_ICONS = {
+  permission: [['path', { d: 'M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z' }]],
+  question: [
+    ['circle', { cx: 12, cy: 12, r: 10 }],
+    ['path', { d: 'M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3' }],
+    ['path', { d: 'M12 17h.01' }],
+  ],
+  auth: [
+    ['circle', { cx: 7.5, cy: 15.5, r: 5.5 }],
+    ['path', { d: 'm21 2-9.6 9.6' }],
+    ['path', { d: 'm15.5 7.5 3 3L22 7l-3-3' }],
+  ],
+  other: [
+    ['path', { d: 'M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9' }],
+    ['path', { d: 'M10.3 21a1.94 1.94 0 0 0 3.4 0' }],
+  ],
+};
+const ATTENTION_TOAST_MS = 8000;
+const ATTENTION_GAP_MS = 30_000;
+let titleDir = null;
+const attention = new Map();
+const attentionToasted = new Map();
+let attentionTimer = 0;
+
+const attentionCount = () => [...attention.values()].reduce((n, list) => n + list.length, 0);
+
+function onAttention(appId, payload) {
+  const list = Array.isArray(payload?.blocked) ? payload.blocked : [];
+  const blocked = list
+    .filter((b) => isPlainObject(b) && typeof b.id === 'string' && b.id.length <= 64 && typeof b.name === 'string')
+    .slice(0, 20)
+    .map((b) => ({
+      id: b.id,
+      name: b.name.slice(0, 120),
+      kind: Object.hasOwn(ATTENTION_KINDS, b.kind) ? b.kind : null,
+    }));
+  const seeded = attention.has(appId);
+  const before = new Set(attention.get(appId)?.map((b) => b.id));
+  attention.set(appId, blocked);
+  applyTitle();
+  const total = attentionCount();
+  if (total) navigator.setAppBadge?.(total).catch(() => {});
+  else navigator.clearAppBadge?.().catch(() => {});
+  const now = Date.now();
+  for (const [id, at] of attentionToasted) if (now - at > ATTENTION_GAP_MS) attentionToasted.delete(id);
+  const fresh = blocked.find((b) => !before.has(b.id) && !attentionToasted.has(b.id));
+  const toast = document.getElementById('attention-toast');
+  if (toast.dataset.app === appId && !blocked.some((b) => b.id === toast.dataset.session)) hideAttentionToast();
+  if (!seeded || !fresh || appId === activeApp) return;
+  attentionToasted.set(fresh.id, now);
+  showAttentionToast(appId, fresh, blocked.length - 1);
+}
+
+function hideAttentionToast() {
+  clearTimeout(attentionTimer);
+  const toast = document.getElementById('attention-toast');
+  if (!toast.hidden) hideToast(toast);
+}
+
+function showAttentionToast(appId, b, others) {
+  const toast = document.getElementById('attention-toast');
+  document
+    .getElementById('attention-icon')
+    .replaceChildren(lucideSvg(ATTENTION_ICONS[b.kind] ?? ATTENTION_ICONS.other));
+  document.getElementById('attention-title').textContent = b.name;
+  document.getElementById('attention-kind').textContent = ATTENTION_KINDS[b.kind] ?? 'Needs you';
+  document.getElementById('attention-detail').textContent = `waiting in ${apps[appId]?.name ?? appId}`;
+  document.getElementById('attention-more').textContent = others > 0 ? `+${others} more waiting` : '';
+  toast.dataset.app = appId;
+  toast.dataset.session = b.id;
+  const timer = document.getElementById('attention-timer');
+  timer.style.animation = 'none';
+  void timer.offsetWidth;
+  timer.style.animation = '';
+  clearTimeout(attentionTimer);
+  attentionTimer = setTimeout(hideAttentionToast, ATTENTION_TOAST_MS);
+  showToast(toast);
+}
+
+function bindAttentionToast() {
+  const toast = document.getElementById('attention-toast');
+  toast.style.setProperty('--attention-ms', `${ATTENTION_TOAST_MS}ms`);
+  toast.addEventListener('mouseenter', () => clearTimeout(attentionTimer));
+  toast.addEventListener('mouseleave', () => (attentionTimer = setTimeout(hideAttentionToast, ATTENTION_TOAST_MS / 2)));
+  document.getElementById('attention-close').addEventListener('click', hideAttentionToast);
+  document.getElementById('attention-open').addEventListener('click', () => {
+    hideAttentionToast();
+    onInvoke({ id: 'attention', action: 'session.open', params: { session: toast.dataset.session } }, () => {});
+  });
 }
 
 // After a config-dir switch every child is a new process, possibly on a new port. Reloading each
@@ -1131,6 +1233,7 @@ function switchTab(appId) {
   if (!iframes[appId]) addIframe(appId);
   if (appId !== activeApp) previousApp = activeApp;
   activeApp = appId;
+  if (document.getElementById('attention-toast').dataset.app === appId) hideAttentionToast();
   try {
     localStorage.setItem(TAB_KEY, appId);
   } catch {}

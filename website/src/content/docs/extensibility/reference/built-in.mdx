@@ -16,7 +16,7 @@ The hub ships four tools. This page lists what each tool gives to other apps and
 
 <BuiltinLinks />
 
-- **Topics.** The hub publishes `project.changed` when you pick a project. Kanban filters its sessions to the project, Marketplace and Memory Diagnoser show that project, and Cost limits its totals to it. Kanban publishes [`session.changed`](#sessionchanged) when you open a session. No built-in tool subscribes to it, but your own apps can, as the Inspector does. Kanban also publishes [`voice.context`](#voicecontext), which the hub's voice help reads.
+- **Topics.** The hub publishes `project.changed` when you pick a project. Kanban filters its sessions to the project, Marketplace and Memory Diagnoser show that project, and Cost limits its totals to it. Kanban publishes [`session.changed`](#sessionchanged) when you open a session. No built-in tool subscribes to it, but your own apps can, as the Inspector does. Kanban also publishes [`voice.context`](#voicecontext), which the hub's voice help reads, and [`attention.changed`](#attentionchanged), which the hub shows as a count and a toast.
 - **Actions.** Kanban calls [`project.plugins`](#projectplugins), [`session.cost`](#sessioncost) and [`project.memory`](#projectmemory) from the session view, and [`agent.cost`](#agentcost) from its CLI. Kanban handles [`session.open`](#sessionopen), [`session.find`](#sessionfind), [`session.approve`, `session.deny`](#sessionapprove-sessiondeny), [`session.next`](#sessionnext), [`session.paste`](#sessionpaste), [`session.live`](#sessionlive), [`session.new`](#sessionnew), [`task.add`](#taskadd) and [`task.live`](#tasklive). Any app can call them.
 - **Capabilities.** The hub reads [`projects`](#projects) and [`terminal`](#terminal) from Kanban.
 - **Kept keys.** Kanban keeps <kbd>Ctrl+Alt+N</kbd> (new session), <kbd>Ctrl+Alt+R</kbd> (resume session) and <kbd>Ctrl+Alt+S</kbd> (swap to the previous session) in `keys.keeps`. See [Kept keys](/claude-code-hub/extensibility/reference/manifest/#kept-keys).
@@ -71,6 +71,24 @@ Kanban tells the hub's voice help which commands fit now. The hub reads the topi
 | `rows` | Per action: `false` hides its row, a string replaces its help, `true` marks it. With a title, the marked rows come first and the other rows fold into one "Also" line |
 
 Kanban publishes it 150 ms after a change, and not again while the payload stays the same. With no `voice.context` from the app on screen, the panel lists every command that the app handles.
+
+### `attention.changed`
+
+Kanban publishes the sessions in its terminal that wait for you, from their reported status (OSC 7501).
+
+```json
+{
+  "blocked": [{ "id": "f2248524-…", "name": "Kanagawa theme rework", "kind": "permission" }]
+}
+```
+
+| Field | Meaning |
+| --- | --- |
+| `id` | The session id |
+| `name` | The session name |
+| `kind` | `permission`, `question`, `auth`, or `null` when the program did not say |
+
+The list holds 20 sessions at most and carries no message text. Kanban publishes it 150 ms after a change, and not again while the payload stays the same. The hub puts the count in the window title and on the installed app's taskbar icon. When a session starts to wait while another tab is on screen, the hub shows a toast with **Open session**, at most once per session in 30 s.
 
 ## Actions
 

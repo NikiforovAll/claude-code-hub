@@ -35,6 +35,10 @@ One setup job runs at a time (409 otherwise). The child process keeps the claude
 
 On load, `openUpdateAfterUpgrade` compares the hub version with `hub-last-version` in `localStorage`. When it changed and a plugin is not settled, it opens update mode once. It calls `GET /api/setup` only on that first load after an upgrade.
 
+## Attention toast
+
+`onAttention` handles `attention.changed` (`{blocked: [{id, name, kind}]}`) from any app. It checks the payload, puts `(n) ` before the title (`applyTitle`) and sets the app badge. The first payload only seeds the state. After that, a newly blocked session shows `#attention-toast` when its app is not on screen, at most once per id in `ATTENTION_GAP_MS`. The toast hides when its session stops waiting, when its app comes on screen, or after `ATTENTION_TOAST_MS`; hover pauses the countdown. **Open session** invokes the `session.open` action for that id.
+
 ## Shortcuts and user keymap
 
 A new hub shortcut goes in `hubActions()` (`public/app.js`, `{id, combo, run, inPalette}`; `bindings()` turns it into the combo → binding map, cached until `setApps`) and in `HUB_ACTIONS` in `lib/keymap.js`, and needs no submodule change. Add a row to `test/fixtures/key-matrix.json` with each key change.
