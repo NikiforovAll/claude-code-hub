@@ -330,6 +330,11 @@ function childEnv(pool, name) {
   const mods = appModEnv(MODS, name);
   if (mods) env.HUB_MODS = mods;
   else delete env.HUB_MODS;
+  // A setting the app's server needs before any page connects, such as cck's terminal host for
+  // the terminals it restores at start. A change later reaches the app through its pages.
+  const settings = appValues.get(name);
+  if (settings) env.HUB_APP_SETTINGS = JSON.stringify(settings);
+  else delete env.HUB_APP_SETTINGS;
   if (TERMINAL.enabled && name === TERMINAL_APP.id) {
     env.CCK_TERMINAL = JSON.stringify(TERMINAL);
     env.CCK_TERMINAL_TOKEN = TERMINAL_TOKEN;

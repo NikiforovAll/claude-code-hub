@@ -151,7 +151,7 @@ Text fields must not contain `<` or `>`.
 
 ## Settings
 
-`settings` lists the user settings of your app. The hub shows them in its settings modal (<kbd>Ctrl+,</kbd>), under the app's name, and stores the values in `~/.claude-hub/config.json`. The page reads them with `hub.settings` and `hub.onSettings` ([SDK](/claude-code-hub/extensibility/reference/sdk/#settings)). A change applies at once.
+`settings` lists the user settings of your app. The hub shows them in its settings modal (<kbd>Ctrl+,</kbd>), under the app's name, and stores the values in `~/.claude-hub/config.json`. The page reads them with `hub.settings` and `hub.onSettings` ([SDK](/claude-code-hub/extensibility/reference/sdk/#settings)). A change applies at once. The server gets the values at start in `HUB_APP_SETTINGS`, as JSON; a later change reaches only the page, so the page relays it when the server needs it.
 
 ```json
 "settings": [

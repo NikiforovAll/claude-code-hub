@@ -50,6 +50,7 @@ The hub spawns each enabled app once per config dir. It runs `run.entry` from th
 | `PORT` | `0`. The app binds any free port |
 | `HOST`, `ALLOWED_HOSTS` | The hub's bind rules. The app must use them as they are |
 | `HUB_SDK_SERVER` | The absolute path of the hub's server SDK, `packages/claude-hub-sdk/src/server.js`. Always set ([SDK](#3-sdk)) |
+| `HUB_APP_SETTINGS` | The app's [settings](/claude-code-hub/extensibility/reference/manifest/#settings) as JSON, `{key: value}`, at spawn. Set only for an app with settings. A later change reaches the page, not this env |
 | Capability env | Only for the provider of that capability, for example `CCK_TERMINAL` and `CCK_TERMINAL_TOKEN` for `terminal` |
 
 The app reads these once at start. A new config dir gets a new process. If an app exits, the hub starts it again, up to 5 times in 60 seconds.
