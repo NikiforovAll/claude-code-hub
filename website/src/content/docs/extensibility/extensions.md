@@ -196,8 +196,11 @@ Kanban's plugin has an `addon` skill that builds an add-on for you. In a Claude 
 
 ```bash
 claude-code-hub ext install git-changes
+claude-code-hub ext install file-explorer
 claude-code-hub ext install ./my-addon
 ```
+
+The two official add-ons are [Changes](/claude-code-hub/extensions/git-changes/), the session's git changes, and [Files](/claude-code-hub/extensions/file-explorer/), a tree of the session's folder that previews a file or opens it as a pane.
 
 In place of a plugin, `ext install` puts the add-on on the Kanban dock of the config dir (`--dir`, else `CLAUDE_CONFIG_DIR`, else `~/.claude`). It writes `.cck/addons.json` there through Kanban's CLI, so it needs no board running, and a running board shows the add-on at once, with no restart. Every session on that config dir shows it. The hub keeps the add-on in `addons` of `config.json`, not in `apps`, because it does not run it. For another config dir, run `ext install <id>` with that `--dir`.
 

@@ -11,6 +11,21 @@
     "tagline": "Browse the session's folder and open files, beside its terminal",
     "description": "A Kanban dock add-on. It lists the session's folder as a tree that loads one folder at a time. A click on a file previews it, and Ctrl+click opens it as a pane of the session. Ctrl+click on a folder makes it the root, Up goes to the parent with that folder still open, and Back, Forward and Home move through the folders you showed. With the add-on on the dock, a folder path in the terminal opens in it: a click offers it, and Ctrl+click opens it at once.",
     "tags": ["files", "dock"],
+    "screenshots": [
+      {
+        "url": "https://nikiforovall.blog/claude-code-hub/shots/extensibility/file-explorer-dock.webp",
+        "alt": "Kanban with a Claude Code session in the embedded terminal and Files docked on its right: the tree of the session's folder with the lib and public folders open",
+        "title": "Beside the terminal",
+        "caption": "Files sits on the dock rail and shows the folder of the session in the terminal.",
+        "card": true
+      },
+      {
+        "url": "https://nikiforovall.blog/claude-code-hub/shots/extensibility/file-explorer-preview.webp",
+        "alt": "The preview dialog over the board with CLAUDE.md rendered, its path under the title, opened from the Files tree",
+        "title": "Preview a file, or open it as a pane",
+        "caption": "Click a file to preview it. Ctrl+click opens it as a pane of the session."
+      }
+    ],
     "author": "NikiforovAll",
     "license": "MIT"
   }
