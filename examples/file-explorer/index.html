@@ -1,0 +1,339 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Files</title>
+<style>
+:where(:root) {
+  --color-bg: #ffffff;
+  --color-bg-subtle: #f6f7f9;
+  --color-text: #1f2328;
+  --color-text-muted: #6b7280;
+  --color-border: #e3e6ea;
+  --color-accent: #6d5dfc;
+  --color-danger: #cf222e;
+  --font-sans: system-ui, -apple-system, "Segoe UI", sans-serif;
+  --font-mono: ui-monospace, "Cascadia Code", Consolas, monospace;
+}
+@media (prefers-color-scheme: dark) {
+  :where(:root) {
+    --color-bg: #15171c;
+    --color-bg-subtle: #1c1f26;
+    --color-text: #e6e8eb;
+    --color-text-muted: #8b93a1;
+    --color-border: #2b2f38;
+    --color-accent: #8b7dff;
+    --color-danger: #f85149;
+  }
+}
+* { box-sizing: border-box; }
+[hidden] { display: none !important; }
+:root { color-scheme: var(--color-scheme, light dark); }
+html, body { margin: 0; }
+body {
+  background: var(--color-bg);
+  color: var(--color-text);
+  font: 13px/1.45 var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+}
+button { font: inherit; color: inherit; background: none; border: 0; padding: 0; cursor: pointer; }
+
+header {
+  position: sticky; top: 0; z-index: 2;
+  background: var(--color-bg);
+  border-bottom: 1px solid var(--color-border);
+  padding: 12px 12px 10px;
+}
+.top { display: flex; align-items: center; gap: 6px; }
+.name { font-weight: 650; font-size: 15px; flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; text-align: left; cursor: copy; }
+.tool {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 26px; height: 26px; border-radius: 6px; color: var(--color-text-muted); flex-shrink: 0;
+}
+.tool:hover, .tool:focus-visible { background: var(--color-bg-subtle); color: var(--color-text); outline: none; }
+.tool:disabled { opacity: 0.35; cursor: default; }
+.tool[aria-expanded="true"] { background: var(--color-bg-subtle); color: var(--color-accent); }
+.tool svg, .row svg { width: 14px; height: 14px; flex-shrink: 0; }
+.filter {
+  width: 100%; margin-top: 8px; padding: 5px 8px;
+  font: inherit; color: inherit; background: var(--color-bg-subtle);
+  border: 1px solid var(--color-border); border-radius: 6px; outline: none;
+}
+.filter:focus { border-color: var(--color-accent); }
+
+main { padding: 6px 0 24px; }
+.row {
+  display: flex; align-items: center; gap: 6px; width: 100%; text-align: left;
+  padding: 3px 12px 3px calc(12px + var(--depth, 0) * 14px);
+  font: 12.5px/1.5 var(--font-mono); white-space: nowrap;
+}
+.row:hover { background: var(--color-bg-subtle); }
+.row:focus-visible { outline: none; background: color-mix(in srgb, var(--color-accent) 14%, transparent); }
+.row .label { overflow: hidden; text-overflow: ellipsis; }
+.row .chev { color: var(--color-text-muted); transition: transform 0.12s ease; }
+.row.open > .chev { transform: rotate(90deg); }
+.row.file::before { content: ''; width: 14px; flex-shrink: 0; }
+.row.dim { color: var(--color-text-muted); }
+.note { padding: 3px 12px 3px calc(32px + var(--depth, 0) * 14px); font-size: 12px; color: var(--color-text-muted); }
+.note.error { color: var(--color-danger); }
+</style>
+</head>
+<body>
+<header>
+  <div class="top">
+    <button class="tool" id="back" title="Back" aria-label="Back"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M13 8H3.5M7.5 4l-4 4 4 4"/></svg></button>
+    <button class="tool" id="forward" title="Forward" aria-label="Forward"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M3 8h9.5M8.5 4l4 4-4 4"/></svg></button>
+    <button class="tool" id="up" title="Parent folder" aria-label="Parent folder"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M8 13V3.5M4 7.5l4-4 4 4"/></svg></button>
+    <button class="tool" id="home" title="The session's folder" aria-label="The session's folder"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M2.5 7.5L8 3l5.5 4.5M4 6.5V13h8V6.5"/></svg></button>
+    <button class="name" id="name"></button>
+    <button class="tool" id="find" title="Filter names (/)" aria-label="Filter names" aria-expanded="false"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><circle cx="7" cy="7" r="4"/><path d="M10 10l3.5 3.5"/></svg></button>
+    <button class="tool" id="reveal" title="Show in the file manager" aria-label="Show in the file manager"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M2 4.5h4l1.5 1.5H14v6.5H2z"/></svg></button>
+    <button class="tool" id="reload" title="Reload" aria-label="Reload"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M13 8a5 5 0 1 1-1.5-3.5M13 3v2.5h-2.5"/></svg></button>
+  </div>
+  <input class="filter" id="filter" type="search" hidden placeholder="Filter names" autocomplete="off">
+</header>
+<main id="main"></main>
+<script>
+const params = new URLSearchParams(location.search);
+const home = params.get('cwd') || '';
+let root = home;
+const trail = [];
+let at = -1;
+const $ = (id) => document.getElementById(id);
+const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]);
+const CHEV = '<svg class="chev" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M6 4l4 4-4 4"/></svg>';
+
+const listings = new Map();
+const open = new Set();
+const parentOf = () => listings.get(root)?.parent;
+const firstRow = () => $('main').querySelector('.row');
+let sep = '/';
+
+addEventListener('message', (e) => {
+  if (e.source !== parent || e.data?.type !== 'cck-show:tokens') return;
+  for (const [k, v] of Object.entries(e.data.tokens)) document.documentElement.style.setProperty(k, v);
+});
+
+let boardKeys = new Set();
+let board = null;
+const sigs = (e) => {
+  const mods = [e.ctrlKey && 'ctrl', e.altKey && 'alt', e.shiftKey && 'shift', e.metaKey && 'meta'].filter(Boolean).join('+');
+  return [e.code && `${mods}|c:${e.code}`, e.key && e.key !== 'Unidentified' && `${mods}|k:${e.key.toLowerCase()}`];
+};
+addEventListener('message', (e) => {
+  if (e.source !== parent || e.data?.type !== 'hub:hostKeys') return;
+  board = e.origin;
+  boardKeys = new Set(e.data.keys.map((k) => sigs(k).find(Boolean)));
+});
+addEventListener('keydown', (e) => {
+  if (!board || !sigs(e).some((s) => boardKeys.has(s))) return;
+  e.preventDefault();
+  parent.postMessage({ type: 'hub:hostKey', key: e.key, code: e.code, ctrl: e.ctrlKey, alt: e.altKey, shift: e.shiftKey, meta: e.metaKey }, board);
+}, true);
+for (const on of [true, false]) addEventListener(on ? 'focus' : 'blur', () => parent.postMessage({ type: 'cck-show:focus', on }, '*'));
+
+addEventListener('message', (e) => {
+  const { type, path: dir } = e.data || {};
+  if (e.source === parent && type === 'cck-addon:path' && typeof dir === 'string') go(dir);
+});
+
+// The board previews the file; with `pane` it opens the file as a pane of the session.
+function ask(target, opts) {
+  if (parent !== window) parent.postMessage({ type: 'cck-addon:open', path: target, ...opts }, board || '*');
+}
+
+const join = (dir, name) => (dir.endsWith(sep) ? dir + name : dir + sep + name);
+
+async function load(dir) {
+  try {
+    const r = await fetch(`/api/list?${new URLSearchParams({ path: dir })}`);
+    const data = await r.json();
+    listings.set(dir, r.ok ? data : { error: data.error || 'Could not read the folder' });
+    return r.ok ? data : null;
+  } catch {
+    listings.set(dir, { error: 'The add-on server does not answer' });
+    return null;
+  }
+}
+
+function rows(dir, depth, filter) {
+  const data = listings.get(dir);
+  const style = `style="--depth:${depth}"`;
+  if (!data) return `<div class="note" ${style}>Loading…</div>`;
+  if (data.error) return `<div class="note error" ${style}>${esc(data.error)}</div>`;
+  const shown = data.entries.filter((e) => !filter || open.has(join(dir, e.name)) || e.name.toLowerCase().includes(filter));
+  if (!shown.length) return `<div class="note" ${style}>${data.entries.length ? 'No match' : 'Empty'}</div>`;
+  let html = '';
+  for (const e of shown) {
+    const full = join(dir, e.name);
+    const isOpen = e.dir && open.has(full);
+    const dim = e.name.startsWith('.') ? ' dim' : '';
+    html += `<button class="row ${e.dir ? 'dir' : 'file'}${isOpen ? ' open' : ''}${dim}" ${style} data-path="${esc(full)}" title="${esc(full)}"${e.dir ? ` aria-expanded="${isOpen}"` : ''}>${e.dir ? CHEV : ''}<span class="label">${esc(e.name)}</span></button>`;
+    if (isOpen) html += rows(full, depth + 1, filter);
+  }
+  if (data.more) html += `<div class="note" ${style}>${data.more} more not shown</div>`;
+  return html;
+}
+
+const rowOf = (p) => $('main').querySelector(`.row[data-path="${CSS.escape(p)}"]`);
+
+function render() {
+  const focused = document.activeElement?.dataset?.path;
+  $('main').innerHTML = root ? rows(root, 0, $('filter').value.trim().toLowerCase()) : '<div class="note">No folder. Open this add-on from a session.</div>';
+  if (focused) rowOf(focused)?.focus();
+}
+
+function focusFirstRow() {
+  if (document.hasFocus() && document.activeElement === document.body) firstRow()?.focus();
+}
+addEventListener('focus', focusFirstRow);
+
+const within = (p, dir) => p === dir || p.startsWith(dir.endsWith(sep) ? dir : dir + sep);
+
+function setFilter(on) {
+  const input = $('filter');
+  input.hidden = !on;
+  $('find').setAttribute('aria-expanded', on);
+  if (on) input.focus();
+  else input.value = '';
+}
+
+function closeFilter() {
+  setFilter(false);
+  render();
+  firstRow()?.focus();
+}
+
+async function show(dir, from) {
+  root = dir;
+  for (const p of [...open]) if (!within(p, dir)) open.delete(p);
+  for (const p of [...listings.keys()]) if (!within(p, dir)) listings.delete(p);
+  if (from) open.add(from);
+  setFilter(false);
+  $('back').disabled = at <= 0;
+  $('forward').disabled = at >= trail.length - 1;
+  if (!listings.has(dir)) render();
+  if (!dir) return;
+  const data = await load(dir);
+  if (root !== dir) return;
+  if (data) {
+    root = data.path;
+    listings.set(root, data);
+    sep = data.sep;
+  }
+  const trimmed = root.replace(/[\\/]+$/, '');
+  $('name').textContent = trimmed.split(/[\\/]/).pop() || root;
+  $('name').title = `${root}\nClick to copy the path`;
+  $('up').disabled = !parentOf();
+  if (trail[at] === dir) trail[at] = root;
+  render();
+  if (from) rowOf(from)?.focus();
+  else focusFirstRow();
+}
+
+function go(dir, from) {
+  if (dir !== trail[at]) {
+    trail.splice(at + 1);
+    trail.push(dir);
+    at = trail.length - 1;
+  }
+  return show(dir, from);
+}
+
+function step(by) {
+  if (!trail[at + by]) return;
+  at += by;
+  show(trail[at]);
+}
+
+async function toggle(dir) {
+  if (open.delete(dir)) return render();
+  open.add(dir);
+  render();
+  if (!listings.has(dir)) {
+    await load(dir);
+    render();
+  }
+}
+
+$('main').addEventListener('click', (e) => {
+  const row = e.target.closest('.row');
+  if (!row) return;
+  const target = row.dataset.path;
+  if (row.classList.contains('dir')) e.ctrlKey || e.metaKey ? go(target) : toggle(target);
+  else ask(target, { pane: e.ctrlKey || e.metaKey });
+});
+
+$('main').addEventListener('keydown', (e) => {
+  const row = e.target.closest('.row');
+  if (!row || e.altKey) return;
+  if (e.key === '/') {
+    e.preventDefault();
+    setFilter(true);
+    return;
+  }
+  if (e.ctrlKey || e.metaKey) {
+    if (e.key !== 'Enter' || !row.classList.contains('dir')) return;
+    e.preventDefault();
+    go(row.dataset.path);
+    return;
+  }
+  const isDir = row.classList.contains('dir');
+  const isOpen = row.classList.contains('open');
+  const near = (side) => {
+    let el = row[side];
+    while (el && !el.classList.contains('row')) el = el[side];
+    return el;
+  };
+  if (e.key === 'ArrowDown') near('nextElementSibling')?.focus();
+  else if (e.key === 'ArrowUp') near('previousElementSibling')?.focus();
+  else if (e.key === 'ArrowRight' && isDir && !isOpen) toggle(row.dataset.path);
+  else if (e.key === 'ArrowLeft' && isDir && isOpen) toggle(row.dataset.path);
+  else return;
+  e.preventDefault();
+});
+
+$('filter').addEventListener('input', render);
+$('filter').addEventListener('keydown', (e) => {
+  if (e.key === 'Escape') closeFilter();
+  else if (e.key !== 'ArrowDown' && e.key !== 'Enter') return;
+  e.preventDefault();
+  firstRow()?.focus();
+});
+$('find').addEventListener('click', () => ($('filter').hidden ? setFilter(true) : closeFilter()));
+$('up').addEventListener('click', () => parentOf() && go(parentOf(), root));
+$('back').addEventListener('click', () => step(-1));
+$('forward').addEventListener('click', () => step(1));
+$('home').addEventListener('click', () => home && go(home));
+$('reload').addEventListener('click', async () => {
+  const dirs = [root, ...open];
+  await Promise.all(dirs.map(load));
+  render();
+});
+$('reveal').addEventListener('click', () => ask(root, { reveal: true }));
+// A frame without clipboard-write (the board's add-on frame) refuses the Clipboard API.
+async function copyText(text) {
+  if (await navigator.clipboard?.writeText(text).then(() => true, () => false)) return true;
+  const ta = document.createElement('textarea');
+  ta.value = text;
+  ta.style.cssText = 'position:fixed;opacity:0';
+  document.body.append(ta);
+  ta.select();
+  const ok = document.execCommand('copy');
+  ta.remove();
+  return ok;
+}
+
+$('name').addEventListener('click', async () => {
+  if (!(await copyText(root))) return;
+  const name = $('name').textContent;
+  $('name').textContent = 'Path copied';
+  setTimeout(() => { if ($('name').textContent === 'Path copied') $('name').textContent = name; }, 900);
+});
+
+$('home').disabled = !home;
+go(root);
+</script>
+</body>
+</html>

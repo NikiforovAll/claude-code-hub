@@ -1,0 +1,17 @@
+{
+  "manifest": 1,
+  "kind": "addon",
+  "id": "file-explorer",
+  "title": "Files",
+  "icon": "./",
+  "url": "http://localhost:4118/?cwd={cwd}",
+  "run": "node server.js",
+  "requires": { "node": "20.0.0", "apps": ["kanban"] },
+  "listing": {
+    "tagline": "Browse the session's folder and open files, beside its terminal",
+    "description": "A Kanban dock add-on. It lists the session's folder as a tree that loads one folder at a time. A click on a file previews it, and Ctrl+click opens it as a pane of the session. Ctrl+click on a folder makes it the root, Up goes to the parent with that folder still open, and Back, Forward and Home move through the folders you showed. With the add-on on the dock, a folder path in the terminal opens in it: a click offers it, and Ctrl+click opens it at once.",
+    "tags": ["files", "dock"],
+    "author": "NikiforovAll",
+    "license": "MIT"
+  }
+}

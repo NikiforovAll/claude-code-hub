@@ -349,13 +349,20 @@ const diffSource = new Map();
 const MAX_SUB_COMMITS = 20;
 const commitsLabel = (n) => `${n >= MAX_SUB_COMMITS ? `${MAX_SUB_COMMITS}+` : n} commit${n === 1 ? '' : 's'}`;
 
+// Ctrl+click on a file that is still on disk opens it as a pane of the session; the board does it (cck-addon:open).
+function openAttrs(key, kind, code) {
+  const src = diffSource.get(key);
+  if (!src || code === 'D' || parent === window) return `title="${esc(kind)}"`;
+  return `title="${esc(kind)} · Ctrl+click opens the file in a pane" data-open="${esc(`${src.root}/${src.path}`)}"`;
+}
+
 function fileRow(kind, f, key) {
   const isSub = !!f.sub?.root;
   const isOpen = open.has(key);
   const code = isSub ? 'S' : f.code;
   const body = !isOpen ? '' : isSub ? subHtml(f, kind) : `<div class="diff">${diffBody(key)}</div>`;
   return `<li class="file${isOpen ? ' open' : ''}" data-key="${esc(key)}">
-    <button class="row" data-key="${esc(key)}" title="${esc(kind)}">${ICON.chev}<span class="badge k-${esc(code)}">${code === '?' ? 'U' : esc(code)}</span>${nameHtml(f)}${statHtml(f, kind)}</button>
+    <button class="row" data-key="${esc(key)}" ${openAttrs(key, kind, code)}>${ICON.chev}<span class="badge k-${esc(code)}">${code === '?' ? 'U' : esc(code)}</span>${nameHtml(f)}${statHtml(f, kind)}</button>
     ${body}
   </li>`;
 }
@@ -623,6 +630,10 @@ document.addEventListener('click', (e) => {
   }
   const row = e.target.closest('.row[data-key]');
   if (!row) return;
+  if ((e.ctrlKey || e.metaKey) && row.dataset.open) {
+    parent.postMessage({ type: 'cck-addon:open', path: row.dataset.open, pane: true }, board || '*');
+    return;
+  }
   const key = row.dataset.key;
   if (open.has(key)) open.delete(key);
   else open.add(key);
