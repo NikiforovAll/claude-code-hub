@@ -1,6 +1,6 @@
 ---
 title: Mods
-description: Change how the hub and its tools look with CSS and a little JS, without a fork. The Christmas mod ships with the hub.
+description: Change how the hub and its tools look with CSS and a little JS, without a fork. The Christmas and Parchment Ink mods ship with the hub.
 ---
 
 import Shot from '../../../kit/Shot.astro';
@@ -9,7 +9,7 @@ A mod adds CSS and JS to the hub page and to the apps in its tabs. It can also b
 
 ## The Christmas mod
 
-The hub ships one mod, `xmas`. It adds:
+The hub ships two mods: `xmas`, below, and [`parchment-ink`](#the-parchment-ink-mod), a color theme. `xmas` adds:
 
 - A **Christmas** color theme in pine and cranberry, for dark and light mode.
 - Light snow over every tab. The snow falls faster while sessions work.
@@ -26,6 +26,24 @@ claude-code-hub ext install xmas
 Restart the hub. To use the colors, pick **Christmas** in the theme picker of any tool. The snow and the lights do not need the theme.
 
 The mod ships with the hub, so `ext install` clones nothing and does not ask, and the mod updates when the hub does. To take it off, run `claude-code-hub ext remove xmas` and restart the hub.
+
+## The Parchment Ink mod
+
+`parchment-ink` brings one color theme, **Parchment Ink**: warm parchment backgrounds with near-black ink in light mode, and parchment text on charcoal in dark mode. The accent is the ink color, so every tab reads in two tones. The mod has no CSS or JS, only the theme.
+
+<Shot src="shots/extensions/parchment-ink-light.webp" alt="The hub in light mode with the Parchment Ink theme: Kanban on parchment-colored panels with near-black text and an ink-colored accent" width={2880} height={1620} />
+
+<Shot src="shots/extensions/parchment-ink-dark.webp" alt="The hub in dark mode with the Parchment Ink theme: Kanban on charcoal panels with parchment-colored text" width={2880} height={1620} />
+
+### Install it
+
+```bash
+claude-code-hub ext install parchment-ink
+```
+
+Restart the hub, then pick **Parchment Ink** in the theme picker of any tool. To take it off, run `claude-code-hub ext remove parchment-ink` and restart the hub.
+
+`themes.json` cannot change a mod's theme. To change its colors, copy its palette from `extensions/parchment-ink/mod.json` in the hub package into a theme with a new id: see [Add a theme from scratch](/claude-code-hub/guides/themes/#add-a-theme-from-scratch).
 
 ## Turn mods off
 

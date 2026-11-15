@@ -1,0 +1,68 @@
+{
+  "manifest": 1,
+  "kind": "mod",
+  "id": "parchment-ink",
+  "title": "Parchment Ink",
+  "themes": [
+    {
+      "id": "parchment-ink",
+      "label": "Parchment Ink",
+      "light": {
+        "ember": "#211f1b",
+        "emberGlow": "#211f1b",
+        "emberDim": "rgba(33, 31, 27, 0.12)",
+        "field": "#dcd8c2",
+        "surface": "#e3dfcb",
+        "elevated": "#eae6d4",
+        "hover": "#d1cdb6",
+        "border": "#b3af99",
+        "ink1": "#211f1b",
+        "ink2": "#4d4b3f",
+        "ink3": "#5c5a4c",
+        "inkMuted": "#6e6b5b",
+        "sidebar": "#d4d0b9",
+        "sidebarItem": "#e6e2ce"
+      },
+      "dark": {
+        "ember": "#d1cdb7",
+        "emberGlow": "#d1cdb7",
+        "emberDim": "rgba(209, 205, 183, 0.18)",
+        "field": "#2f2d26",
+        "surface": "#36342c",
+        "elevated": "#3b3930",
+        "hover": "#45433a",
+        "border": "#4f4d45",
+        "ink1": "#d1cdb7",
+        "ink2": "#a8a593",
+        "ink3": "#9d9986",
+        "inkMuted": "#7f7c6c",
+        "sidebar": "#282620",
+        "sidebarItem": "#33312a"
+      }
+    }
+  ],
+  "targets": {},
+  "listing": {
+    "tagline": "A sepia parchment and charcoal ink color theme",
+    "description": "Warm parchment backgrounds with near-black ink in light mode, and parchment text on charcoal in dark mode. The accent is the ink color, so the whole hub reads in two tones. It is colors only, with no CSS or JS, so the install does not ask.",
+    "tags": [
+      "theme",
+      "mod"
+    ],
+    "screenshots": [
+      {
+        "url": "https://nikiforovall.blog/claude-code-hub/shots/extensions/parchment-ink-light.webp",
+        "alt": "The hub in light mode with the Parchment Ink theme: Kanban on parchment-colored panels with near-black text and an ink-colored accent",
+        "title": "Light mode",
+        "caption": "Parchment panels and ink text.",
+        "card": true
+      },
+      {
+        "url": "https://nikiforovall.blog/claude-code-hub/shots/extensions/parchment-ink-dark.webp",
+        "alt": "The hub in dark mode with the Parchment Ink theme: Kanban on charcoal panels with parchment-colored text",
+        "title": "Dark mode",
+        "caption": "Parchment text on charcoal."
+      }
+    ]
+  }
+}

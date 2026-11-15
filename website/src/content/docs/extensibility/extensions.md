@@ -241,7 +241,7 @@ Only the hub's own repository has features today: [Voice control](/claude-code-h
 
 ## Mods
 
-A mod adds CSS and JS to the hub page and the apps, and can bring color themes. Its folder holds a `mod.json`. `ext install` takes a mod in the same forms as an app. The hub ships one mod, `xmas`. Read [Mods](/claude-code-hub/extensibility/mods/).
+A mod adds CSS and JS to the hub page and the apps, and can bring color themes. Its folder holds a `mod.json`. `ext install` takes a mod in the same forms as an app. The hub ships two mods, `xmas` and `parchment-ink`. Read [Mods](/claude-code-hub/extensibility/mods/).
 
 ## Trust
 
