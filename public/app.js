@@ -423,12 +423,16 @@ function hideToast(toast) {
 
 // Null on success. A 409 with live terminals asks for force: true on the next call.
 // op is restart or stop.
-async function requestAppOp(id, op, force) {
+function requestAppOp(id, op, force) {
+  return requestForcible(`/api/apps/${encodeURIComponent(id)}/${op}`, force, apps[id]?.name ?? id, op);
+}
+
+// A 409 with a terminal count means the op would end live terminals; the caller asks for a second press.
+async function requestForcible(url, force, name, op) {
   try {
-    await sendJson('POST', `/api/apps/${encodeURIComponent(id)}/${op}`, { force });
+    await sendJson('POST', url, { force });
     return null;
   } catch (err) {
-    const name = apps[id]?.name ?? id;
     const n = err.status === 409 && err.data?.terminals;
     if (!n) return { message: `${name} did not ${op}: ${err.message}` };
     const them = n === 1 ? 'it' : 'them';
@@ -897,6 +901,7 @@ function runVoiceCommand({ text, command = {} }) {
 // `voice.dictate`, an action the hub handles itself: an app's mic gets the provider's text with no command.
 const DICTATE = 'voice.dictate';
 const HUB_UPDATES = 'hub.updates';
+const HUB_RESTART = 'hub.restart';
 // With the browser provider an app's mic runs its own browser speech, so the hub does not offer it.
 const hubDictates = () => voiceOn && !voiceInBrowser();
 const HUB_OWNED = {
@@ -905,6 +910,15 @@ const HUB_OWNED = {
     available: () => true,
     run: (_params, reply) => {
       openUpdate();
+      reply({ ok: true, handledBy: 'hub' });
+    },
+  },
+  // Runs in the launcher, so a refusal over live terminals asks there for a second Enter.
+  [HUB_RESTART]: {
+    available: () => true,
+    run: (_params, reply) => {
+      openPalette('app', `> ${HUB_COMMANDS.find((c) => c.id === HUB_RESTART).name}`);
+      restartHub();
       reply({ ok: true, handledBy: 'hub' });
     },
   },
@@ -1915,7 +1929,7 @@ function rowButton(className, glyph, key, title, label) {
 
 // The footer shows palette.message, set by an action, else the mode's hint.
 function drawPaletteHint() {
-  const content = palette.message ?? PALETTE_MODES[palette.mode].hint ?? '';
+  const content = palette.message ?? paletteView().spec.hint ?? '';
   document.getElementById('palette-hint').replaceChildren(...[].concat(content));
 }
 
@@ -1972,21 +1986,10 @@ const APP_OPS = {
 
 // The terminal provider answers 409 with a terminal count; the same key again on the same app sends force.
 async function appOpFromPalette(id, op) {
-  const confirm = `${op}\n${id}`;
-  const force = palette.confirmOp === confirm;
-  palette.confirmOp = null;
   const name = apps[id]?.name ?? id;
   setPaletteHint(`${APP_OPS[op].verb} ${name}…`);
-  const failed = await withPaletteBusy(() => requestAppOp(id, op, force));
-  if (failed?.terminals) {
-    palette.confirmOp = confirm;
-    setPaletteHint(`${failed.message} Press Ctrl+${APP_OPS[op].key} again to ${op}.`);
-    return;
-  }
-  if (failed) {
-    setPaletteHint(failed.message);
-    return;
-  }
+  const again = `Press Ctrl+${APP_OPS[op].key} again to ${op}.`;
+  if (!(await confirmableOp(`${op}\n${id}`, again, (force) => requestAppOp(id, op, force)))) return;
   if (iframes[id]) replaceIframe(id);
   if (op === 'stop') {
     if (palette.appStats) palette.appStats[id] = { ...palette.appStats[id], stopped: true, rss: 0 };
@@ -1996,6 +1999,41 @@ async function appOpFromPalette(id, op) {
   }
   closePalette();
   switchTab(id);
+}
+
+// The same press again, while confirmOp holds its key, sends force. True when the request went through.
+async function confirmableOp(key, again, request) {
+  const force = palette.confirmOp === key;
+  palette.confirmOp = null;
+  const failed = await withPaletteBusy(() => request(force));
+  if (failed?.terminals) palette.confirmOp = key;
+  if (failed) setPaletteHint(failed.terminals ? `${failed.message} ${again}` : failed.message);
+  return !failed;
+}
+
+const HUB_COMMANDS = [
+  {
+    id: HUB_RESTART,
+    name: 'Restart Hub',
+    detail: 'Stops every app and starts a new hub process',
+    icon: ROW_ICONS.restart,
+    run: restartHub,
+  },
+];
+
+async function restartHub() {
+  setPaletteHint('Restarting the hub…');
+  const request = (force) => requestForcible('/api/restart', force, 'The hub', 'restart');
+  if (await confirmableOp(HUB_RESTART, 'Press Enter again to restart.', request))
+    setPaletteHint('Restarting the hub. The page reloads when it is back.');
+}
+
+// In the app launcher, a query that starts with '>' lists HUB_COMMANDS, matched on the text after it.
+function paletteView() {
+  const typed = palette.query.trim();
+  if (palette.mode === 'app' && typed.startsWith('>'))
+    return { spec: PALETTE_MODES.command, typed: typed.slice(1).trimStart() };
+  return { spec: PALETTE_MODES[palette.mode], typed };
 }
 
 // `typed` is the trimmed query, `q` its lowercase form for matching.
@@ -2070,7 +2108,7 @@ const PALETTE_MODES = {
       const keys =
         row?.kind === 'item'
           ? itemKeys(row.item)
-          : 'Enter switch · Ctrl+C copy URL · Ctrl+R restart · Ctrl+S start/stop';
+          : 'Enter switch · Ctrl+C copy URL · Ctrl+R restart · Ctrl+S start/stop · > commands';
       if (!hubInfo.version) return keys;
       const plugin = hubInfo.plugin ? [pluginNode(hubInfo.plugin), ' · '] : [];
       return [`Hub ${hubInfo.version} · `, ...plugin, keys];
@@ -2123,6 +2161,17 @@ const PALETTE_MODES = {
       closePalette();
       switchTab(row.id);
     },
+  },
+  command: {
+    hint: 'Enter run',
+    empty: 'No matching command',
+    rows: (_typed, q) => HUB_COMMANDS.filter((c) => subseq(c.name.toLowerCase(), q)),
+    fillRow(li, row, q) {
+      const icon = el('span', 'palette-icon');
+      icon.append(lucideSvg(row.icon));
+      li.append(icon, markedSpan('name', row.name, q), el('span', 'url', row.detail));
+    },
+    commit: (row) => row.run(),
   },
 };
 
@@ -2964,8 +3013,7 @@ function bindSettings() {
 
 function renderPalette() {
   const list = document.getElementById('palette-list');
-  const spec = PALETTE_MODES[palette.mode];
-  const typed = palette.query.trim();
+  const { spec, typed } = paletteView();
   const q = typed.toLowerCase();
   const rows = spec.rows(typed, q);
   palette.rows = rows;
@@ -3006,23 +3054,23 @@ function togglePalette(mode) {
   else openPalette(mode);
 }
 
-function openPalette(mode) {
+function openPalette(mode, query = '') {
   const input = document.getElementById('palette-input');
   const spec = PALETTE_MODES[mode];
   palette.open = true;
   palette.mode = mode;
-  palette.query = '';
+  palette.query = query;
   palette.sel = null;
   palette.confirmOp = null;
   palette.message = null;
-  input.value = '';
+  input.value = query;
   input.placeholder = spec.placeholder;
   document.querySelector('#palette .palette-box').setAttribute('aria-label', spec.label);
   showOverlay('palette', closePalette);
   renderPalette();
   input.focus();
   // Stale-while-revalidate: the cached list renders instantly, recency refreshes when this lands.
-  Promise.resolve(spec.load?.())
+  Promise.resolve(paletteView().spec.load?.())
     .then(() => {
       if (!palette.open || palette.mode !== mode) return;
       renderPalette();
@@ -3071,7 +3119,7 @@ function movePaletteSel(delta) {
 
 async function commitPalette() {
   const row = palette.rows[palette.sel];
-  if (row) await PALETTE_MODES[palette.mode].commit(row);
+  if (row) await paletteView().spec.commit(row);
 }
 
 async function commitProject(row) {
@@ -3195,7 +3243,7 @@ function bindPalette() {
       !e.metaKey &&
       ['c', 'd', 'r', 's'].includes(e.key.toLowerCase())
     ) {
-      const run = PALETTE_MODES[palette.mode].rowKeys?.[e.key.toLowerCase()];
+      const run = paletteView().spec.rowKeys?.[e.key.toLowerCase()];
       // Ctrl+C with text selected in the input keeps the browser's copy.
       if (e.key.toLowerCase() === 'c' && (!run || input.selectionStart !== input.selectionEnd)) return;
       // Ctrl+D would otherwise bookmark the page in Chrome and Firefox.
@@ -3210,7 +3258,7 @@ function bindPalette() {
     const li = e.target.closest('.palette-row');
     if (btn) {
       e.stopPropagation();
-      PALETTE_MODES[palette.mode].rowKeys[btn.dataset.rowKey](palette.rows[Number(li.dataset.idx)]);
+      paletteView().spec.rowKeys[btn.dataset.rowKey](palette.rows[Number(li.dataset.idx)]);
       document.getElementById('palette-input').focus();
       return;
     }

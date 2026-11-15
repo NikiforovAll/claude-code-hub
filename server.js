@@ -347,6 +347,7 @@ function spawnApp(pool, name, cmd, args) {
     cwd: __dirname,
     env: childEnv(pool, name),
     stdio: ['ignore', 'pipe', 'pipe', 'ipc'],
+    windowsHide: true,
   });
 
   let stdoutBuf = '';
@@ -474,6 +475,19 @@ async function ensurePool(dir) {
   return pool.ready;
 }
 
+// Per pool, in order; zeros when the terminal is off.
+function liveTerminals(poolList) {
+  return TERMINAL.enabled ? Promise.all(poolList.map(terminalCount)) : Promise.resolve(poolList.map(() => 0));
+}
+
+// Ending live terminals takes force: true. Without it, answers 409 with the count and returns true.
+async function refuseLiveTerminals(req, res, poolList, error) {
+  if (req.body?.force === true) return false;
+  const terminals = (await liveTerminals(poolList)).reduce((a, b) => a + b, 0);
+  if (terminals) res.status(409).json({ error, terminals });
+  return terminals > 0;
+}
+
 async function terminalCount(pool) {
   const port = pool.ports[TERMINAL_APP.id];
   if (!port) return 0;
@@ -490,12 +504,9 @@ async function terminalCount(pool) {
 // A pool whose cck holds live terminals is pinned: killing it would kill running claude sessions.
 // When every candidate is pinned the pool size is exceeded rather than losing work.
 async function evictPools(keepDir) {
-  let pinned = new Set();
-  if (TERMINAL.enabled) {
-    const candidates = [...pools.values()].filter((p) => p.dir !== keepDir);
-    const counts = await Promise.all(candidates.map(terminalCount));
-    pinned = new Set(candidates.filter((_, i) => counts[i]).map((p) => p.dir));
-  }
+  const candidates = [...pools.values()].filter((p) => p.dir !== keepDir);
+  const counts = await liveTerminals(candidates);
+  const pinned = new Set(candidates.filter((_, i) => counts[i]).map((p) => p.dir));
   while (pools.size >= currentPoolSize()) {
     const victim = [...pools.keys()].find((d) => d !== keepDir && !pinned.has(d));
     if (!victim) {
@@ -1416,13 +1427,8 @@ app.post('/api/apps/:id/:op(restart|start|stop)', async (req, res) => {
   }
   restarting.add(key);
   try {
-    if (TERMINAL.enabled && id === TERMINAL_APP.id && req.body?.force !== true) {
-      const terminals = await terminalCount(pool);
-      if (terminals) {
-        res.status(409).json({ error: `${target.name} has live terminals`, terminals });
-        return;
-      }
-    }
+    if (id === TERMINAL_APP?.id && (await refuseLiveTerminals(req, res, [pool], `${target.name} has live terminals`)))
+      return;
     console.log(`[${id}] ${op} asked for by the hub page`);
     if (op === 'stop') {
       await stopApp(pool, target);
@@ -1552,6 +1558,47 @@ app.post('/api/shutdown', (_req, res) => {
   res.json({ ok: true });
 });
 
+// The new hub starts first and waits for this pid to exit, so it gets the same ports.
+app.post('/api/restart', async (req, res) => {
+  if (shuttingDown) return res.status(409).json({ error: 'The hub is already stopping' });
+  if (await refuseLiveTerminals(req, res, [...pools.values()], 'The hub has live terminals')) return;
+  const args = process.argv.slice(1).filter((a) => a !== '--open');
+  if (!args.includes('--detached')) args.push('--detached');
+  let child;
+  try {
+    // Detached, or libuv's job object kills it with this process on Windows. A detached hub has no
+    // console, so every console program it starts must pass windowsHide or it opens a window.
+    child = spawn(process.execPath, [...process.execArgv, ...args], {
+      detached: true,
+      stdio: restartStdio(),
+      windowsHide: true,
+      env: { ...process.env, CLAUDE_HUB_RESTART_PID: String(process.pid) },
+    });
+  } catch (err) {
+    return res.status(500).json({ error: err.message });
+  }
+  child.unref();
+  console.log(`Restart asked for over the API; the new hub is pid ${child.pid}`);
+  // The tray polls hub.json for a live pid: with no record in the gap, it would say the hub stopped.
+  writeRecord(HUB_DIR, hubPort, child.pid);
+  res.on('finish', shutdown);
+  res.json({ ok: true });
+});
+
+// The new hub cannot write to the terminal that started this one. Under the tray, stdout is already
+// hub.log through the tray's cmd redirect, which locks the file, so the new hub inherits that handle.
+function restartStdio() {
+  try {
+    if (fs.fstatSync(1).isFile()) return ['ignore', 'inherit', 'inherit'];
+  } catch {}
+  try {
+    const out = fs.openSync(path.join(HUB_DIR, 'hub.log'), 'a');
+    return ['ignore', out, out];
+  } catch {
+    return 'ignore';
+  }
+}
+
 // List-picked project paths skip this: they are byte-exact copies of what kanban reported.
 app.get('/api/resolve-path', (req, res) => {
   res.setHeader('Cache-Control', 'no-store');
@@ -1601,21 +1648,38 @@ const onReady = (actual) => {
 
 // One hub per hub dir: a second one would overwrite hub.json, and the first would run unseen.
 // A tray flag's command is still running here and exits on its own.
-if (!TRAY_FLAG) {
-  liveHub(HUB_DIR, HUB_TOKEN).then((running) => {
-    if (!running) {
-      if (!process.argv.includes('--detached')) watchStdin();
-      listenProxies();
-      listenWithFallback(app, HUB_PORT, onReady, '');
+async function waitForExit(pid, ms = 15_000) {
+  if (!pid) return;
+  const end = Date.now() + ms;
+  while (Date.now() < end) {
+    try {
+      process.kill(pid, 0);
+    } catch {
       return;
     }
-    printUrl(`Claude Code Hub already runs for ${HUB_DIR} at`, running.port);
-    if (process.argv.includes('--open')) {
-      import('open').then((m) => m.default(accessUrl(running.port))).finally(() => process.exit(0));
-    } else {
-      process.exit(0);
-    }
-  });
+    await new Promise((r) => setTimeout(r, 100));
+  }
+}
+
+if (!TRAY_FLAG) {
+  const restartedFrom = Number(process.env.CLAUDE_HUB_RESTART_PID);
+  delete process.env.CLAUDE_HUB_RESTART_PID;
+  waitForExit(restartedFrom)
+    .then(() => liveHub(HUB_DIR, HUB_TOKEN))
+    .then((running) => {
+      if (!running) {
+        if (!process.argv.includes('--detached')) watchStdin();
+        listenProxies();
+        listenWithFallback(app, HUB_PORT, onReady, '');
+        return;
+      }
+      printUrl(`Claude Code Hub already runs for ${HUB_DIR} at`, running.port);
+      if (process.argv.includes('--open')) {
+        import('open').then((m) => m.default(accessUrl(running.port))).finally(() => process.exit(0));
+      } else {
+        process.exit(0);
+      }
+    });
 }
 
 function accessUrl(port) {

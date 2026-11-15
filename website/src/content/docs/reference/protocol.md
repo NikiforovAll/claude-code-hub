@@ -240,7 +240,7 @@ An action is a request with exactly one handler, for example `session.cost`: "sh
 
 ### Names
 
-`<noun>.<verb or view>`, lowercase: `session.cost`, `project.plugins`, `project.memory`. An app-specific name uses the app id as its prefix, for example `cost.refresh`. `hub.*` is reserved for the hub's own actions. The hub handles `hub.updates`, with no params: it opens the update window, which updates the plugins in every config dir, and answers `{ok: true, handledBy: 'hub'}`. The hub skips an app handler with a `hub.*` name, with a log line.
+`<noun>.<verb or view>`, lowercase: `session.cost`, `project.plugins`, `project.memory`. An app-specific name uses the app id as its prefix, for example `cost.refresh`. `hub.*` is reserved for the hub's own actions. The hub handles `hub.updates`, with no params: it opens the update window, which updates the plugins in every config dir, and answers `{ok: true, handledBy: 'hub'}`. It handles `hub.restart`, with no params, the same way: it opens the app launcher on **Restart Hub** and restarts the hub process. With live terminals it waits there for a second Enter. The hub skips an app handler with a `hub.*` name, with a log line.
 
 ### Declaration
 
