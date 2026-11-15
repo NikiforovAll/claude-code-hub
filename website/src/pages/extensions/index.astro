@@ -4,6 +4,10 @@ import { url } from '../../kit/family';
 import { loadExtensions, onSite } from '../../extensions/load';
 
 const extensions = await loadExtensions();
+const sections = [
+  { id: 'tools', title: null, items: extensions.filter((x) => !x.theme) },
+  { id: 'themes', title: 'Themes', items: extensions.filter((x) => x.theme) },
+].filter((s) => s.items.length > 0);
 ---
 
 <Shell
@@ -20,40 +24,48 @@ const extensions = await loadExtensions();
     </p>
   </section>
 
-  <ul class="grid">
-    {
-      extensions.map((x) => (
-        <li class="card">
-          <a class="card-link" href={url(`extensions/${x.id}/`)}>
-            <span class="preview">
-              {x.card ? (
-                <img src={onSite(x.card)} alt="" loading="lazy" decoding="async" />
-              ) : (
-                <span class="no-shot" aria-hidden="true">{x.name}</span>
-              )}
-            </span>
-            <span class="title">
-              <span class="name">{x.name}</span>
-              {x.official && <span class="badge">Official</span>}
-              {x.kind === 'addon' && <span class="badge">Add-on</span>}
-              {x.kind === 'feature' && <span class="badge">Feature</span>}
-              {x.kind === 'mod' && <span class="badge">Mod</span>}
-            </span>
-            <span class="tagline">{x.tagline}</span>
-            {x.tags.length > 0 && (
-              <span class="tags">
-                {x.tags.map((t) => <span class="tag">{t}</span>)}
-              </span>
-            )}
-          </a>
-          <div class="install">
-            <code>{x.install}</code>
-            <button type="button" data-copy={x.install} aria-label={`Copy the install command for ${x.name}`}>Copy</button>
-          </div>
-        </li>
-      ))
-    }
-  </ul>
+  {
+    sections.map((section) => (
+      <section aria-labelledby={section.title ? section.id : undefined}>
+        {section.title && <h2 id={section.id}>{section.title}</h2>}
+        <ul class="grid">
+          {
+            section.items.map((x) => (
+              <li class="card">
+                <a class="card-link" href={url(`extensions/${x.id}/`)}>
+                  <span class="preview">
+                    {x.card ? (
+                      <img src={onSite(x.card)} alt="" loading="lazy" decoding="async" />
+                    ) : (
+                      <span class="no-shot" aria-hidden="true">{x.name}</span>
+                    )}
+                  </span>
+                  <span class="title">
+                    <span class="name">{x.name}</span>
+                    {x.official && <span class="badge">Official</span>}
+                    {x.kind === 'addon' && <span class="badge">Add-on</span>}
+                    {x.kind === 'feature' && <span class="badge">Feature</span>}
+                    {x.kind === 'mod' && <span class="badge">Mod</span>}
+                    {x.theme && <span class="badge">Theme</span>}
+                  </span>
+                  <span class="tagline">{x.tagline}</span>
+                  {x.tags.length > 0 && (
+                    <span class="tags">
+                      {x.tags.map((t) => <span class="tag">{t}</span>)}
+                    </span>
+                  )}
+                </a>
+                <div class="install">
+                  <code>{x.install}</code>
+                  <button type="button" data-copy={x.install} aria-label={`Copy the install command for ${x.name}`}>Copy</button>
+                </div>
+              </li>
+            ))
+          }
+        </ul>
+      </section>
+    ))
+  }
 </Shell>
 
 <script>
@@ -83,6 +95,14 @@ const extensions = await loadExtensions();
     margin: 1.25rem 0 0;
     font-size: 1.125rem;
     color: var(--c-ink2);
+  }
+  h2 {
+    margin: clamp(3rem, 7vw, 5rem) 0 0;
+    font: 600 clamp(1.75rem, 4vw, 2.5rem) / 1.1 var(--font-display);
+    letter-spacing: -0.02em;
+  }
+  h2 + .grid {
+    margin-top: 1.25rem;
   }
   .grid {
     margin: clamp(2rem, 5vw, 3.5rem) 0 0;

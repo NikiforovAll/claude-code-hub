@@ -56,6 +56,7 @@ const ld = {
       {addon && <span class="badge">Add-on</span>}
       {feature && <span class="badge">Feature</span>}
       {mod && <span class="badge">Mod</span>}
+      {x.theme && <span class="badge">Theme</span>}
     </h1>
     <p class="lede">{x.tagline}</p>
     {x.description && <p class="description">{x.description}</p>}
@@ -74,29 +75,52 @@ const ld = {
       <pre><code>{x.install}</code></pre>
       {
         feature ? (
-          <p>
-            The hub ships the code of a feature, so nothing is cloned. <code>ext install</code> checks that {tools.map((t) => t.name).join(' and ') || 'the hub can run it'} {tools.length ? 'is installed' : ''} and turns {x.name.toLowerCase()} on in the hub's <code>config.json</code>.
-            Restart the hub.{' '}
-            {x.homepage && <a href={x.homepage}>Read the guide</a>}
-          </p>
+          <>
+            <p class="next">Restart the hub after the install.</p>
+            <details>
+              <summary>How the install works</summary>
+              <p>
+                The hub ships the code of a feature, so nothing is cloned. <code>ext install</code> checks that {tools.map((t) => t.name).join(' and ') || 'the hub can run it'} {tools.length ? 'is installed' : ''} and turns {x.name.toLowerCase()} on in the hub's <code>config.json</code>.{' '}
+                {x.homepage && <a href={x.homepage}>Read the guide</a>}
+              </p>
+            </details>
+          </>
         ) : mod ? (
-          <p>
-            <code>ext install</code> finds {x.id} in the mods the hub ships, else in this registry, and adds it to the hub's <code>config.json</code>.
-            A mod from GitHub with JS says where its JS runs and asks <code>y/N</code> first; a mod the hub ships does not ask. Restart the hub. <code>/?nomods</code> opens the hub without mods once.{' '}
-            <a href={url('extensibility/mods/')}>Read how mods work</a>.
-          </p>
+          <>
+            <p class="next">Restart the hub after the install{x.theme && <>, then pick the theme in the theme picker of any tool</>}.</p>
+            <details>
+              <summary>How the install works</summary>
+              <p>
+                <code>ext install</code> finds {x.id} in the mods the hub ships, else in this registry, and adds it to the hub's <code>config.json</code>.
+                A mod the hub ships does not ask. A mod from GitHub with JS says where its JS runs and asks <code>y/N</code> first.
+                To open the hub once without mods, add <code>/?nomods</code> to its URL.{' '}
+                <a href={url('extensibility/mods/')}>Read how mods work</a>.
+              </p>
+            </details>
+          </>
         ) : addon ? (
-          <p>
-            <code>ext install</code> finds {x.id} in this registry, clones it into the hub dir with git and puts it on the Kanban dock of your Claude config dir.
-            An add-on with a server says so and asks <code>y/N</code> first. No restart is needed: every session shows it, and Kanban starts its server the first time you open it from the dock rail.{' '}
-            <a href={url('extensibility/extensions/#add-ons')}>Read how add-ons work</a>.
-          </p>
+          <>
+            <p class="next">No restart is needed. Open it from the dock rail beside Kanban's terminal.</p>
+            <details>
+              <summary>How the install works</summary>
+              <p>
+                <code>ext install</code> finds {x.id} in this registry, clones it into the hub dir with git and puts it on the Kanban dock of your Claude config dir.
+                An add-on with a server says so and asks <code>y/N</code> first. Kanban starts its server the first time you open it.{' '}
+                <a href={url('extensibility/extensions/#add-ons')}>Read how add-ons work</a>.
+              </p>
+            </details>
+          </>
         ) : (
-          <p>
-            <code>ext install</code> finds {x.id} in this registry and clones it into the hub dir with git{x.plugin && <> and installs the {x.plugin} plugin in your Claude config dir</>}.
-            It says what runs (the app's server{x.plugin && <> and the plugin's hooks in your sessions</>}) and asks <code>y/N</code> first.
-            Restart the hub, and the app gets the next tab.
-          </p>
+          <>
+            <p class="next">Restart the hub after the install. The app gets the next tab.</p>
+            <details>
+              <summary>How the install works</summary>
+              <p>
+                <code>ext install</code> finds {x.id} in this registry and clones it into the hub dir with git{x.plugin && <> and installs the {x.plugin} plugin in your Claude config dir</>}.
+                It says what runs (the app's server{x.plugin && <> and the plugin's hooks in your sessions</>}) and asks <code>y/N</code> first.
+              </p>
+            </details>
+          </>
         )
       }
     </section>
@@ -249,6 +273,25 @@ const ld = {
     margin: 0;
     color: var(--c-ink2);
     font-size: 0.9375rem;
+  }
+  .body p.next {
+    color: var(--c-ink1);
+  }
+  details {
+    margin-top: 0.75rem;
+  }
+  summary {
+    width: fit-content;
+    cursor: pointer;
+    font: 500 0.8125rem/1.65 var(--font-mono);
+    color: var(--c-ink3);
+  }
+  summary:hover,
+  details[open] summary {
+    color: var(--c-ink2);
+  }
+  details p {
+    margin-top: 0.5rem !important;
   }
   dl {
     margin: 0;

@@ -20,6 +20,7 @@ export interface Extension {
   name: string;
   kind: 'app' | 'addon' | 'feature' | 'mod';
   official: boolean;
+  theme: boolean;
   order: number;
   tagline: string;
   description?: string;
@@ -137,6 +138,7 @@ async function loadOne(file: string, local: Map<string, string>): Promise<Extens
     name: (kind === 'app' ? manifest.name : manifest.title) ?? id,
     kind,
     official: entry.official === true,
+    theme: kind === 'mod' && Array.isArray(manifest.themes) && manifest.themes.length > 0,
     order: typeof entry.order === 'number' ? entry.order : Number.MAX_SAFE_INTEGER,
     tagline: listing.tagline,
     description: listing.description,
