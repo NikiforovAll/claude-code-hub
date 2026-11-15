@@ -107,7 +107,7 @@ The page and the tools talk with `postMessage`. The hub accepts a message only f
 | `hub:keydown` | Tool to hub | A hub key pressed inside the tool |
 | `hub:theme` | Tool to hub | The user changed the theme in the tool |
 | `hub:active` | Hub to tool | Whether the tool is on screen. A hidden iframe cannot tell by itself. Cost uses it to pause auto-refresh. |
-| `hub:closeGuard` | Tool to hub | Ask before the window closes. Kanban sets it while a terminal is attached. |
+| `hub:closeGuard` | Tool to hub | Do not reload the tool to route an action. Kanban sets it while a terminal is attached. |
 | `hub:terminalToken` | Both | Kanban asks for the current terminal token after a hub restart, and the hub answers |
 | `hub:openExternal` | Tool to hub | Open an external link from the top window |
 

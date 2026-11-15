@@ -10,6 +10,7 @@ let previousApp = null;
 const iframes = {};
 const loadedApps = new Set();
 const guardedApps = new Set();
+let closeAllowed = false;
 // App id → the topics its hub:hello subscribes to. An app is live from its hello until the next
 // iframe load: e.source is the same WindowProxy across reloads, so a new document starts unknown.
 const liveApps = new Map();
@@ -1031,7 +1032,7 @@ async function endCancelledHold() {
 
 function bindErrorToast() {
   document.getElementById('error-close').addEventListener('click', hideErrorToast);
-  document.getElementById('error-reload').addEventListener('click', () => location.reload());
+  document.getElementById('error-reload').addEventListener('click', reloadHub);
 }
 
 // The hub has no visible chrome, so the window/tab title is the only place the active config dir
@@ -1391,8 +1392,9 @@ function onInvoke({ id, action, params = {}, open }, send) {
 }
 
 function listenMessages() {
+  // Chrome keeps Ctrl+W from the page, so the close prompt is the only way to stop it.
   window.addEventListener('beforeunload', (e) => {
-    if (guardedApps.size) e.preventDefault();
+    if (!closeAllowed) e.preventDefault();
   });
   window.addEventListener('message', (e) => {
     const appId = appIdOf(e.source);
@@ -1552,10 +1554,10 @@ function hubActions() {
   ];
 }
 
-// The close guard is for Ctrl+W. A reload keeps the apps' terminals, and after a hub restart they
-// are gone, so neither needs the prompt.
+// A reload keeps the apps' terminals, and after a hub restart they are gone, so neither needs the
+// close prompt.
 function reloadHub() {
-  guardedApps.clear();
+  closeAllowed = true;
   location.reload();
 }
 

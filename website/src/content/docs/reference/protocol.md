@@ -395,7 +395,7 @@ v0 (`hub:project`, `hub:keys`, hub → app `hub:theme`, `hub:navigate`, `hub:key
 | Direction | Type | Payload | Meaning |
 |---|---|---|---|
 | Hub → app | `hub:active` | `{active: boolean}` | Whether this app is the tab on screen. Sent after `welcome` and on each tab switch. An app cannot find this itself: a hidden iframe is `display: none`, and `visibilityState` follows the top window |
-| App → hub | `hub:closeGuard` | `{on: boolean}` | While any app has it on, the hub asks before the window closes. Cleared when the app document loads again |
+| App → hub | `hub:closeGuard` | `{on: boolean}` | While the app has it on, the hub does not reload it to route an action. Cleared when the app document loads again |
 | App → hub | `hub:openExternal` | `{url}` | The hub opens an `http` or `https` URL in a new window |
 | App → hub | `hub:terminalToken` | `{}` | The `terminal` provider asks for a fresh token |
 | Hub → app | `hub:terminalToken` | `{token}` | The answer. Sent only to the `terminal` provider |

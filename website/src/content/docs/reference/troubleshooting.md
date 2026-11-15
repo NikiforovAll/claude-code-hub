@@ -51,7 +51,7 @@ The palette gets the project list from Kanban. While Kanban starts, the list can
 
 ## The window asks before it closes
 
-A Kanban terminal is attached. The prompt stops <kbd>Ctrl+W</kbd>, meant for the terminal, from closing the hub. Confirm to close, or end the terminal first. See [Embedded terminal](/claude-code-hub/guides/terminal/).
+The hub always asks. The prompt stops <kbd>Ctrl+W</kbd> from closing the hub by mistake. Confirm to close. To reload without the prompt, press <kbd>Ctrl+Shift+R</kbd>. See [Embedded terminal](/claude-code-hub/guides/terminal/).
 
 ## Switching the config dir is slow
 
