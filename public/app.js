@@ -79,9 +79,21 @@ function loadThemeState() {
 // An id the registry lacks shows as Ember everywhere, so the hub page and every app agree.
 const DEFAULT_COLOR_THEME = 'ember';
 
-function activeColorTheme() {
+// The theme under the theme picker's cursor: shown in every app but not saved. Null outside the picker.
+let previewTheme = null;
+
+function savedColorTheme() {
   const id = themeState.colorThemes[activeConfigDir] ?? themeState.colorTheme;
   return id && hubThemes.length && !themeVars[id] ? DEFAULT_COLOR_THEME : id;
+}
+
+function activeColorTheme() {
+  return previewTheme ?? savedColorTheme();
+}
+
+// The theme every app shows when none was ever picked.
+function shownColorTheme() {
+  return savedColorTheme() ?? DEFAULT_COLOR_THEME;
 }
 
 function osTheme() {
@@ -143,11 +155,10 @@ function applyHubTheme() {
   const core = themeVars[theme]?.[mode];
   let vars = core && Object.fromEntries(Object.entries(HUB_VARS).map(([hub, name]) => [hub, core[name]]));
   try {
-    if (vars) localStorage.setItem(PALETTE_KEY, JSON.stringify({ key, vars }));
-    else {
+    if (!vars) {
       const cached = JSON.parse(localStorage.getItem(PALETTE_KEY));
       if (cached?.key === key) vars = cached.vars;
-    }
+    } else if (previewTheme === null) localStorage.setItem(PALETTE_KEY, JSON.stringify({ key, vars }));
   } catch {}
   root.style.cssText = '';
   for (const [name, value] of Object.entries(vars ?? {})) root.style.setProperty(name, value);
@@ -1463,18 +1474,42 @@ function onThemeMessage(data) {
   // colorTheme is optional and sticky.
   if (data.theme !== 'light' && data.theme !== 'dark') return;
   const hasColor = typeof data.colorTheme === 'string' && /^[a-z0-9-]{0,32}$/.test(data.colorTheme);
-  const changed = data.theme !== themeState.theme || (hasColor && data.colorTheme !== activeColorTheme());
+  const changed = data.theme !== themeState.theme || (hasColor && data.colorTheme !== savedColorTheme());
   if (!changed) return;
-  themeState.theme = data.theme;
-  if (hasColor) {
-    themeState.colorTheme = data.colorTheme;
-    if (activeConfigDir) themeState.colorThemes[activeConfigDir] = data.colorTheme;
+  storeTheme(data.theme, hasColor ? data.colorTheme : undefined);
+}
+
+function storeTheme(theme, colorTheme) {
+  themeState.theme = theme;
+  if (colorTheme !== undefined) {
+    themeState.colorTheme = colorTheme;
+    if (activeConfigDir) themeState.colorThemes[activeConfigDir] = colorTheme;
   }
   localStorage.setItem('hub-theme', JSON.stringify(themeState));
+  broadcastTheme();
+}
+
+// A re-theme restyles a whole app (Cost re-renders its charts), so while the cursor moves only the
+// hub page and the app on screen follow it; the end of the preview sends the theme to every app.
+function previewColorTheme(id) {
+  const before = activeColorTheme();
+  previewTheme = id ?? null;
+  if (activeColorTheme() === before) return;
+  if (previewTheme === null) {
+    broadcastTheme();
+    return;
+  }
   applyHubTheme();
-  // The sender gets the echo too, for the vars.
-  for (const id of Object.keys(iframes)) sendTheme(id);
   const payload = themeEvent();
+  if (activeApp) sendTopic(activeApp, 'theme.changed', payload);
+  for (const win of nestedApps.keys()) sendNestedTheme(win, payload);
+}
+
+function broadcastTheme() {
+  applyHubTheme();
+  const payload = themeEvent();
+  // The sender gets the echo too, for the vars.
+  for (const id of Object.keys(iframes)) sendTopic(id, 'theme.changed', payload);
   for (const win of nestedApps.keys()) sendNestedTheme(win, payload);
 }
 
@@ -1808,6 +1843,18 @@ const ROW_ICONS = {
   ],
   start: [['polygon', { points: '6 3 20 12 6 21 6 3' }]],
   stop: [['rect', { width: 18, height: 18, x: 3, y: 3, rx: 2 }]],
+  palette: [
+    ['circle', { cx: 13.5, cy: 6.5, r: 0.5, fill: 'currentColor' }],
+    ['circle', { cx: 17.5, cy: 10.5, r: 0.5, fill: 'currentColor' }],
+    ['circle', { cx: 8.5, cy: 7.5, r: 0.5, fill: 'currentColor' }],
+    ['circle', { cx: 6.5, cy: 12.5, r: 0.5, fill: 'currentColor' }],
+    [
+      'path',
+      {
+        d: 'M12 2C6.5 2 2 6.5 2 12s4.5 10 10 10c.926 0 1.648-.746 1.648-1.688 0-.437-.18-.835-.437-1.125-.29-.289-.438-.652-.438-1.125a1.64 1.64 0 0 1 1.668-1.668h1.996c3.051 0 5.555-2.503 5.555-5.554C21.965 6.012 17.461 2 11.994 2z',
+      },
+    ],
+  ],
 };
 
 const SVG_NS = 'http://www.w3.org/2000/svg';
@@ -2019,6 +2066,13 @@ const HUB_COMMANDS = [
     icon: ROW_ICONS.restart,
     run: restartHub,
   },
+  {
+    id: 'hub.colorTheme',
+    name: 'Color theme',
+    detail: 'Previews each theme as you move',
+    icon: ROW_ICONS.palette,
+    run: () => openPalette('theme'),
+  },
 ];
 
 async function restartHub() {
@@ -2101,7 +2155,7 @@ const PALETTE_MODES = {
     commit: commitConfigDir,
   },
   app: {
-    placeholder: 'Search apps...',
+    placeholder: 'Search apps, or type > for commands...',
     label: 'Switch app',
     get hint() {
       const row = palette.rows?.[palette.sel];
@@ -2172,6 +2226,35 @@ const PALETTE_MODES = {
       li.append(icon, markedSpan('name', row.name, q), el('span', 'url', row.detail));
     },
     commit: (row) => row.run(),
+  },
+  theme: {
+    placeholder: 'Search color themes...',
+    label: 'Color theme',
+    hint: '↑↓ preview · Enter keep · Esc cancel',
+    empty: 'No matching theme',
+    rows: (_typed, q) => hubThemes.filter((t) => subseq(t.label.toLowerCase(), q)),
+    initialSel(rows) {
+      return Math.max(
+        0,
+        rows.findIndex((r) => r.id === shownColorTheme()),
+      );
+    },
+    preview: (row) => previewColorTheme(row?.id),
+    leave: () => previewColorTheme(null),
+    fillRow(li, row, q) {
+      const sw = row.swatch?.[themePayload().theme];
+      const chip = el('span', 'palette-swatch');
+      if (sw) {
+        chip.style.background = `linear-gradient(135deg, ${sw.bg} 55%, ${sw.accent} 55%)`;
+        chip.style.borderColor = sw.border;
+      }
+      li.append(chip, markedSpan('name', row.label, q));
+      if (row.id === shownColorTheme()) li.append(el('span', 'age', 'current'));
+    },
+    commit(row) {
+      storeTheme(themeState.theme, row.id);
+      closePalette();
+    },
   },
 };
 
@@ -3020,6 +3103,7 @@ function renderPalette() {
   // sel is null until the first render that has rows: the cached list may be empty until load() lands.
   if (palette.sel === null && rows.length > 0) palette.sel = spec.initialSel?.(rows) ?? 0;
   palette.sel = Math.min(palette.sel, Math.max(0, rows.length - 1));
+  spec.preview?.(rows[palette.sel]);
   drawPaletteHint();
   if (rows.length === 0) {
     list.replaceChildren(el('li', 'palette-empty', spec.empty));
@@ -3057,6 +3141,7 @@ function togglePalette(mode) {
 function openPalette(mode, query = '') {
   const input = document.getElementById('palette-input');
   const spec = PALETTE_MODES[mode];
+  if (palette.open) paletteView().spec.leave?.();
   palette.open = true;
   palette.mode = mode;
   palette.query = query;
@@ -3082,6 +3167,7 @@ function openPalette(mode, query = '') {
 }
 
 function closePalette() {
+  paletteView().spec.leave?.();
   palette.open = false;
   hideOverlay('palette');
 }

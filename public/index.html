@@ -49,6 +49,11 @@
 
     * { margin: 0; padding: 0; box-sizing: border-box; }
 
+    ::-webkit-scrollbar { width: 6px; height: 6px; }
+    ::-webkit-scrollbar-track { background: transparent; }
+    ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+    ::-webkit-scrollbar-thumb:hover { background: var(--text-dim); }
+
     body {
       background: var(--bg);
       height: 100vh;
@@ -356,6 +361,15 @@
 
     .palette-row.selected .palette-icon { color: var(--accent); }
 
+    .palette-row .palette-swatch {
+      flex: none;
+      align-self: center;
+      width: 16px;
+      height: 16px;
+      border: 1px solid var(--border);
+      border-radius: 4px;
+    }
+
     .palette-row .palette-btn {
       display: inline-flex;
       align-items: center;
@@ -416,6 +430,7 @@
     .settings-bar kbd { margin-left: auto; }
 
     #settings .palette-box { width: min(820px, 94vw); }
+    #palette .palette-box { width: min(860px, 92vw); }
     #settings-body:has(> .set-nav) { display: grid; grid-template-columns: 150px 1fr; min-height: 360px; }
 
     .set-nav {
