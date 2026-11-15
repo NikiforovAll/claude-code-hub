@@ -49,6 +49,7 @@ function loadHubKeys({
     togglePalette: (mode) =>
       ran.push({ project: 'hub.projectPicker', configDir: 'hub.configDirPicker', app: 'hub.appLauncher' }[mode]),
     toggleSettings: () => ran.push('hub.settings'),
+    reloadHub: () => ran.push('hub.reload'),
     swapConfigDir: () => ran.push('hub.configDirPicker:swap'),
     cycleTab: (delta) => ran.push(delta < 0 ? 'hub.prevApp' : 'hub.nextApp'),
     switchTab: (id) => ran.push(`hub.appByNumber:${ctx.k.tabIds().indexOf(id) + 1}`),

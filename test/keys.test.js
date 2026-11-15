@@ -15,9 +15,17 @@ const PALETTE_AND_ARROWS = [
 
 describe('hub keymap', () => {
   it('forwards the default combos, in this order', () => {
-    assert.deepEqual(Object.keys(loadHubKeys().bindings()), [...PALETTE_AND_ARROWS, 'alt+1', 'alt+2', 'alt+3', 'alt+4']);
+    assert.deepEqual(Object.keys(loadHubKeys().bindings()), [
+      ...PALETTE_AND_ARROWS,
+      'ctrl+shift+r',
+      'alt+1',
+      'alt+2',
+      'alt+3',
+      'alt+4',
+    ]);
     assert.deepEqual(Object.keys(loadHubKeys({ platform: 'mac' }).bindings()), [
       ...PALETTE_AND_ARROWS,
+      'shift+meta+r',
       'ctrl+alt+1',
       'ctrl+alt+2',
       'ctrl+alt+3',
@@ -52,8 +60,18 @@ describe('hub keymap', () => {
       ['hub.prevApp', 'ctrl+alt+ArrowLeft'],
       ['hub.nextApp', 'ctrl+alt+ArrowRight'],
     ];
-    assert.deepEqual(ids('win'), [...fixed, ['hub.appByNumber', 'alt+1'], ['hub.appByNumber', 'alt+2']]);
-    assert.deepEqual(ids('mac'), [...fixed, ['hub.appByNumber', 'ctrl+alt+1'], ['hub.appByNumber', 'ctrl+alt+2']]);
+    assert.deepEqual(ids('win'), [
+      ...fixed,
+      ['hub.reload', 'ctrl+shift+r'],
+      ['hub.appByNumber', 'alt+1'],
+      ['hub.appByNumber', 'alt+2'],
+    ]);
+    assert.deepEqual(ids('mac'), [
+      ...fixed,
+      ['hub.reload', 'shift+meta+r'],
+      ['hub.appByNumber', 'ctrl+alt+1'],
+      ['hub.appByNumber', 'ctrl+alt+2'],
+    ]);
   });
 
   it('builds the keymap once and again after the app list changes', () => {
@@ -84,7 +102,7 @@ describe('hub keymap', () => {
   it('keeps the palette keys working while the palette is open', () => {
     const map = loadHubKeys().bindings();
     const inPalette = Object.keys(map).filter((c) => map[c].inPalette);
-    assert.deepEqual(inPalette, ['ctrl+alt+p', 'ctrl+alt+w', 'ctrl+alt+a', 'ctrl+,']);
+    assert.deepEqual(inPalette, ['ctrl+alt+p', 'ctrl+alt+w', 'ctrl+alt+a', 'ctrl+,', 'ctrl+shift+r']);
   });
 
   it('swaps the config dir with no palette when configDirSwitch is swap', () => {
@@ -104,6 +122,7 @@ describe('user keymap', () => {
       'ctrl+,',
       'ctrl+alt+ArrowLeft',
       'ctrl+alt+ArrowRight',
+      'ctrl+shift+r',
       'ctrl+1',
       'ctrl+2',
     ]);
@@ -119,7 +138,10 @@ describe('user keymap', () => {
 
   it('unbinds an action set to null', () => {
     const map = loadHubKeys({ keys: { 'hub.appByNumber': null, 'hub.appLauncher': null } }).bindings();
-    assert.deepEqual(Object.keys(map), PALETTE_AND_ARROWS.filter((c) => c !== 'ctrl+alt+a'));
+    assert.deepEqual(Object.keys(map), [
+      ...PALETTE_AND_ARROWS.filter((c) => c !== 'ctrl+alt+a'),
+      'ctrl+shift+r',
+    ]);
   });
 
   it('labels each tab number in the launcher with its user combo', () => {

@@ -341,11 +341,7 @@ function reloadOnHubRestart() {
   const connect = () => {
     const events = new EventSource('/api/events');
     events.addEventListener('boot', (e) => {
-      if (boot && e.data !== boot) {
-        // The old hub stopped its apps, so the terminals the guard protects are gone.
-        guardedApps.clear();
-        location.reload();
-      }
+      if (boot && e.data !== boot) reloadHub();
       boot = e.data;
     });
     events.addEventListener('error', () => {
@@ -1545,6 +1541,7 @@ function hubActions() {
     { id: 'hub.settings', combo: 'ctrl+,', run: () => toggleSettings(), inPalette: true },
     { id: 'hub.prevApp', combo: 'ctrl+alt+ArrowLeft', run: () => cycleTab(-1) },
     { id: 'hub.nextApp', combo: 'ctrl+alt+ArrowRight', run: () => cycleTab(1) },
+    { id: 'hub.reload', combo: IS_MAC ? 'shift+meta+r' : 'ctrl+shift+r', run: () => reloadHub(), inPalette: true },
     {
       id: 'hub.appByNumber',
       combo: `${IS_MAC ? 'ctrl+alt' : 'alt'}+{n}`,
@@ -1553,6 +1550,13 @@ function hubActions() {
     },
     { id: 'hub.voice', combo: 'ctrl+shift+Space', off: !voiceOn, run: () => voiceDown() },
   ];
+}
+
+// The close guard is for Ctrl+W. A reload keeps the apps' terminals, and after a hub restart they
+// are gone, so neither needs the prompt.
+function reloadHub() {
+  guardedApps.clear();
+  location.reload();
 }
 
 // The one keymap, combo → binding. Its combos are what welcome.forward lists for the apps.
@@ -2553,6 +2557,7 @@ const ACTION_NAMES = {
   'hub.nextApp': 'Next app',
   'hub.appByNumber': 'App by number',
   'hub.voice': 'Hold to talk',
+  'hub.reload': 'Reload without the close prompt',
 };
 
 const MODIFIER_KEYS = new Set(['Control', 'Alt', 'Shift', 'Meta', 'AltGraph', 'CapsLock', 'Dead', 'Process']);

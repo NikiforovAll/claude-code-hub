@@ -19,6 +19,7 @@ The hub has no visible controls. These keys drive it. They work while focus is i
 | <kbd>Ctrl+Alt+W</kbd> | Open or close the config-dir palette, or switch to the previous dir (see [Switch with one key](/claude-code-hub/guides/config-dirs/#switch-with-one-key)) |
 | <kbd>Ctrl+Alt+A</kbd> | Open or close the app launcher |
 | <kbd>Ctrl+,</kbd> | Open or close the hub settings |
+| <kbd>Ctrl+Shift+R</kbd> | Reload the hub without the "Reload app?" prompt. The terminals keep running. |
 
 The number keys follow the tab order. The table shows the default order. The `apps` list in the [config file](/claude-code-hub/reference/configuration/#the-config-file) changes it, and a tool that is off has no number.
 
@@ -44,6 +45,7 @@ On macOS, the hub keys use <kbd>Control</kbd> (⌃), not <kbd>Command</kbd>. All
 | <kbd>⌃⌥1</kbd> … <kbd>⌃⌥9</kbd> | Go to a tool by its number |
 | <kbd>⌃⌥P</kbd>, <kbd>⌃⌥W</kbd>, <kbd>⌃⌥A</kbd> | Project palette, config-dir palette, app launcher |
 | <kbd>⌃,</kbd> | Hub settings |
+| <kbd>⌘⇧R</kbd> | Reload the hub without the "Reload app?" prompt |
 
 <kbd>Option</kbd> with a digit types a character on macOS, for example <kbd>Option+5</kbd> types `[` on a German layout. The hub does not bind it, so you can type these characters in every tool.
 
@@ -78,6 +80,7 @@ The window saves the keys in a `keys` block in the [config file](/claude-code-hu
 | `hub.prevApp` | `ctrl+alt+ArrowLeft` | `ctrl+alt+ArrowLeft` |
 | `hub.nextApp` | `ctrl+alt+ArrowRight` | `ctrl+alt+ArrowRight` |
 | `hub.appByNumber` | `alt+{n}` | `ctrl+alt+{n}` |
+| `hub.reload` | `ctrl+shift+r` | `shift+meta+r` |
 | `hub.voice` | `ctrl+shift+Space` (with [voice](/claude-code-hub/guides/voice/) on) | `ctrl+shift+Space` |
 
 - A key is one or more of `ctrl`, `alt`, `shift` and `meta`, then a letter, a digit, one of `` , . ; ' ` / \ = - [ ] ``, or a key name such as `ArrowUp` or `F2`, joined by `+`. On macOS, `alt` is <kbd>Option</kbd> and `meta` is <kbd>Command</kbd>. Case does not matter, except in a key name.

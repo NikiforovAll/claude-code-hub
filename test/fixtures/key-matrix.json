@@ -12,6 +12,8 @@
     { "name": "Windows US: app 4", "platform": "win", "key": "4", "code": "Digit4", "mods": ["alt"], "expect": "hub.appByNumber:4" },
     { "name": "Windows US: app 5 with 4 apps", "platform": "win", "key": "5", "code": "Digit5", "mods": ["alt"], "expect": "text" },
     { "name": "Windows US: hold to talk with voice off", "platform": "win", "key": " ", "code": "Space", "mods": ["ctrl", "shift"], "expect": "text" },
+    { "name": "Windows US: reload without the close prompt", "platform": "win", "key": "R", "code": "KeyR", "mods": ["ctrl", "shift"], "expect": "hub.reload" },
+    { "name": "Windows US: plain reload keeps the browser's", "platform": "win", "key": "r", "code": "KeyR", "mods": ["ctrl"], "expect": "text" },
     { "name": "Windows US: Ctrl+Alt+Shift+P", "platform": "win", "key": "P", "code": "KeyP", "mods": ["ctrl", "alt", "shift"], "expect": "text" },
     { "name": "Windows US: Ctrl+Alt+1", "platform": "win", "key": "1", "code": "Digit1", "mods": ["ctrl", "alt"], "expect": "text" },
     { "name": "Windows US: plain p", "platform": "win", "key": "p", "code": "KeyP", "mods": [], "expect": "text" },
@@ -48,6 +50,7 @@
     { "name": "macOS US: ⌥P alone types π", "platform": "mac", "key": "π", "code": "KeyP", "mods": ["alt"], "expect": "text" },
     { "name": "macOS German: ⌥5 types [", "platform": "mac", "key": "[", "code": "Digit5", "mods": ["alt"], "expect": "text" },
     { "name": "macOS German: ⌥2 types “", "platform": "mac", "key": "“", "code": "Digit2", "mods": ["alt"], "expect": "text" },
+    { "name": "macOS US: ⌘⇧R, reload without the close prompt", "platform": "mac", "key": "R", "code": "KeyR", "mods": ["shift", "meta"], "expect": "hub.reload" },
     { "name": "macOS: ⌘⌥1", "platform": "mac", "key": "¡", "code": "Digit1", "mods": ["alt", "meta"], "expect": "text" }
   ],
   "remap": {
