@@ -341,7 +341,11 @@ function reloadOnHubRestart() {
   const connect = () => {
     const events = new EventSource('/api/events');
     events.addEventListener('boot', (e) => {
-      if (boot && e.data !== boot) location.reload();
+      if (boot && e.data !== boot) {
+        // The old hub stopped its apps, so the terminals the guard protects are gone.
+        guardedApps.clear();
+        location.reload();
+      }
       boot = e.data;
     });
     events.addEventListener('error', () => {
