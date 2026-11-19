@@ -3214,6 +3214,15 @@ function movePaletteSel(delta) {
   renderPalette();
 }
 
+function pagePaletteSel(dir) {
+  const list = document.getElementById('palette-list');
+  const rowHeight = list.querySelector('.palette-row')?.offsetHeight;
+  if (!rowHeight) return;
+  const page = Math.max(1, Math.floor(list.clientHeight / rowHeight) - 1);
+  palette.sel = Math.max(0, palette.sel + dir * page);
+  renderPalette();
+}
+
 async function commitPalette() {
   const row = palette.rows[palette.sel];
   if (row) await paletteView().spec.commit(row);
@@ -3333,6 +3342,9 @@ function bindPalette() {
     } else if (e.key === 'ArrowUp' || (e.key === 'Tab' && e.shiftKey)) {
       e.preventDefault();
       movePaletteSel(-1);
+    } else if (e.key === 'PageDown' || e.key === 'PageUp') {
+      e.preventDefault();
+      pagePaletteSel(e.key === 'PageDown' ? 1 : -1);
     } else if (
       e.ctrlKey &&
       !e.altKey &&
