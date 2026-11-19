@@ -37,6 +37,10 @@
 [hidden] { display: none !important; }
 :root { color-scheme: var(--color-scheme, light dark); }
 html, body { margin: 0; }
+::-webkit-scrollbar { width: 6px; height: 6px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: var(--color-border); border-radius: 3px; }
+::-webkit-scrollbar-thumb:hover { background: var(--color-text-muted); }
 body {
   background: var(--color-bg);
   color: var(--color-text);
