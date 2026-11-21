@@ -12,6 +12,7 @@ const { requires } = x;
 const addon = x.kind === 'addon';
 const feature = x.kind === 'feature';
 const mod = x.kind === 'mod';
+const skill = x.kind === 'skill';
 const OS = { win32: 'Windows', darwin: 'macOS', linux: 'Linux' } as Record<string, string>;
 const tools = (requires.tools ?? []).filter((t) => !t.optional);
 const optionalTools = (requires.tools ?? []).filter((t) => t.optional);
@@ -24,7 +25,7 @@ const needs = [
 ].filter(Boolean) as string[];
 const linkedTools = tools.filter((t) => t.url);
 const facts = [
-  ['Kind', addon ? 'Kanban dock add-on' : feature ? 'Hub feature' : mod ? 'Mod' : 'Hub app'],
+  ['Kind', skill ? `Skill for the built-in ${x.name} tool` : addon ? 'Kanban dock add-on' : feature ? 'Hub feature' : mod ? 'Mod' : 'Hub app'],
   ['Author', x.author],
   ['License', x.license],
   ['Requires', needs.join(', ')],
@@ -56,6 +57,7 @@ const ld = {
       {addon && <span class="badge">Add-on</span>}
       {feature && <span class="badge">Feature</span>}
       {mod && <span class="badge">Mod</span>}
+      {skill && <span class="badge">Skill</span>}
       {x.theme && <span class="badge">Theme</span>}
     </h1>
     <p class="lede">{x.tagline}</p>
@@ -107,6 +109,18 @@ const ld = {
                 <code>ext install</code> finds {x.id} in this registry, clones it into the hub dir with git and puts it on the Kanban dock of your Claude config dir.
                 An add-on with a server says so and asks <code>y/N</code> first. Kanban starts its server the first time you open it.{' '}
                 <a href={url('extensibility/extensions/#add-ons')}>Read how add-ons work</a>.
+              </p>
+            </details>
+          </>
+        ) : skill ? (
+          <>
+            <p class="next">No restart is needed. Start a new Claude Code session, and the skill is there.</p>
+            <details>
+              <summary>How the install works</summary>
+              <p>
+                The hub already runs {x.name}, so nothing is cloned and no tab is added. <code>ext install</code> installs the {x.plugin} plugin
+                from the tool's own folder in one Claude config dir: <code>--dir</code>, else <code>CLAUDE_CONFIG_DIR</code>, else <code>~/.claude</code>.
+                Run it again with <code>--dir</code> for another config dir. <code>claude-code-hub --install</code> installs it too.
               </p>
             </details>
           </>
@@ -178,10 +192,12 @@ const ld = {
   <section class="remove" aria-labelledby="remove">
     <h2 id="remove">Didn't like it?</h2>
     <p>One command takes it out again.</p>
-    <pre><code>claude-code-hub ext remove {x.id}</code></pre>
+    <pre><code>{skill ? `claude plugin uninstall ${x.pluginId}` : `claude-code-hub ext remove ${x.id}`}</code></pre>
     <p>
       {
-        feature
+        skill
+          ? <>This removes the plugin from your Claude config dir. The {x.name} tool stays in the hub.</>
+          : feature
           ? <>This turns {x.name.toLowerCase()} off in the hub's <code>config.json</code>. Restart the hub.</>
           : mod
             ? <>This takes {x.id} out of the hub's <code>config.json</code> and deletes its clone, if it has one. Restart the hub.</>

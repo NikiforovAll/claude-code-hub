@@ -17,8 +17,8 @@ const sections = [
   <section class="head">
     <h1>Extensions</h1>
     <p class="lede">
-      Apps that run in the hub next to the four built-in tools, and add-ons that sit on the dock rail beside Kanban's
-      terminal. Official extensions install from their latest code;
+      Apps that run in the hub next to the four built-in tools, add-ons that sit on the dock rail beside Kanban's
+      terminal, and skills that let Claude use a built-in tool. Official extensions install from their latest code;
       every other extension was reviewed at a fixed commit before it was listed.
       <a href={url('extensibility/extensions/')}>Read how extensions work</a>.
     </p>
@@ -46,6 +46,7 @@ const sections = [
                     {x.kind === 'addon' && <span class="badge">Add-on</span>}
                     {x.kind === 'feature' && <span class="badge">Feature</span>}
                     {x.kind === 'mod' && <span class="badge">Mod</span>}
+                    {x.kind === 'skill' && <span class="badge">Skill</span>}
                     {x.theme && <span class="badge">Theme</span>}
                   </span>
                   <span class="tagline">{x.tagline}</span>
@@ -131,7 +132,7 @@ const sections = [
   }
   .preview {
     margin: 0 -1.25rem 0.875rem;
-    aspect-ratio: 16 / 10;
+    aspect-ratio: 16 / 9;
     overflow: hidden;
     border-bottom: 1px solid var(--c-border);
     background: var(--c-elevated);

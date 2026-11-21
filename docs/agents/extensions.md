@@ -2,7 +2,7 @@
 
 `plugin/` is a Claude Code marketplace with one plugin, `claude-code-hub`, which holds the `hub-builder` skill. `--install` (`lib/install.js`) copies it to `<hub-dir>/plugin` and registers that copy in one config dir per run: `--dir`, else `CLAUDE_CONFIG_DIR`, else `~/.claude`. Any change under `plugin/` bumps the version in `plugin/plugins/claude-code-hub/.claude-plugin/plugin.json`, because `claude plugin update` only loads a new version. Test an install with scratch `--dir` and `--hub-dir`. The hub never installs or updates a plugin on its own: after a hub update the user runs `--install` again.
 
-`--install` also installs the plugins of the enabled built-in apps (`installBuiltInPlugins` in `lib/ext.js`, today Kanban's) through `ext install <id>`, which the launcher's ⚠ copies.
+`--install` also installs the plugins of the enabled built-in apps (`installBuiltInPlugins` in `lib/ext.js`, today Kanban's, Cost's and Memory's) through `ext install <id>`, which the launcher's ⚠ copies.
 
 ## `ext install`
 

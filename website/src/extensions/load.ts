@@ -10,7 +10,7 @@ const execFileAsync = promisify(execFile);
 const SITE = process.cwd();
 const REGISTRY = path.join(SITE, 'src', 'content', 'extensions');
 const CACHE = path.join(SITE, 'node_modules', '.cache', 'extensions');
-const { manifestError } = createRequire(path.join(SITE, 'package.json'))('../lib/apps.js');
+const { manifestError, listedPlugin, APPS } = createRequire(path.join(SITE, 'package.json'))('../lib/apps.js');
 
 const SOURCE_RE = /^github:([\w.-]+)\/([\w.-]+)(?:\/(.+))?$/;
 const SHA_RE = /^[0-9a-f]{40}$/;
@@ -18,7 +18,8 @@ const SHA_RE = /^[0-9a-f]{40}$/;
 export interface Extension {
   id: string;
   name: string;
-  kind: 'app' | 'addon' | 'feature' | 'mod';
+  // `skill` is the plugin of a built-in app: the hub already runs the app, so the entry lists only its plugin.
+  kind: 'app' | 'addon' | 'feature' | 'mod' | 'skill';
   official: boolean;
   theme: boolean;
   order: number;
@@ -32,6 +33,8 @@ export interface Extension {
   license?: string;
   requires: { hub?: string; node?: string; apps?: string[]; os?: string[]; tools?: { name: string; url?: string; optional?: boolean }[] };
   plugin?: string;
+  // Set for a skill, to name the plugin in the uninstall command.
+  pluginId?: string;
   source: string;
   sha: string;
   pinned: boolean;
@@ -133,9 +136,20 @@ async function loadOne(file: string, local: Map<string, string>): Promise<Extens
       card: s.card === true,
     }),
   );
+  const name = (kind === 'app' ? manifest.name : manifest.title) ?? id;
+  let pluginId: string | undefined;
+  if (kind === 'app' && APPS.some((a: { id: string }) => a.id === id)) {
+    kind = 'skill';
+    if (!manifest.plugin) throw new Error(`${file}: a built-in app is listed for its plugin, and hub-app.json has none`);
+    const marketFile = `${manifest.plugin.marketplace}/.claude-plugin/marketplace.json`;
+    const market = await readAt(src, sha, marketFile, dir);
+    if (market === null) throw new Error(`${file}: no ${marketFile} at ${entry.source}@${sha}`);
+    pluginId = listedPlugin(JSON.parse(market), manifest.plugin, `${file}: ${marketFile}`).id;
+  }
   return {
     id,
-    name: (kind === 'app' ? manifest.name : manifest.title) ?? id,
+    pluginId,
+    name,
     kind,
     official: entry.official === true,
     theme: kind === 'mod' && Array.isArray(manifest.themes) && manifest.themes.length > 0,

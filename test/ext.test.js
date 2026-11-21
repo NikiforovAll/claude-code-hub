@@ -4,6 +4,7 @@ const { execFileSync } = require('node:child_process');
 const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
+const { APPS } = require('../lib/apps');
 const { runExt, installBuiltInPlugins } = require('../lib/ext');
 
 const tmp = (prefix) => fs.realpathSync.native(fs.mkdtempSync(path.join(os.tmpdir(), prefix)));
@@ -484,7 +485,8 @@ describe('ext', () => {
     manifest({ id: 'kanban', plugin: PLUGIN });
     const swarm = tmp('hub-ext-swarm-');
     writeJson(path.join(swarm, 'hub-app.json'), { manifest: 1, id: 'swarm', run: { entry: 'server.js' }, plugin: PLUGIN });
-    writeJson(configFile(), { apps: [{ id: 'kanban', path: root }, { id: 'swarm', path: swarm, source: 'local' }] });
+    const off = APPS.filter((a) => a.id !== 'kanban').map(({ id }) => ({ id, enabled: false }));
+    writeJson(configFile(), { apps: [{ id: 'kanban', path: root }, { id: 'swarm', path: swarm, source: 'local' }, ...off] });
     assert.equal(installBuiltInPlugins({ hubDir, configDir: () => configDir, exec }), true);
     assert.deepEqual(commands, installCmds());
     fs.rmSync(swarm, { recursive: true, force: true });

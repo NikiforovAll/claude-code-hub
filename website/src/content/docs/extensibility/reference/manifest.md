@@ -116,7 +116,7 @@ The launcher shows the installed version. When the plugin is not installed, is d
 
 ## Listing
 
-`listing` is what the [Extensions](/claude-code-hub/extensions/) page shows for an extension. The hub does not use it. Every text field is plain text.
+`listing` is what the [Extensions](/claude-code-hub/extensions/) page shows for an extension. The hub does not use it. Every text field is plain text. A built-in tool is listed only for its plugin, so its `listing` describes the plugin.
 
 ```json
 "listing": {
